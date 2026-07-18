@@ -421,7 +421,27 @@ export default function App() {
     setWidgets((prev) => prev.filter((w) => w.id !== id).map((w, i) => ({ ...w, order: i })));
   const addCustomWidget = () => {
     const id = "w-custom-" + Date.now();
-    setWidgets((prev) => [...prev, { id, type: "custom", title: "Neues Widget", bgColor: "", colSpan: 1, rowSpan: 1, order: prev.length, customCode: "return '<p>Mein Widget</p>';" }]);
+    const defaultCode = `// Das Widget wird in einer sicheren Sandbox ausgeführt.
+// Gib einen HTML-String zurück (inklusive Script-Tags für Interaktivität).
+// Du kannst CSS-Variablen wie var(--glow-color-1) oder var(--text-primary) nutzen.
+
+return \`
+  <div style="display: flex; flex-direction: column; gap: 10px; height: 100%; justify-content: center; align-items: center; text-align: center; padding: 10px;">
+    <div style="font-size: 24px; font-weight: 800; color: var(--glow-color-1, #3574F0); text-shadow: 0 0 10px rgba(53, 116, 240, 0.3);" id="counter">0</div>
+    <div style="font-size: 11px; color: var(--text-muted); font-weight: 500;">Interaktiver Zähler</div>
+    <div style="display: flex; gap: 6px;">
+      <button id="btn-dec" style="background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color); padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 10px; font-weight: 600;">-1</button>
+      <button id="btn-inc" style="background: var(--glow-color-1, #3574F0); color: white; border: none; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 10px; font-weight: 600;">+1</button>
+    </div>
+  </div>
+  <script>
+    let count = 0;
+    const c = document.getElementById('counter');
+    document.getElementById('btn-inc').onclick = () => { count++; c.innerText = count; };
+    document.getElementById('btn-dec').onclick = () => { count--; c.innerText = count; };
+  </script>
+\`;`;
+    setWidgets((prev) => [...prev, { id, type: "custom", title: "Neues Widget", bgColor: "", colSpan: 1, rowSpan: 1, order: prev.length, customCode: defaultCode }]);
     setEditingWidgetId(id);
   };
   const handleWidgetDrop = (targetId: string) => {
@@ -1504,7 +1524,19 @@ sys.stderr = io.StringIO()
                               const r = new Function(widget.customCode)();
                               if (typeof r === "string") html = r;
                             } catch (e: unknown) { html = `<span style='color:#e05252;font-size:11px'>Fehler: ${(e as Error).message}</span>`; }
-                            return `<!DOCTYPE html><html><head><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:system-ui,sans-serif;font-size:12px;background:${widget.bgColor || "transparent"};color:${fgColor};padding:8px;overflow:auto}</style></head><body>${html}</body></html>`;
+                            return `<!DOCTYPE html><html><head><style>
+                            :root {
+                              --bg-primary: ${theme === "light" ? "#FFFFFF" : "#1E1F22"};
+                              --bg-secondary: ${theme === "light" ? "#F2F3F5" : "#2B2D30"};
+                              --bg-tertiary: ${theme === "light" ? "#EBECF0" : "#1A1B1D"};
+                              --border-color: ${theme === "light" ? "#DFE1E5" : "#3f4248"};
+                              --text-primary: ${theme === "light" ? "#060607" : "#F2F3F5"};
+                              --text-muted: ${theme === "light" ? "#5C6370" : "#949BA4"};
+                              --glow-color-1: ${glowColor};
+                            }
+                            *{box-sizing:border-box;margin:0;padding:0}
+                            body{font-family:system-ui,sans-serif;font-size:12px;background:${widget.bgColor || "transparent"};color:${fgColor};padding:8px;overflow:auto;height:100vh;}
+                            </style></head><body>${html}</body></html>`;
                           })()}
                           sandbox="allow-scripts"
                           style={{ width: "100%", height: "100%", border: "none", background: "transparent" }}
@@ -1515,241 +1547,6 @@ sys.stderr = io.StringIO()
                   </div>
                 );
               })}
-            </div>
-          </div>
-
-            <div className="dashboard-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "16px", padding: "16px 0" }}>
-              {/* Row 1, Col 1: Recent Files */}
-              <div className="dashboard-card recent-files-card" style={{ backgroundColor: "var(--bg-secondary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-lg)", padding: "16px", display: "flex", flexDirection: "column" }}>
-                <div className="card-header" style={{ display: "flex", alignItems: "center", gap: "8px", borderBottom: "1px solid var(--border-color)", paddingBottom: "10px", marginBottom: "12px" }}>
-                  <span className="card-icon" style={{ fontSize: "18px", color: "var(--accent-color)" }}><Icon icon="mage:file-records" /></span>
-                  <h3 style={{ fontSize: "13px", fontWeight: "600", color: "var(--text-primary)" }}>Zuletzt bearbeitete Dateien</h3>
-                </div>
-                <div className="card-content" style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                  <div className="dashboard-files-list" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                    {recentFiles.map((file) => (
-                      <div key={file.name} className="dashboard-file-row" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", backgroundColor: "var(--bg-tertiary)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-color)" }}>
-                        <div className="file-info" onClick={() => {
-                          setEditorFilename(file.name);
-                          setEditorLanguage(file.language);
-                          setEditorCode(file.code);
-                          setEditorWorkflowStep("editor");
-                          setEditorOutput("");
-                          setIsEditorOpen(true);
-                        }} style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", flex: 1, minWidth: 0 }}>
-                          <Icon 
-                            icon={
-                              file.language === "rust" ? "vscode-icons:file-type-rust" :
-                              file.language === "python" ? "vscode-icons:file-type-python" :
-                              file.language === "csharp" ? "vscode-icons:file-type-csharp" :
-                              file.language === "cpp" ? "vscode-icons:file-type-cpp" :
-                              file.language === "javascript" ? "vscode-icons:file-type-js" :
-                              file.language === "typescript" ? "vscode-icons:file-type-typescript" :
-                              "mage:file-records"
-                            } 
-                            style={{ fontSize: "18px", flexShrink: 0 }}
-                          />
-                          <span className="file-name" style={{ fontSize: "12px", fontWeight: "500", color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{file.name}</span>
-                        </div>
-                        <span className="file-lang" style={{ fontSize: "9px", color: "var(--text-muted)", fontWeight: "600" }}>{file.language.toUpperCase()}</span>
-                      </div>
-                    ))}
-                    {recentFiles.length === 0 && (
-                      <p className="empty-text" style={{ fontSize: "11px", color: "var(--text-muted)", textAlign: "center", padding: "16px" }}>Keine kürzlich bearbeiteten Dateien.</p>
-                    )}
-                  </div>
-                  <div className="card-actions" style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
-                    <button className="settings-btn primary" onClick={() => { setEditorCode(""); setEditorWorkflowStep("input_filename"); setIsEditorOpen(true); }} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", padding: "6px 12px" }}>
-                      <Icon icon="mage:plus" /> Neue Datei
-                    </button>
-                    <button className="settings-btn" onClick={() => { setEditorWorkflowStep("select_action"); setIsEditorOpen(true); }} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", padding: "6px 12px" }}>
-                      <Icon icon="mage:file-records" /> Editor öffnen
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Row 1, Col 2: Git Status Integration */}
-              <div className="dashboard-card git-card" style={{ backgroundColor: "var(--bg-secondary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-lg)", padding: "16px", display: "flex", flexDirection: "column" }}>
-                <div className="card-header" style={{ display: "flex", alignItems: "center", gap: "8px", borderBottom: "1px solid var(--border-color)", paddingBottom: "10px", marginBottom: "12px" }}>
-                  <span className="card-icon" style={{ fontSize: "18px", color: "#F05032" }}><Icon icon="mage:github" /></span>
-                  <h3 style={{ fontSize: "13px", fontWeight: "600", color: "var(--text-primary)" }}>Git Repository Status</h3>
-                </div>
-                <div className="card-content" style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                  <div>
-                    <div className="git-status-summary" style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px", borderBottom: "1px solid var(--border-color)", paddingBottom: "10px" }}>
-                      <div>
-                        <span className="label" style={{ fontSize: "10px", color: "var(--text-muted)", display: "block" }}>Branch</span>
-                        <span className="value" style={{ fontSize: "12px", fontWeight: "600", color: "#F05032", display: "flex", alignItems: "center", gap: "4px" }}>
-                          <Icon icon="mage:code" style={{ fontSize: "14px" }} /> main
-                        </span>
-                      </div>
-                      <div style={{ textAlign: "right" }}>
-                        <span className="label" style={{ fontSize: "10px", color: "var(--text-muted)", display: "block" }}>Arbeitsverzeichnis</span>
-                        <span className="badge" style={{ backgroundColor: "rgba(89, 168, 105, 0.15)", color: "#59A869", border: "1px solid rgba(89, 168, 105, 0.2)", fontSize: "10px", padding: "2px 6px" }}>Clean</span>
-                      </div>
-                    </div>
-
-                    <div className="git-commits-list" style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                      <span style={{ fontSize: "9px", fontWeight: "bold", textTransform: "uppercase", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>Letzte Commits</span>
-                      <div className="git-commit-row" style={{ display: "flex", gap: "8px", fontSize: "11px" }}>
-                        <span className="commit-hash" style={{ color: "var(--glow-color-1, #3574F0)", fontFamily: "var(--font-mono)", fontWeight: "600" }}>e125a22</span>
-                        <span className="commit-msg" style={{ color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>Restore server active indicator, channel slide-in, and message...</span>
-                      </div>
-                      <div className="git-commit-row" style={{ display: "flex", gap: "8px", fontSize: "11px" }}>
-                        <span className="commit-hash" style={{ color: "var(--glow-color-1, #3574F0)", fontFamily: "var(--font-mono)", fontWeight: "600" }}>0f551dc</span>
-                        <span className="commit-msg" style={{ color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>Add Monaco Editor runtime settings tab with download simulation...</span>
-                      </div>
-                      <div className="git-commit-row" style={{ display: "flex", gap: "8px", fontSize: "11px" }}>
-                        <span className="commit-hash" style={{ color: "var(--glow-color-1, #3574F0)", fontFamily: "var(--font-mono)", fontWeight: "600" }}>1c90d32</span>
-                        <span className="commit-msg" style={{ color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>Update main.rs to import zeno_lib instead of desktop_lib</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="card-actions" style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
-                    <button className="settings-btn" onClick={() => showToast("Git Status abgefragt (Verzeichnis clean)")} style={{ fontSize: "11px", padding: "6px 12px" }}>Status prüfen</button>
-                    <button className="settings-btn" onClick={() => showToast("Git Push simuliert – Branch up-to-date")} style={{ fontSize: "11px", padding: "6px 12px" }}>Git Push</button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Row 2, Col 1: Weather & Time Widget */}
-              <div className="dashboard-card weather-card" style={{ backgroundColor: "var(--bg-secondary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-lg)", padding: "16px", display: "flex", flexDirection: "column" }}>
-                <div className="card-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid var(--border-color)", paddingBottom: "10px", marginBottom: "12px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span className="card-icon" style={{ fontSize: "18px", color: "#FFC66D" }}><Icon icon="mage:sun" /></span>
-                    <h3 style={{ fontSize: "13px", fontWeight: "600", color: "var(--text-primary)" }}>Lokale Zeit & Wetter</h3>
-                  </div>
-                  {/* Mode badge */}
-                  <span style={{ fontSize: "9px", fontWeight: "600", textTransform: "uppercase", padding: "2px 7px", borderRadius: "99px",
-                    backgroundColor: weatherMode === "simulated" ? "rgba(255,198,109,0.15)" : "rgba(89,168,105,0.15)",
-                    color: weatherMode === "simulated" ? "#FFC66D" : "#59A869",
-                    border: `1px solid ${weatherMode === "simulated" ? "rgba(255,198,109,0.25)" : "rgba(89,168,105,0.25)"}` }}>
-                    {weatherMode === "simulated" ? "Simuliert" : weatherMode === "wttr" ? "wttr.in" : "Custom API"}
-                  </span>
-                </div>
-                <div className="card-content" style={{ flex: 1, display: "flex", flexDirection: "column", gap: "10px" }}>
-
-                  {/* Location + mode selector row */}
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    <input
-                      type="text"
-                      className="settings-input"
-                      placeholder="Standort eingeben (z. B. Berlin)"
-                      value={dashboardLocation}
-                      onChange={(e) => { setDashboardLocation(e.target.value); setRealWeatherData(null); }}
-                      style={{ flex: 1, padding: "6px 10px", fontSize: "12px", maxWidth: "none" }}
-                    />
-                    <select
-                      className="settings-input"
-                      value={weatherMode}
-                      onChange={(e) => { setWeatherMode(e.target.value as "simulated" | "wttr" | "custom"); setRealWeatherData(null); }}
-                      style={{ padding: "6px 8px", fontSize: "11px", width: "auto", flexShrink: 0 }}
-                    >
-                      <option value="simulated">Simuliert (Offline)</option>
-                      <option value="wttr">wttr.in (Kostenlos)</option>
-                      <option value="custom">Custom API</option>
-                    </select>
-                  </div>
-
-                  {/* Custom API config (only when mode = custom) */}
-                  {weatherMode === "custom" && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "6px", padding: "8px 10px", backgroundColor: "var(--bg-tertiary)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-color)" }}>
-                      <label style={{ fontSize: "9px", fontWeight: "700", textTransform: "uppercase", color: "var(--text-muted)", letterSpacing: "0.5px" }}>API-Endpunkt <span style={{ opacity: 0.6 }}>({'{city}'} und {'{key}'} werden ersetzt)</span></label>
-                      <input
-                        type="text"
-                        className="settings-input"
-                        value={weatherApiUrl}
-                        onChange={(e) => setWeatherApiUrl(e.target.value)}
-                        style={{ fontSize: "10px", padding: "5px 8px", maxWidth: "none", fontFamily: "var(--font-mono)" }}
-                      />
-                      <label style={{ fontSize: "9px", fontWeight: "700", textTransform: "uppercase", color: "var(--text-muted)", letterSpacing: "0.5px", marginTop: "4px" }}>API-Key <span style={{ opacity: 0.6 }}>(lokal gespeichert, wird nie übertragen)</span></label>
-                      <input
-                        type="password"
-                        className="settings-input"
-                        placeholder="Deinen API-Key hier eingeben..."
-                        value={weatherApiKey}
-                        onChange={(e) => setWeatherApiKey(e.target.value)}
-                        style={{ fontSize: "11px", padding: "5px 8px", maxWidth: "none" }}
-                      />
-                    </div>
-                  )}
-
-                  {/* Weather display */}
-                  {(() => {
-                    const weather = realWeatherData ?? getMockWeather(dashboardLocation);
-                    const isReal = !!realWeatherData;
-                    return (
-                      <div className="weather-display" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", backgroundColor: "var(--bg-tertiary)", borderRadius: "var(--radius-md)", border: `1px solid ${isReal ? "rgba(89,168,105,0.3)" : "var(--border-color)"}` }}>
-                        <div>
-                          <span className="weather-temp" style={{ fontSize: "24px", fontWeight: "700", display: "block", color: "var(--text-primary)" }}>{weather.temp}</span>
-                          <span className="weather-loc" style={{ fontSize: "12px", fontWeight: "600", color: "var(--text-muted)" }}>{dashboardLocation}</span>
-                          <span className="weather-time" style={{ fontSize: "10px", display: "block", color: "var(--glow-color-1, #3574F0)", marginTop: "4px" }}>{dashboardTime}</span>
-                        </div>
-                        <div style={{ textAlign: "right" }}>
-                          <Icon icon={weather.icon} style={{ fontSize: "28px", color: "#FFC66D", display: "block", marginLeft: "auto", marginBottom: "2px" }} />
-                          <span className="weather-cond" style={{ fontSize: "11px", color: "var(--text-primary)", display: "block" }}>{weather.condition}</span>
-                          <span style={{ fontSize: "9px", color: "var(--text-muted)", display: "block" }}>Feuchte: {weather.humidity} • Wind: {weather.wind}</span>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* Fetch button (hidden for simulated mode) */}
-                  {weatherMode !== "simulated" && (
-                    <button
-                      className="settings-btn primary"
-                      onClick={fetchRealWeather}
-                      disabled={weatherFetching}
-                      style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", fontSize: "11px", padding: "6px 12px" }}
-                    >
-                      {weatherFetching
-                        ? <><span className="spinner" style={{ width: "12px", height: "12px", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} /> Lade Daten...
-                        </>
-                        : <><Icon icon="mage:refresh" /> Wetterdaten abrufen</>}
-                    </button>
-                  )}
-
-                  {/* Privacy hint – adapts to active mode */}
-                  <p style={{ fontSize: "9px", color: "var(--text-muted)", lineHeight: "1.4", marginTop: "auto" }}>
-                    {weatherMode === "simulated" && "🔒 Vollständig offline. Keine Netzwerkverbindung. Standort und Zeitzone werden nur lokal verarbeitet."}
-                    {weatherMode === "wttr" && "🌐 wttr.in ist Open Source & selbst-hostbar. Es wird nur der Stadtname übertragen – kein Account, kein Tracking, keine Nutzer-ID."}
-                    {weatherMode === "custom" && "🔑 Dein API-Key verlässt niemals Zeno in unverschlüsselter Form. Die Anfrage erfolgt direkt von deinem Gerät ohne Proxy."}
-                  </p>
-                </div>
-              </div>
-
-              {/* Row 2, Col 2: Privacy Status Guard */}
-              <div className="dashboard-card security-card" style={{ backgroundColor: "var(--bg-secondary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-lg)", padding: "16px", display: "flex", flexDirection: "column" }}>
-                <div className="card-header" style={{ display: "flex", alignItems: "center", gap: "8px", borderBottom: "1px solid var(--border-color)", paddingBottom: "10px", marginBottom: "12px" }}>
-                  <span className="card-icon" style={{ fontSize: "18px", color: "var(--accent-success)" }}><Icon icon="mage:shield" /></span>
-                  <h3 style={{ fontSize: "14px", fontWeight: "600", color: "var(--text-primary)" }}>Zeno Privacy Guard</h3>
-                </div>
-                <div className="card-content" style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                    <div className="status-item" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span className="status-label" style={{ fontSize: "11px", color: "var(--text-muted)" }}>Schlüsselhoheit</span>
-                      <span className="badge" style={{ backgroundColor: "rgba(89, 168, 105, 0.15)", color: "#59A869", border: "1px solid rgba(89, 168, 105, 0.2)", fontSize: "10px", padding: "2px 6px" }}>Aktiv & Lokal</span>
-                    </div>
-                    <div className="status-item" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span className="status-label" style={{ fontSize: "11px", color: "var(--text-muted)" }}>E2E Verschlüsselung</span>
-                      <span className="badge" style={{ backgroundColor: "rgba(89, 168, 105, 0.15)", color: "#59A869", border: "1px solid rgba(89, 168, 105, 0.2)", fontSize: "10px", padding: "2px 6px" }}>AES-GCM-256 + SFrame</span>
-                    </div>
-                    <div className="status-item" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span className="status-label" style={{ fontSize: "11px", color: "var(--text-muted)" }}>Storage Backup</span>
-                      <span className="badge" style={{ backgroundColor: "rgba(255, 198, 109, 0.15)", color: "#FFC66D", border: "1px solid rgba(255, 198, 109, 0.2)", fontSize: "10px", padding: "2px 6px" }}>BYOS</span>
-                    </div>
-                    <div className="status-item" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span className="status-label" style={{ fontSize: "11px", color: "var(--text-muted)" }}>Isolations-Sandbox</span>
-                      <span className="badge" style={{ backgroundColor: "rgba(89, 168, 105, 0.15)", color: "#59A869", border: "1px solid rgba(89, 168, 105, 0.2)", fontSize: "10px", padding: "2px 6px" }}>WASM Sandbox Aktiv</span>
-                    </div>
-                  </div>
-                  <p style={{ fontSize: "9px", color: "var(--text-muted)", marginTop: "10px", lineHeight: "1.3" }}>
-                    Alle Systemfunktionen arbeiten vollverschlüsselt. Metadaten werden im Arbeitsspeicher des Client-Prozesses isoliert gehalten.
-                  </p>
-                </div>
-              </div>
             </div>
           </div>
         ) : (
