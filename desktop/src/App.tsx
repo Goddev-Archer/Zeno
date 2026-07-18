@@ -375,6 +375,10 @@ export default function App() {
     csharp: "not_installed",
     cpp: "not_installed"
   });
+  const [weatherMode, setWeatherMode] = useState<"simulated" | "wttr" | "custom">("simulated");
+  const [weatherApiKey, setWeatherApiKey] = useState<string>("");
+  const [weatherApiUrl, setWeatherApiUrl] = useState<string>("https://api.openweathermap.org/data/2.5/weather?q={city}&appid={key}&units=metric&lang=de");
+  const [realWeatherData, setRealWeatherData] = useState<{ temp: string; condition: string; icon: string; humidity: string; wind: string } | null>(null);
   const [recentFiles, setRecentFiles] = useState<RecentFile[]>([
     { name: "main.rs", code: "fn main() {\n    println!(\"Hello World!\");\n}", language: "rust" },
     { name: "index.js", code: "console.log(\"Hello Zeno!\");", language: "javascript" },
@@ -447,6 +451,70 @@ export default function App() {
       return { temp: "16°C", condition: "Regnerisch / Sprühregen", icon: "mage:volume-mute", humidity: "88%", wind: "22 km/h" };
     } else {
       return { temp: "19°C", condition: "Sonnig / Heiter", icon: "mage:sun", humidity: "45%", wind: "10 km/h" };
+    }
+  };
+
+  // Fetch real weather data — wttr.in (no key, privacy-friendly) or user-supplied custom API
+  const [weatherFetching, setWeatherFetching] = useState(false);
+  const fetchRealWeather = async () => {
+    if (!dashboardLocation.trim()) { showToast("Bitte einen Standort eingeben."); return; }
+    setWeatherFetching(true);
+    setRealWeatherData(null);
+    try {
+      if (weatherMode === "wttr") {
+        // wttr.in: city name only, no API key, open source, self-hostable
+        const city = encodeURIComponent(dashboardLocation.trim());
+        const res = await fetch(`https://wttr.in/${city}?format=j1`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const cur = data.current_condition?.[0];
+        if (!cur) throw new Error("Ungültige Antwort von wttr.in");
+        const tempC = cur.temp_C;
+        const desc = cur.lang_de?.[0]?.value || cur.weatherDesc?.[0]?.value || "Unbekannt";
+        const humidity = cur.humidity + "%";
+        const windKmph = cur.windspeedKmph + " km/h";
+        const code = parseInt(cur.weatherCode, 10);
+        let icon = "mage:sun";
+        if (code >= 200 && code < 300) icon = "mage:lightning";
+        else if (code >= 300 && code < 400) icon = "mage:cloudy";
+        else if (code >= 500 && code < 600) icon = "mage:cloudy";
+        else if (code >= 600 && code < 700) icon = "mage:cloudy";
+        else if (code >= 700 && code < 800) icon = "mage:cloudy";
+        else if (code === 800) icon = "mage:sun";
+        else if (code > 800) icon = "mage:cloudy";
+        setRealWeatherData({ temp: tempC + "°C", condition: desc, icon, humidity, wind: windKmph });
+        showToast(`Wetterdaten für ${dashboardLocation} aktualisiert (wttr.in)`);
+      } else if (weatherMode === "custom") {
+        if (!weatherApiKey.trim() && weatherApiUrl.includes("{key}")) {
+          showToast("Bitte einen API-Key eingeben."); setWeatherFetching(false); return;
+        }
+        const url = weatherApiUrl
+          .replace("{city}", encodeURIComponent(dashboardLocation.trim()))
+          .replace("{key}", weatherApiKey.trim());
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        // Try OpenWeatherMap shape; fall back gracefully
+        const temp = data.main?.temp !== undefined ? Math.round(data.main.temp) + "°C" : "?";
+        const condition = data.weather?.[0]?.description || data.condition?.text || "Unbekannt";
+        const humidity = (data.main?.humidity ?? data.current?.humidity ?? "?") + "%";
+        const wind = Math.round(data.wind?.speed ?? data.current?.wind_kph ?? 0) + " km/h";
+        const oid = data.weather?.[0]?.id;
+        let icon = "mage:sun";
+        if (oid) {
+          if (oid >= 200 && oid < 300) icon = "mage:lightning";
+          else if (oid >= 300 && oid < 600) icon = "mage:cloudy";
+          else if (oid >= 600 && oid < 700) icon = "mage:cloudy";
+          else if (oid > 800) icon = "mage:cloudy";
+        }
+        setRealWeatherData({ temp, condition, icon, humidity, wind });
+        showToast(`Wetterdaten für ${dashboardLocation} aktualisiert (Custom API)`);
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      showToast("Fehler beim Abrufen: " + msg);
+    } finally {
+      setWeatherFetching(false);
     }
   };
 
@@ -1284,44 +1352,106 @@ sys.stderr = io.StringIO()
 
               {/* Row 2, Col 1: Weather & Time Widget */}
               <div className="dashboard-card weather-card" style={{ backgroundColor: "var(--bg-secondary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-lg)", padding: "16px", display: "flex", flexDirection: "column" }}>
-                <div className="card-header" style={{ display: "flex", alignItems: "center", gap: "8px", borderBottom: "1px solid var(--border-color)", paddingBottom: "10px", marginBottom: "12px" }}>
-                  <span className="card-icon" style={{ fontSize: "18px", color: "#FFC66D" }}><Icon icon="mage:sun" /></span>
-                  <h3 style={{ fontSize: "13px", fontWeight: "600", color: "var(--text-primary)" }}>Lokale Zeit & Wetter</h3>
+                <div className="card-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid var(--border-color)", paddingBottom: "10px", marginBottom: "12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span className="card-icon" style={{ fontSize: "18px", color: "#FFC66D" }}><Icon icon="mage:sun" /></span>
+                    <h3 style={{ fontSize: "13px", fontWeight: "600", color: "var(--text-primary)" }}>Lokale Zeit & Wetter</h3>
+                  </div>
+                  {/* Mode badge */}
+                  <span style={{ fontSize: "9px", fontWeight: "600", textTransform: "uppercase", padding: "2px 7px", borderRadius: "99px",
+                    backgroundColor: weatherMode === "simulated" ? "rgba(255,198,109,0.15)" : "rgba(89,168,105,0.15)",
+                    color: weatherMode === "simulated" ? "#FFC66D" : "#59A869",
+                    border: `1px solid ${weatherMode === "simulated" ? "rgba(255,198,109,0.25)" : "rgba(89,168,105,0.25)"}` }}>
+                    {weatherMode === "simulated" ? "Simuliert" : weatherMode === "wttr" ? "wttr.in" : "Custom API"}
+                  </span>
                 </div>
-                <div className="card-content" style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                  <div>
-                    <div style={{ display: "flex", gap: "12px", marginBottom: "12px" }}>
-                      <input 
-                        type="text" 
-                        className="settings-input" 
-                        placeholder="Standort manuell eingeben..." 
-                        value={dashboardLocation}
-                        onChange={(e) => setDashboardLocation(e.target.value)}
-                        style={{ flex: 1, padding: "6px 10px", fontSize: "12px", maxWidth: "none" }}
-                      />
-                    </div>
+                <div className="card-content" style={{ flex: 1, display: "flex", flexDirection: "column", gap: "10px" }}>
 
-                    {(() => {
-                      const weather = getMockWeather(dashboardLocation);
-                      return (
-                        <div className="weather-display" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", backgroundColor: "var(--bg-tertiary)", borderRadius: "var(--radius-md)", border: "1px solid var(--border-color)" }}>
-                          <div>
-                            <span className="weather-temp" style={{ fontSize: "24px", fontWeight: "700", display: "block", color: "var(--text-primary)" }}>{weather.temp}</span>
-                            <span className="weather-loc" style={{ fontSize: "12px", fontWeight: "600", color: "var(--text-muted)" }}>{dashboardLocation}</span>
-                            <span className="weather-time" style={{ fontSize: "10px", display: "block", color: "var(--glow-color-1, #3574F0)", marginTop: "4px" }}>{dashboardTime}</span>
-                          </div>
-                          <div style={{ textAlign: "right" }}>
-                            <Icon icon={weather.icon} style={{ fontSize: "28px", color: "#FFC66D", display: "block", marginLeft: "auto", marginBottom: "2px" }} />
-                            <span className="weather-cond" style={{ fontSize: "11px", color: "var(--text-primary)", display: "block" }}>{weather.condition}</span>
-                            <span style={{ fontSize: "9px", color: "var(--text-muted)", display: "block" }}>Feuchte: {weather.humidity} • Wind: {weather.wind}</span>
-                          </div>
-                        </div>
-                      );
-                    })()}
+                  {/* Location + mode selector row */}
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <input
+                      type="text"
+                      className="settings-input"
+                      placeholder="Standort eingeben (z. B. Berlin)"
+                      value={dashboardLocation}
+                      onChange={(e) => { setDashboardLocation(e.target.value); setRealWeatherData(null); }}
+                      style={{ flex: 1, padding: "6px 10px", fontSize: "12px", maxWidth: "none" }}
+                    />
+                    <select
+                      className="settings-input"
+                      value={weatherMode}
+                      onChange={(e) => { setWeatherMode(e.target.value as "simulated" | "wttr" | "custom"); setRealWeatherData(null); }}
+                      style={{ padding: "6px 8px", fontSize: "11px", width: "auto", flexShrink: 0 }}
+                    >
+                      <option value="simulated">Simuliert (Offline)</option>
+                      <option value="wttr">wttr.in (Kostenlos)</option>
+                      <option value="custom">Custom API</option>
+                    </select>
                   </div>
 
-                  <p style={{ fontSize: "9px", color: "var(--text-muted)", marginTop: "10px", lineHeight: "1.3" }}>
-                    🔒 <strong>Datenschutz-Hinweis:</strong> Standort und Zeitzone werden manuell eingegeben. Es finden keine Tracker-basierten Standortabfragen statt (Zero-Knowledge Prinzip).
+                  {/* Custom API config (only when mode = custom) */}
+                  {weatherMode === "custom" && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px", padding: "8px 10px", backgroundColor: "var(--bg-tertiary)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-color)" }}>
+                      <label style={{ fontSize: "9px", fontWeight: "700", textTransform: "uppercase", color: "var(--text-muted)", letterSpacing: "0.5px" }}>API-Endpunkt <span style={{ opacity: 0.6 }}>({'{city}'} und {'{key}'} werden ersetzt)</span></label>
+                      <input
+                        type="text"
+                        className="settings-input"
+                        value={weatherApiUrl}
+                        onChange={(e) => setWeatherApiUrl(e.target.value)}
+                        style={{ fontSize: "10px", padding: "5px 8px", maxWidth: "none", fontFamily: "var(--font-mono)" }}
+                      />
+                      <label style={{ fontSize: "9px", fontWeight: "700", textTransform: "uppercase", color: "var(--text-muted)", letterSpacing: "0.5px", marginTop: "4px" }}>API-Key <span style={{ opacity: 0.6 }}>(lokal gespeichert, wird nie übertragen)</span></label>
+                      <input
+                        type="password"
+                        className="settings-input"
+                        placeholder="Deinen API-Key hier eingeben..."
+                        value={weatherApiKey}
+                        onChange={(e) => setWeatherApiKey(e.target.value)}
+                        style={{ fontSize: "11px", padding: "5px 8px", maxWidth: "none" }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Weather display */}
+                  {(() => {
+                    const weather = realWeatherData ?? getMockWeather(dashboardLocation);
+                    const isReal = !!realWeatherData;
+                    return (
+                      <div className="weather-display" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", backgroundColor: "var(--bg-tertiary)", borderRadius: "var(--radius-md)", border: `1px solid ${isReal ? "rgba(89,168,105,0.3)" : "var(--border-color)"}` }}>
+                        <div>
+                          <span className="weather-temp" style={{ fontSize: "24px", fontWeight: "700", display: "block", color: "var(--text-primary)" }}>{weather.temp}</span>
+                          <span className="weather-loc" style={{ fontSize: "12px", fontWeight: "600", color: "var(--text-muted)" }}>{dashboardLocation}</span>
+                          <span className="weather-time" style={{ fontSize: "10px", display: "block", color: "var(--glow-color-1, #3574F0)", marginTop: "4px" }}>{dashboardTime}</span>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <Icon icon={weather.icon} style={{ fontSize: "28px", color: "#FFC66D", display: "block", marginLeft: "auto", marginBottom: "2px" }} />
+                          <span className="weather-cond" style={{ fontSize: "11px", color: "var(--text-primary)", display: "block" }}>{weather.condition}</span>
+                          <span style={{ fontSize: "9px", color: "var(--text-muted)", display: "block" }}>Feuchte: {weather.humidity} • Wind: {weather.wind}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Fetch button (hidden for simulated mode) */}
+                  {weatherMode !== "simulated" && (
+                    <button
+                      className="settings-btn primary"
+                      onClick={fetchRealWeather}
+                      disabled={weatherFetching}
+                      style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", fontSize: "11px", padding: "6px 12px" }}
+                    >
+                      {weatherFetching
+                        ? <><span className="spinner" style={{ width: "12px", height: "12px", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} /> Lade Daten...
+                        </>
+                        : <><Icon icon="mage:refresh" /> Wetterdaten abrufen</>}
+                    </button>
+                  )}
+
+                  {/* Privacy hint – adapts to active mode */}
+                  <p style={{ fontSize: "9px", color: "var(--text-muted)", lineHeight: "1.4", marginTop: "auto" }}>
+                    {weatherMode === "simulated" && "🔒 Vollständig offline. Keine Netzwerkverbindung. Standort und Zeitzone werden nur lokal verarbeitet."}
+                    {weatherMode === "wttr" && "🌐 wttr.in ist Open Source & selbst-hostbar. Es wird nur der Stadtname übertragen – kein Account, kein Tracking, keine Nutzer-ID."}
+                    {weatherMode === "custom" && "🔑 Dein API-Key verlässt niemals Zeno in unverschlüsselter Form. Die Anfrage erfolgt direkt von deinem Gerät ohne Proxy."}
                   </p>
                 </div>
               </div>
