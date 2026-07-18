@@ -337,7 +337,7 @@ function getCurrentTimestamp(): string {
 export default function App() {
   // --- STATE ---
   const [servers, setServers] = useState<Server[]>(initialServers);
-  const [activeServerId, setActiveServerId] = useState<string>(initialServers[0].id);
+  const [activeServerId, setActiveServerId] = useState<string>("home");
   const [animatingServerId, setAnimatingServerId] = useState<string | null>(null);
   const activeServer = servers.find((s) => s.id === activeServerId) || servers[0];
   
@@ -413,6 +413,41 @@ export default function App() {
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 3000);
+  };
+
+  // --- DASHBOARD STATES & EFFECT ---
+  const [dashboardLocation, setDashboardLocation] = useState<string>("Berlin");
+  const [dashboardTime, setDashboardTime] = useState<string>("");
+
+  useEffect(() => {
+    const updateTime = () => {
+      const date = new Date();
+      let offsetHours = 0;
+      const loc = dashboardLocation.toLowerCase();
+      if (loc.includes("new york") || loc.includes("nyc") || loc.includes("usa")) offsetHours = -6;
+      else if (loc.includes("tokyo") || loc.includes("tokio") || loc.includes("japan")) offsetHours = 7;
+      else if (loc.includes("london") || loc.includes("uk") || loc.includes("england")) offsetHours = -1;
+      
+      date.setHours(date.getHours() + offsetHours);
+      setDashboardTime(date.toTimeString().slice(0, 5) + " Uhr");
+    };
+
+    updateTime();
+    const interval = setInterval(updateTime, 10000);
+    return () => clearInterval(interval);
+  }, [dashboardLocation]);
+
+  const getMockWeather = (loc: string) => {
+    const l = loc.toLowerCase();
+    if (l.includes("tokyo") || l.includes("tokio")) {
+      return { temp: "26°C", condition: "Klar & Windig", icon: "mage:sun", humidity: "54%", wind: "18 km/h" };
+    } else if (l.includes("new york") || l.includes("nyc")) {
+      return { temp: "22°C", condition: "Leicht bewölkt", icon: "mage:cloudy", humidity: "62%", wind: "14 km/h" };
+    } else if (l.includes("london")) {
+      return { temp: "16°C", condition: "Regnerisch / Sprühregen", icon: "mage:volume-mute", humidity: "88%", wind: "22 km/h" };
+    } else {
+      return { temp: "19°C", condition: "Sonnig / Heiter", icon: "mage:sun", humidity: "45%", wind: "10 km/h" };
+    }
   };
 
   // --- DYNAMIC BACKGROUND & THEME SYNC ---
@@ -963,8 +998,8 @@ sys.stderr = io.StringIO()
       {/* 1. SERVER SIDEBAR */}
       <aside className="server-sidebar">
         <button 
-          className="server-icon home-button" 
-          onClick={() => showToast("Zeno Startseite geöffnet")} 
+          className={`server-icon home-button ${activeServerId === "home" ? "active" : ""}`} 
+          onClick={() => setActiveServerId("home")} 
           title="Zeno Home"
         >
           <img src="/zeno_logo.svg" alt="Zeno Logo" style={{ width: "30px", height: "30px", borderRadius: "6px" }} />
@@ -976,7 +1011,7 @@ sys.stderr = io.StringIO()
           {servers.map((srv) => (
             <button
               key={srv.id}
-              className={`server-icon ${activeServer.id === srv.id ? "active" : ""} ${animatingServerId === srv.id ? "indicator-animate" : ""}`}
+              className={`server-icon ${activeServer.id === srv.id && activeServerId !== "home" ? "active" : ""} ${animatingServerId === srv.id ? "indicator-animate" : ""}`}
               onClick={() => handleServerSelect(srv)}
               title={srv.name}
             >
@@ -996,14 +1031,43 @@ sys.stderr = io.StringIO()
 
       {/* 2. CHANNEL SIDEBAR */}
       <aside className="channel-sidebar">
-        <header className="server-header">
-          <h1 className="server-name">{activeServer.name}</h1>
-          <button className="server-dropdown-toggle" onClick={() => showToast("Server-Menü geöffnet")}>
-            <Icon icon="mage:chevron-down" />
-          </button>
-        </header>
-
-        <div className="channel-list" key={activeServer.id}>
+        {activeServerId === "home" ? (
+          <>
+            <header className="server-header">
+              <h1 className="server-name">Zeno Home</h1>
+              <Icon icon="mage:home" style={{ fontSize: "16px", color: "var(--text-muted)" }} />
+            </header>
+            <div className="channel-list">
+              <section className="channel-category">
+                <button className="category-header" style={{ cursor: "default" }}>
+                  <span className="category-name">NAVIGATION</span>
+                </button>
+                <ul className="category-channels">
+                  <li>
+                    <button className="channel-item active">
+                      <span className="channel-icon"><Icon icon="mage:dashboard" /></span>
+                      <span className="channel-name">Dashboard</span>
+                    </button>
+                  </li>
+                  <li>
+                    <button className="channel-item" onClick={() => setIsSettingsOpen(true)}>
+                      <span className="channel-icon"><Icon icon="mage:settings" /></span>
+                      <span className="channel-name">Einstellungen</span>
+                    </button>
+                  </li>
+                </ul>
+              </section>
+            </div>
+          </>
+        ) : (
+          <>
+            <header className="server-header">
+              <h1 className="server-name">{activeServer.name}</h1>
+              <button className="server-dropdown-toggle" onClick={() => showToast("Server-Menü geöffnet")}>
+                <Icon icon="mage:chevron-down" />
+              </button>
+            </header>
+            <div className="channel-list" key={activeServer.id}>
           {activeServer.categories.map((cat) => {
             const isCollapsed = collapsedCategories[cat.name];
             return (
@@ -1054,6 +1118,8 @@ sys.stderr = io.StringIO()
             );
           })}
         </div>
+          </>
+        )}
 
         {/* User Info Footer */}
         <footer className="user-panel">
@@ -1107,7 +1173,194 @@ sys.stderr = io.StringIO()
 
       {/* 3. CHAT MAIN AREA */}
       <main className="chat-area">
-        <header className="chat-header">
+        {activeServerId === "home" ? (
+          <div className="zeno-dashboard" style={{ padding: "24px", overflowY: "auto", display: "flex", flexDirection: "column", height: "100%", boxSizing: "border-box" }}>
+            <header className="dashboard-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-color)", paddingBottom: "16px", marginBottom: "8px" }}>
+              <div className="dashboard-welcome">
+                <h1 style={{ fontSize: "20px", fontWeight: "700", color: "var(--text-primary)" }}>Willkommen zurück, CipherNaut</h1>
+                <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>Dein privates, sicheres Workspace-Dashboard. Zero-Knowledge, 100% clientseitig.</p>
+              </div>
+              <div className="dashboard-logo-badge" style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 12px", backgroundColor: "var(--bg-secondary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-md)" }}>
+                <img src="/zeno_logo.svg" alt="Zeno Logo" className="dashboard-logo" style={{ width: "24px", height: "24px", borderRadius: "4px" }} />
+                <span className="logo-text" style={{ fontSize: "12px", fontWeight: "700", letterSpacing: "1px", color: "var(--text-primary)" }}>ZENO</span>
+              </div>
+            </header>
+
+            <div className="dashboard-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "16px", padding: "16px 0" }}>
+              {/* Row 1, Col 1: Recent Files */}
+              <div className="dashboard-card recent-files-card" style={{ backgroundColor: "var(--bg-secondary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-lg)", padding: "16px", display: "flex", flexDirection: "column" }}>
+                <div className="card-header" style={{ display: "flex", alignItems: "center", gap: "8px", borderBottom: "1px solid var(--border-color)", paddingBottom: "10px", marginBottom: "12px" }}>
+                  <span className="card-icon" style={{ fontSize: "18px", color: "var(--accent-color)" }}><Icon icon="mage:file-records" /></span>
+                  <h3 style={{ fontSize: "13px", fontWeight: "600", color: "var(--text-primary)" }}>Zuletzt bearbeitete Dateien</h3>
+                </div>
+                <div className="card-content" style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                  <div className="dashboard-files-list" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    {recentFiles.map((file) => (
+                      <div key={file.name} className="dashboard-file-row" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", backgroundColor: "var(--bg-tertiary)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-color)" }}>
+                        <div className="file-info" onClick={() => {
+                          setEditorFilename(file.name);
+                          setEditorLanguage(file.language);
+                          setEditorCode(file.code);
+                          setEditorWorkflowStep("editor");
+                          setEditorOutput("");
+                          setIsEditorOpen(true);
+                        }} style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", flex: 1, minWidth: 0 }}>
+                          <Icon 
+                            icon={
+                              file.language === "rust" ? "vscode-icons:file-type-rust" :
+                              file.language === "python" ? "vscode-icons:file-type-python" :
+                              file.language === "csharp" ? "vscode-icons:file-type-csharp" :
+                              file.language === "cpp" ? "vscode-icons:file-type-cpp" :
+                              file.language === "javascript" ? "vscode-icons:file-type-js" :
+                              file.language === "typescript" ? "vscode-icons:file-type-typescript" :
+                              "mage:file-records"
+                            } 
+                            style={{ fontSize: "18px", flexShrink: 0 }}
+                          />
+                          <span className="file-name" style={{ fontSize: "12px", fontWeight: "500", color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{file.name}</span>
+                        </div>
+                        <span className="file-lang" style={{ fontSize: "9px", color: "var(--text-muted)", fontWeight: "600" }}>{file.language.toUpperCase()}</span>
+                      </div>
+                    ))}
+                    {recentFiles.length === 0 && (
+                      <p className="empty-text" style={{ fontSize: "11px", color: "var(--text-muted)", textAlign: "center", padding: "16px" }}>Keine kürzlich bearbeiteten Dateien.</p>
+                    )}
+                  </div>
+                  <div className="card-actions" style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
+                    <button className="settings-btn primary" onClick={() => { setEditorCode(""); setEditorWorkflowStep("input_filename"); setIsEditorOpen(true); }} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", padding: "6px 12px" }}>
+                      <Icon icon="mage:plus" /> Neue Datei
+                    </button>
+                    <button className="settings-btn" onClick={() => { setEditorWorkflowStep("select_action"); setIsEditorOpen(true); }} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", padding: "6px 12px" }}>
+                      <Icon icon="mage:file-records" /> Editor öffnen
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 1, Col 2: Git Status Integration */}
+              <div className="dashboard-card git-card" style={{ backgroundColor: "var(--bg-secondary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-lg)", padding: "16px", display: "flex", flexDirection: "column" }}>
+                <div className="card-header" style={{ display: "flex", alignItems: "center", gap: "8px", borderBottom: "1px solid var(--border-color)", paddingBottom: "10px", marginBottom: "12px" }}>
+                  <span className="card-icon" style={{ fontSize: "18px", color: "#F05032" }}><Icon icon="mage:github" /></span>
+                  <h3 style={{ fontSize: "13px", fontWeight: "600", color: "var(--text-primary)" }}>Git Repository Status</h3>
+                </div>
+                <div className="card-content" style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                  <div>
+                    <div className="git-status-summary" style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px", borderBottom: "1px solid var(--border-color)", paddingBottom: "10px" }}>
+                      <div>
+                        <span className="label" style={{ fontSize: "10px", color: "var(--text-muted)", display: "block" }}>Branch</span>
+                        <span className="value" style={{ fontSize: "12px", fontWeight: "600", color: "#F05032", display: "flex", alignItems: "center", gap: "4px" }}>
+                          <Icon icon="mage:code" style={{ fontSize: "14px" }} /> main
+                        </span>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <span className="label" style={{ fontSize: "10px", color: "var(--text-muted)", display: "block" }}>Arbeitsverzeichnis</span>
+                        <span className="badge" style={{ backgroundColor: "rgba(89, 168, 105, 0.15)", color: "#59A869", border: "1px solid rgba(89, 168, 105, 0.2)", fontSize: "10px", padding: "2px 6px" }}>Clean</span>
+                      </div>
+                    </div>
+
+                    <div className="git-commits-list" style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      <span style={{ fontSize: "9px", fontWeight: "bold", textTransform: "uppercase", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>Letzte Commits</span>
+                      <div className="git-commit-row" style={{ display: "flex", gap: "8px", fontSize: "11px" }}>
+                        <span className="commit-hash" style={{ color: "var(--glow-color-1, #3574F0)", fontFamily: "var(--font-mono)", fontWeight: "600" }}>e125a22</span>
+                        <span className="commit-msg" style={{ color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>Restore server active indicator, channel slide-in, and message...</span>
+                      </div>
+                      <div className="git-commit-row" style={{ display: "flex", gap: "8px", fontSize: "11px" }}>
+                        <span className="commit-hash" style={{ color: "var(--glow-color-1, #3574F0)", fontFamily: "var(--font-mono)", fontWeight: "600" }}>0f551dc</span>
+                        <span className="commit-msg" style={{ color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>Add Monaco Editor runtime settings tab with download simulation...</span>
+                      </div>
+                      <div className="git-commit-row" style={{ display: "flex", gap: "8px", fontSize: "11px" }}>
+                        <span className="commit-hash" style={{ color: "var(--glow-color-1, #3574F0)", fontFamily: "var(--font-mono)", fontWeight: "600" }}>1c90d32</span>
+                        <span className="commit-msg" style={{ color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>Update main.rs to import zeno_lib instead of desktop_lib</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="card-actions" style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
+                    <button className="settings-btn" onClick={() => showToast("Git Status abgefragt (Verzeichnis clean)")} style={{ fontSize: "11px", padding: "6px 12px" }}>Status prüfen</button>
+                    <button className="settings-btn" onClick={() => showToast("Git Push simuliert – Branch up-to-date")} style={{ fontSize: "11px", padding: "6px 12px" }}>Git Push</button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 2, Col 1: Weather & Time Widget */}
+              <div className="dashboard-card weather-card" style={{ backgroundColor: "var(--bg-secondary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-lg)", padding: "16px", display: "flex", flexDirection: "column" }}>
+                <div className="card-header" style={{ display: "flex", alignItems: "center", gap: "8px", borderBottom: "1px solid var(--border-color)", paddingBottom: "10px", marginBottom: "12px" }}>
+                  <span className="card-icon" style={{ fontSize: "18px", color: "#FFC66D" }}><Icon icon="mage:sun" /></span>
+                  <h3 style={{ fontSize: "13px", fontWeight: "600", color: "var(--text-primary)" }}>Lokale Zeit & Wetter</h3>
+                </div>
+                <div className="card-content" style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                  <div>
+                    <div style={{ display: "flex", gap: "12px", marginBottom: "12px" }}>
+                      <input 
+                        type="text" 
+                        className="settings-input" 
+                        placeholder="Standort manuell eingeben..." 
+                        value={dashboardLocation}
+                        onChange={(e) => setDashboardLocation(e.target.value)}
+                        style={{ flex: 1, padding: "6px 10px", fontSize: "12px", maxWidth: "none" }}
+                      />
+                    </div>
+
+                    {(() => {
+                      const weather = getMockWeather(dashboardLocation);
+                      return (
+                        <div className="weather-display" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", backgroundColor: "var(--bg-tertiary)", borderRadius: "var(--radius-md)", border: "1px solid var(--border-color)" }}>
+                          <div>
+                            <span className="weather-temp" style={{ fontSize: "24px", fontWeight: "700", display: "block", color: "var(--text-primary)" }}>{weather.temp}</span>
+                            <span className="weather-loc" style={{ fontSize: "12px", fontWeight: "600", color: "var(--text-muted)" }}>{dashboardLocation}</span>
+                            <span className="weather-time" style={{ fontSize: "10px", display: "block", color: "var(--glow-color-1, #3574F0)", marginTop: "4px" }}>{dashboardTime}</span>
+                          </div>
+                          <div style={{ textAlign: "right" }}>
+                            <Icon icon={weather.icon} style={{ fontSize: "28px", color: "#FFC66D", display: "block", marginLeft: "auto", marginBottom: "2px" }} />
+                            <span className="weather-cond" style={{ fontSize: "11px", color: "var(--text-primary)", display: "block" }}>{weather.condition}</span>
+                            <span style={{ fontSize: "9px", color: "var(--text-muted)", display: "block" }}>Feuchte: {weather.humidity} • Wind: {weather.wind}</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  <p style={{ fontSize: "9px", color: "var(--text-muted)", marginTop: "10px", lineHeight: "1.3" }}>
+                    🔒 <strong>Datenschutz-Hinweis:</strong> Standort und Zeitzone werden manuell eingegeben. Es finden keine Tracker-basierten Standortabfragen statt (Zero-Knowledge Prinzip).
+                  </p>
+                </div>
+              </div>
+
+              {/* Row 2, Col 2: Privacy Status Guard */}
+              <div className="dashboard-card security-card" style={{ backgroundColor: "var(--bg-secondary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-lg)", padding: "16px", display: "flex", flexDirection: "column" }}>
+                <div className="card-header" style={{ display: "flex", alignItems: "center", gap: "8px", borderBottom: "1px solid var(--border-color)", paddingBottom: "10px", marginBottom: "12px" }}>
+                  <span className="card-icon" style={{ fontSize: "18px", color: "var(--accent-success)" }}><Icon icon="mage:shield" /></span>
+                  <h3 style={{ fontSize: "14px", fontWeight: "600", color: "var(--text-primary)" }}>Zeno Privacy Guard</h3>
+                </div>
+                <div className="card-content" style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    <div className="status-item" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span className="status-label" style={{ fontSize: "11px", color: "var(--text-muted)" }}>Schlüsselhoheit</span>
+                      <span className="badge" style={{ backgroundColor: "rgba(89, 168, 105, 0.15)", color: "#59A869", border: "1px solid rgba(89, 168, 105, 0.2)", fontSize: "10px", padding: "2px 6px" }}>Aktiv & Lokal</span>
+                    </div>
+                    <div className="status-item" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span className="status-label" style={{ fontSize: "11px", color: "var(--text-muted)" }}>E2E Verschlüsselung</span>
+                      <span className="badge" style={{ backgroundColor: "rgba(89, 168, 105, 0.15)", color: "#59A869", border: "1px solid rgba(89, 168, 105, 0.2)", fontSize: "10px", padding: "2px 6px" }}>AES-GCM-256 + SFrame</span>
+                    </div>
+                    <div className="status-item" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span className="status-label" style={{ fontSize: "11px", color: "var(--text-muted)" }}>Storage Backup</span>
+                      <span className="badge" style={{ backgroundColor: "rgba(255, 198, 109, 0.15)", color: "#FFC66D", border: "1px solid rgba(255, 198, 109, 0.2)", fontSize: "10px", padding: "2px 6px" }}>BYOS</span>
+                    </div>
+                    <div className="status-item" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span className="status-label" style={{ fontSize: "11px", color: "var(--text-muted)" }}>Isolations-Sandbox</span>
+                      <span className="badge" style={{ backgroundColor: "rgba(89, 168, 105, 0.15)", color: "#59A869", border: "1px solid rgba(89, 168, 105, 0.2)", fontSize: "10px", padding: "2px 6px" }}>WASM Sandbox Aktiv</span>
+                    </div>
+                  </div>
+                  <p style={{ fontSize: "9px", color: "var(--text-muted)", marginTop: "10px", lineHeight: "1.3" }}>
+                    Alle Systemfunktionen arbeiten vollverschlüsselt. Metadaten werden im Arbeitsspeicher des Client-Prozesses isoliert gehalten.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            <header className="chat-header">
           <div className="chat-header-info">
             <span className="chat-header-icon"><Icon icon="mage:hashtag" /></span>
             <h2 className="chat-header-channel">{activeChannel.name}</h2>
@@ -1306,67 +1559,71 @@ sys.stderr = io.StringIO()
             </div>
           </form>
         </footer>
+          </>
+        )}
       </main>
 
       {/* 4. MEMBERS SIDEBAR */}
-      <aside className={`members-sidebar ${isMembersOpen ? "" : "collapsed"}`}>
-        <section className="member-role-group" data-role="entwickler">
-          <h3 className="role-group-header">ONLINE — 3</h3>
-          <ul className="role-group-list">
-            {["MaxShield", "LenaCrypt", "CipherNaut"].map((user) => {
-              const profile = mockProfiles[user];
-              return (
-                <li key={user}>
-                  <div className="member-item" onClick={() => setSelectedUserProfile(profile)}>
-                    <div className="member-avatar-wrapper">
-                      <div className={`member-avatar ${profile.avatarColor}`}>{profile.avatar}</div>
-                      <span className="status-dot online" />
+      {activeServerId !== "home" && (
+        <aside className={`members-sidebar ${isMembersOpen ? "" : "collapsed"}`}>
+          <section className="member-role-group" data-role="entwickler">
+            <h3 className="role-group-header">ONLINE — 3</h3>
+            <ul className="role-group-list">
+              {["MaxShield", "LenaCrypt", "CipherNaut"].map((user) => {
+                const profile = mockProfiles[user];
+                return (
+                  <li key={user}>
+                    <div className="member-item" onClick={() => setSelectedUserProfile(profile)}>
+                      <div className="member-avatar-wrapper">
+                        <div className={`member-avatar ${profile.avatarColor}`}>{profile.avatar}</div>
+                        <span className="status-dot online" />
+                      </div>
+                      <span className="member-name">{profile.name}</span>
+                      {profile.role === "Unterstützer" && <span className="badge supporter-badge">⭐</span>}
                     </div>
-                    <span className="member-name">{profile.name}</span>
-                    {profile.role === "Unterstützer" && <span className="badge supporter-badge">⭐</span>}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
 
-        <section className="member-role-group" data-role="bots">
-          <h3 className="role-group-header">BOTS — 1</h3>
-          <ul className="role-group-list">
-            <li>
-              <div className="member-item" onClick={() => setSelectedUserProfile(mockProfiles.ZenoBot)}>
-                <div className="member-avatar-wrapper">
-                  <div className="member-avatar orange">Z</div>
-                  <span className="status-dot online" />
+          <section className="member-role-group" data-role="bots">
+            <h3 className="role-group-header">BOTS — 1</h3>
+            <ul className="role-group-list">
+              <li>
+                <div className="member-item" onClick={() => setSelectedUserProfile(mockProfiles.ZenoBot)}>
+                  <div className="member-avatar-wrapper">
+                    <div className="member-avatar orange">Z</div>
+                    <span className="status-dot online" />
+                  </div>
+                  <span className="member-name">ZenoBot</span>
+                  <span className="badge bot-badge">BOT</span>
                 </div>
-                <span className="member-name">ZenoBot</span>
-                <span className="badge bot-badge">BOT</span>
-              </div>
-            </li>
-          </ul>
-        </section>
+              </li>
+            </ul>
+          </section>
 
-        <section className="member-role-group" data-role="offline">
-          <h3 className="role-group-header">OFFLINE — 2</h3>
-          <ul className="role-group-list">
-            {["DarkNode", "QuantumLeap"].map((user) => {
-              const profile = mockProfiles[user];
-              return (
-                <li key={user}>
-                  <div className="member-item offline" onClick={() => setSelectedUserProfile(profile)}>
-                    <div className="member-avatar-wrapper">
-                      <div className="member-avatar gray">{profile.avatar}</div>
-                      <span className="status-dot offline" />
+          <section className="member-role-group" data-role="offline">
+            <h3 className="role-group-header">OFFLINE — 2</h3>
+            <ul className="role-group-list">
+              {["DarkNode", "QuantumLeap"].map((user) => {
+                const profile = mockProfiles[user];
+                return (
+                  <li key={user}>
+                    <div className="member-item offline" onClick={() => setSelectedUserProfile(profile)}>
+                      <div className="member-avatar-wrapper">
+                        <div className="member-avatar gray">{profile.avatar}</div>
+                        <span className="status-dot offline" />
+                      </div>
+                      <span className="member-name">{profile.name}</span>
                     </div>
-                    <span className="member-name">{profile.name}</span>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      </aside>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        </aside>
+      )}
 
       {/* 5. CODE EDITOR MODAL */}
       <div className={`modal-overlay ${isEditorOpen ? "open" : ""}`} id="editor-modal">
