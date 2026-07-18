@@ -207,7 +207,7 @@ fn visit_dirs(dir: &std::path::Path, files: &mut Vec<WorkspaceFile>, root: &std:
             let path = entry.path();
             if path.is_dir() {
                 let name = path.file_name().unwrap_or_default().to_string_lossy();
-                if name == "node_modules" || name == ".git" || name == "target" || name == "dist" || name == ".tauri" {
+                if name == "node_modules" || name == ".git" || name == "target" || name == "dist" || name == ".tauri" || name == "desktop" {
                     continue;
                 }
                 visit_dirs(&path, files, root)?;
