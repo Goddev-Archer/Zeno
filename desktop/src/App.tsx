@@ -363,6 +363,7 @@ export default function App() {
   const [editorCode, setEditorCode] = useState<string>("");
   const [editorLanguage, setEditorLanguage] = useState<string>("rust");
   const [editorFilename, setEditorFilename] = useState<string>("main.rs");
+  const [isRenaming, setIsRenaming] = useState<boolean>(false);
   const [editorWorkflowStep, setEditorWorkflowStep] = useState<"select_action" | "input_filename" | "editor">("select_action");
   const [editorOutput, setEditorOutput] = useState<string>("");
   const [recentFiles, setRecentFiles] = useState<RecentFile[]>([
@@ -662,6 +663,45 @@ export default function App() {
       showToast(`Datei "${editorFilename}" erfolgreich gespeichert!`);
     } catch (err: any) {
       showToast(`Fehler beim Speichern: ${err.message}`);
+    }
+  };
+
+  const handleRenameFile = (newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed) {
+      setIsRenaming(false);
+      return;
+    }
+    
+    setRecentFiles((prev) =>
+      prev.map((f) =>
+        f.name === editorFilename
+          ? { ...f, name: trimmed, language: getLanguageFromExtension(trimmed) }
+          : f
+      )
+    );
+
+    setEditorFilename(trimmed);
+    setEditorLanguage(getLanguageFromExtension(trimmed));
+    setIsRenaming(false);
+    showToast(`Datei umbenannt in "${trimmed}"`);
+  };
+
+  const handleDeleteRecentFile = (e: React.MouseEvent, name: string) => {
+    e.stopPropagation();
+    setRecentFiles((prev) => prev.filter((f) => f.name !== name));
+    showToast(`Datei "${name}" gelöscht`);
+  };
+
+  const handleDeleteCurrentFile = () => {
+    if (window.confirm(`Möchtest du die Datei "${editorFilename}" wirklich aus dem Workspace löschen?`)) {
+      setRecentFiles((prev) => prev.filter((f) => f.name !== editorFilename));
+      setEditorCode("");
+      setEditorFilename("main.rs");
+      setEditorLanguage("rust");
+      setEditorWorkflowStep("select_action");
+      setEditorOutput("");
+      showToast(`Datei "${editorFilename}" gelöscht`);
     }
   };
 
@@ -1335,6 +1375,7 @@ sys.stderr = io.StringIO()
                         setEditorWorkflowStep("editor");
                         setEditorOutput("");
                       }}
+                      style={{ position: "relative" }}
                     >
                       <Icon 
                         icon={
@@ -1351,10 +1392,17 @@ sys.stderr = io.StringIO()
                         } 
                         className="recent-file-icon"
                       />
-                      <div className="recent-file-details">
+                      <div className="recent-file-details" style={{ flex: 1 }}>
                         <span className="recent-file-name">{file.name}</span>
                         <span className="recent-file-lang">{file.language.toUpperCase()}</span>
                       </div>
+                      <span 
+                        className="recent-file-delete-btn"
+                        onClick={(e) => handleDeleteRecentFile(e, file.name)}
+                        title="Aus Historie löschen"
+                      >
+                        <Icon icon="mage:trash-3" />
+                      </span>
                     </button>
                   ))}
                   {recentFiles.length === 0 && (
@@ -1428,7 +1476,31 @@ sys.stderr = io.StringIO()
             <>
               <header className="editor-modal-header">
                 <div className="editor-modal-title-area">
-                  <span className="editor-filename">{editorFilename}</span>
+                  {isRenaming ? (
+                    <input
+                      type="text"
+                      className="editor-filename-rename-input"
+                      defaultValue={editorFilename}
+                      onBlur={(e) => handleRenameFile(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          handleRenameFile(e.currentTarget.value);
+                        } else if (e.key === "Escape") {
+                          setIsRenaming(false);
+                        }
+                      }}
+                      autoFocus
+                    />
+                  ) : (
+                    <span 
+                      className="editor-filename editable" 
+                      onClick={() => setIsRenaming(true)}
+                      title="Klicke zum Umbenennen"
+                    >
+                      {editorFilename}
+                      <Icon icon="mage:edit" className="filename-edit-icon" style={{ marginLeft: "6px", fontSize: "12px", opacity: 0.6 }} />
+                    </span>
+                  )}
                   <span className="badge language-badge">{editorLanguage.toUpperCase()}</span>
                 </div>
                 <button className="editor-close-btn modal-close" onClick={() => setIsEditorOpen(false)} title="Schließen">
@@ -1489,6 +1561,14 @@ sys.stderr = io.StringIO()
                   title="Änderung vorschlagen"
                 >
                   <Icon icon="mage:message-round" /> Suggest
+                </button>
+                <button 
+                  className="editor-toolbar-btn btn-delete-file" 
+                  onClick={handleDeleteCurrentFile} 
+                  title="Aus Workspace löschen"
+                  style={{ color: "var(--accent-danger, #E05555)", marginLeft: "auto" }}
+                >
+                  <Icon icon="mage:trash-3" /> Delete
                 </button>
               </footer>
 

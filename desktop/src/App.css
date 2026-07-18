@@ -1110,6 +1110,37 @@ pre.code-block {
   color: var(--text-primary);
 }
 
+.editor-filename.editable {
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed transparent;
+  display: flex;
+  align-items: center;
+  transition: all var(--transition-fast);
+}
+
+.editor-filename.editable:hover {
+  background-color: var(--bg-hover);
+  border-color: var(--text-muted);
+}
+
+.editor-filename.editable:hover .filename-edit-icon {
+  opacity: 1 !important;
+}
+
+.editor-filename-rename-input {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--accent-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  padding: 2px 6px;
+  outline: none;
+}
+
 .language-badge {
   background-color: rgba(255, 198, 109, 0.15);
   color: #FFC66D;
@@ -2351,6 +2382,31 @@ input:checked + .slider:before {
   border-color: var(--accent-color);
   color: var(--accent-color);
   background-color: rgba(53, 116, 240, 0.1);
+}
+
+/* ── Recent File Delete Button ── */
+.recent-file-delete-btn {
+  font-size: 14px;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: all var(--transition-fast);
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.recent-file-item:hover .recent-file-delete-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.recent-file-delete-btn:hover {
+  background-color: rgba(224, 85, 85, 0.15);
+  color: var(--accent-danger);
 }
 
 
