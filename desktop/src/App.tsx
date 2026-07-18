@@ -476,6 +476,40 @@ export default function App() {
     const interval = setInterval(fetchLiveGitData, 15000);
     return () => clearInterval(interval);
   }, []);
+
+  const [githubToken, setGithubToken] = useState<string>("");
+  const [githubUser, setGithubUser] = useState<{ login: string; name: string | null; avatarUrl: string } | null>(null);
+  const [githubConnecting, setGithubConnecting] = useState<boolean>(false);
+
+  const testGithubConnection = async () => {
+    if (!githubToken.trim()) return;
+    setGithubConnecting(true);
+    try {
+      const res = await fetch("https://api.github.com/user", {
+        headers: {
+          Authorization: `Bearer ${githubToken.trim()}`,
+          Accept: "application/vnd.github.v3+json",
+        },
+      });
+      if (!res.ok) {
+        throw new Error(`GitHub API Fehler: HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      setGithubUser({
+        login: data.login,
+        name: data.name,
+        avatarUrl: data.avatar_url,
+      });
+      showToast(`GitHub-Verbindung hergestellt: @${data.login}`);
+    } catch (e: any) {
+      console.error(e);
+      showToast("GitHub-Verbindung fehlgeschlagen: " + (e.message || String(e)));
+      setGithubUser(null);
+    } finally {
+      setGithubConnecting(false);
+    }
+  };
+
   const [widgets, setWidgets] = useState<WidgetConfig[]>(DEFAULT_WIDGETS);
   const [dashboardEditMode, setDashboardEditMode] = useState<boolean>(false);
   const [editingWidgetId, setEditingWidgetId] = useState<string | null>(null);
@@ -2303,6 +2337,12 @@ sys.stderr = io.StringIO()
             >
               Monaco-Editor
             </button>
+            <button 
+              className={`settings-nav-item ${activeSettingsTab === "github" ? "active" : ""}`} 
+              onClick={() => setActiveSettingsTab("github")}
+            >
+              GitHub-Integration
+            </button>
           </aside>
 
           <main className="settings-content">
@@ -2507,6 +2547,89 @@ sys.stderr = io.StringIO()
                         </div>
                       );
                     })}
+                  </div>
+                </div>
+              )}
+
+              {/* Tab: GitHub-Integration */}
+              {activeSettingsTab === "github" && (
+                <div className="settings-tab-content" id="tab-github">
+                  <h3>GitHub-Integration (100% lokal & privat)</h3>
+                  <p className="settings-help-text">
+                    Verbinde dein GitHub-Konto direkt über deinen Webbrowser mit der GitHub-API. 
+                    <strong> Wichtig:</strong> Dein Token verbleibt ausschließlich lokal auf diesem Gerät im Speicher der App. 
+                    Es wird niemals an einen Zeno-Server gesendet.
+                  </p>
+
+                  <div className="settings-form-group" style={{ marginTop: "20px" }}>
+                    <label>Personal Access Token (PAT)</label>
+                    <p className="settings-help-text">
+                      Erstelle ein Token mit <code>repo</code>-Rechten auf GitHub, um deinen Repository-Status abzufragen und Commits einzusehen.
+                    </p>
+                    <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+                      <input 
+                        type="password" 
+                        className="settings-input" 
+                        placeholder="ghp_..." 
+                        value={githubToken} 
+                        onChange={(e) => {
+                          setGithubToken(e.target.value);
+                          setGithubUser(null);
+                        }}
+                        style={{ flex: 1, maxWidth: "none" }}
+                      />
+                      <button 
+                        className="settings-btn primary" 
+                        onClick={testGithubConnection} 
+                        disabled={githubConnecting || !githubToken.trim()}
+                        style={{ flexShrink: 0 }}
+                      >
+                        {githubConnecting ? "Verbinde..." : "Verbindung testen"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {githubUser && (
+                    <div style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "12px",
+                      marginTop: "16px",
+                      padding: "12px",
+                      backgroundColor: "rgba(89, 168, 105, 0.1)",
+                      border: "1px solid rgba(89, 168, 105, 0.3)",
+                      borderRadius: "var(--radius-md)"
+                    }}>
+                      <img 
+                        src={githubUser.avatarUrl} 
+                        alt="GitHub Avatar" 
+                        style={{ width: "36px", height: "36px", borderRadius: "50%", border: "2px solid #59A869" }}
+                      />
+                      <div style={{ display: "flex", flexDirection: "column" }}>
+                        <span style={{ fontSize: "12px", fontWeight: "700", color: "#59A869" }}>✓ Erfolgreich verbunden</span>
+                        <span style={{ fontSize: "11px", color: "var(--text-primary)", fontWeight: "600" }}>
+                          {githubUser.name || githubUser.login} (@{githubUser.login})
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{
+                    marginTop: "24px",
+                    padding: "16px",
+                    backgroundColor: "var(--bg-tertiary)",
+                    border: "1px solid var(--border-color)",
+                    borderRadius: "var(--radius-lg)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px"
+                  }}>
+                    <span style={{ fontSize: "10px", fontWeight: "700", textTransform: "uppercase", color: "var(--text-muted)", letterSpacing: "0.5px" }}>Sicherheitsprotokoll & Transparenz</span>
+                    <ul style={{ fontSize: "11px", color: "var(--text-muted)", paddingLeft: "16px", lineHeight: "1.6" }}>
+                      <li>Direct-Client-Request: Keine API-Proxy-Server oder Cloud-Gateways. Die Anfrage erfolgt direkt von deiner lokalen IP zu GitHub.</li>
+                      <li>Speicherort: Der Token wird ausschließlich in deiner lokalen Desktop-App-Sandbox gespeichert.</li>
+                      <li>Minimalberechtigung: Verwende am besten ein feinkörniges (Fine-grained) Token mit Nur-Lese-Rechten auf ausgewählte Repositories.</li>
+                    </ul>
                   </div>
                 </div>
               )}
