@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Zeno – Zero-Knowledge Kommunikationsplattform. Privatsphäre-orientierte Discord-Alternative mit E2EE.">
+  <title>Zeno – Secure Communication</title>
+  <link rel="icon" type="image/svg+xml" href="./zeno_logo.svg">
+  <link rel="apple-touch-icon" href="./zeno_logo.svg">
+  <link rel="stylesheet" href="./styles.css">
+  <script src="https://code.iconify.design/3/3.1.1/iconify.min.js"></script>
+</head>
+<body class="app-layout glass-effect">
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       1. SERVER SIDEBAR
+       ═══════════════════════════════════════════════════════════════ -->
+  <aside class="server-sidebar" id="server-sidebar">
+    <button class="server-icon home-button" id="btn-home" data-server="home" aria-label="Startseite" title="Startseite">
+      <img src="./zeno_logo.svg" alt="Zeno Logo" style="width: 30px; height: 30px; border-radius: 6px; object-fit: contain;">
+    </button>
+
+    <div class="server-separator" role="separator"></div>
+
+    <nav class="server-list" aria-label="Server-Liste">
+      <button class="server-icon active" id="server-zeno-dev" data-server="zeno-dev" title="Zeno Dev">
+        <span class="server-icon-letter">Z</span>
+      </button>
+      <button class="server-icon" id="server-gaming-hub" data-server="gaming-hub" title="Gaming Hub">
+        <span class="server-icon-letter">G</span>
+      </button>
+      <button class="server-icon" id="server-design-team" data-server="design-team" title="Design Team">
+        <span class="server-icon-letter">D</span>
+      </button>
+      <button class="server-icon" id="server-open-source" data-server="open-source" title="Open Source">
+        <span class="server-icon-letter">O</span>
+      </button>
+    </nav>
+
+    <button class="server-icon add-server" id="btn-add-server" title="Server hinzufügen" aria-label="Server hinzufügen">
+      <span class="server-icon-letter"><span class="iconify" data-icon="mage:plus"></span></span>
+    </button>
+  </aside>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       2. CHANNEL SIDEBAR
+       ═══════════════════════════════════════════════════════════════ -->
+  <nav class="channel-sidebar" id="channel-sidebar" aria-label="Kanäle">
+
+    <!-- Server Header -->
+    <header class="server-header" id="server-header">
+      <h1 class="server-name" id="server-name">Zeno Development</h1>
+      <button class="server-dropdown-toggle" id="btn-server-dropdown" aria-label="Server-Menü öffnen">
+        <span class="chevron"><span class="iconify" data-icon="mage:chevron-down"></span></span>
+      </button>
+    </header>
+
+    <!-- Channel List -->
+    <div class="channel-list" id="channel-list">
+
+      <!-- Text Channels Category -->
+      <section class="channel-category" data-category="text">
+        <button class="category-header" id="toggle-text-channels" aria-expanded="true">
+          <span class="category-arrow"><span class="iconify" data-icon="mage:chevron-down"></span></span>
+          <span class="category-name">TEXTKANÄLE</span>
+        </button>
+        <ul class="category-channels" id="text-channels">
+          <li>
+            <button class="channel-item active" id="channel-allgemein" data-channel="allgemein" data-channel-type="text">
+              <span class="channel-icon"><span class="iconify" data-icon="mage:hashtag"></span></span>
+              <span class="channel-name">allgemein</span>
+            </button>
+          </li>
+          <li>
+            <button class="channel-item" id="channel-dev-talk" data-channel="dev-talk" data-channel-type="text">
+              <span class="channel-icon"><span class="iconify" data-icon="mage:hashtag"></span></span>
+              <span class="channel-name">dev-talk</span>
+            </button>
+          </li>
+          <li>
+            <button class="channel-item" id="channel-ui-design" data-channel="ui-design" data-channel-type="text">
+              <span class="channel-icon"><span class="iconify" data-icon="mage:hashtag"></span></span>
+              <span class="channel-name">ui-design</span>
+            </button>
+          </li>
+          <li>
+            <button class="channel-item" id="channel-kryptografie" data-channel="kryptografie" data-channel-type="text">
+              <span class="channel-icon"><span class="iconify" data-icon="mage:hashtag"></span></span>
+              <span class="channel-name">kryptografie</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+
+      <!-- Voice Channels Category -->
+      <section class="channel-category" data-category="voice">
+        <button class="category-header" id="toggle-voice-channels" aria-expanded="true">
+          <span class="category-arrow"><span class="iconify" data-icon="mage:chevron-down"></span></span>
+          <span class="category-name">SPRACHKANÄLE</span>
+        </button>
+        <ul class="category-channels" id="voice-channels">
+          <li>
+            <button class="channel-item voice-channel" id="channel-voice-lobby" data-channel="Voice Lobby" data-channel-type="voice">
+              <span class="channel-icon"><span class="iconify" data-icon="mage:volume-up"></span></span>
+              <span class="channel-name">Voice Lobby</span>
+            </button>
+            <ul class="voice-connected-users">
+              <li class="voice-user">
+                <span class="voice-user-avatar">M</span>
+                <span class="voice-user-name">Max</span>
+              </li>
+              <li class="voice-user">
+                <span class="voice-user-avatar">L</span>
+                <span class="voice-user-name">Lena</span>
+              </li>
+            </ul>
+          </li>
+          <li>
+            <button class="channel-item voice-channel" id="channel-pair-programming" data-channel="Pair Programming" data-channel-type="voice">
+              <span class="channel-icon"><span class="iconify" data-icon="mage:volume-up"></span></span>
+              <span class="channel-name">Pair Programming</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+
+    </div>
+
+    <!-- Canvas Customizer Popup (hidden by default) -->
+    <div class="canvas-customizer" id="canvas-customizer" style="display: none;">
+      <header class="customizer-header">
+        <span class="customizer-title">Hintergrund anpassen</span>
+        <button class="customizer-close" id="btn-close-customizer" title="Schließen"><span class="iconify" data-icon="mage:multiply"></span></button>
+      </header>
+      <div class="customizer-body">
+        <div class="customizer-section">
+          <span class="customizer-section-label">Presets</span>
+          <div class="color-presets" id="color-presets">
+            <button class="preset-btn active" data-color="#18191B" style="background-color: #18191B;" title="Default Dark"></button>
+            <button class="preset-btn" data-color="#0F1015" style="background-color: #0F1015;" title="Deep Space"></button>
+            <button class="preset-btn" data-color="#0F1411" style="background-color: #0F1411;" title="Forest Green"></button>
+            <button class="preset-btn" data-color="#150F1A" style="background-color: #150F1A;" title="Nebula Purple"></button>
+          </div>
+        </div>
+        <div class="customizer-section">
+          <div class="custom-color-control">
+            <label for="custom-canvas-color">Eigene Farbe:</label>
+            <input type="color" id="custom-canvas-color" value="#18191B">
+          </div>
+        </div>
+        <div class="customizer-section">
+          <div class="custom-color-control">
+            <label for="custom-glow-color">Glow-Farbe:</label>
+            <input type="color" id="custom-glow-color" value="#3574F0">
+          </div>
+        </div>
+        <div class="customizer-section">
+          <div class="switch-control">
+            <span>Milchglas-Effekt:</span>
+            <label class="switch">
+              <input type="checkbox" id="toggle-glassmorphism" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- User Panel -->
+    <footer class="user-panel" id="user-panel">
+      <div class="user-info">
+        <div class="user-avatar-wrapper">
+          <div class="user-avatar" aria-hidden="true">C</div>
+          <span class="status-dot online" title="Online"></span>
+        </div>
+        <div class="user-details">
+          <span class="user-name">CipherNaut</span>
+          <span class="user-id">0xA3F...8B2</span>
+        </div>
+      </div>
+      <div class="user-controls">
+        <button class="user-control-btn" id="btn-theme" title="Design umschalten" aria-label="Design umschalten"><span class="iconify" data-icon="mage:sun"></span></button>
+        <button class="user-control-btn" id="btn-mic" title="Mikrofon" aria-label="Mikrofon umschalten"><span class="iconify" data-icon="mage:microphone"></span></button>
+        <button class="user-control-btn" id="btn-deafen" title="Stummschalten" aria-label="Audio stummschalten"><span class="iconify" data-icon="mage:volume-mute"></span></button>
+        <button class="user-control-btn" id="btn-settings" title="Einstellungen" aria-label="Benutzereinstellungen"><span class="iconify" data-icon="mage:settings"></span></button>
+      </div>
+    </footer>
+
+  </nav>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       3. CHAT AREA
+       ═══════════════════════════════════════════════════════════════ -->
+  <main class="chat-area" id="chat-area">
+
+    <!-- Chat Header -->
+    <header class="chat-header" id="chat-header">
+      <div class="chat-header-left">
+        <span class="chat-header-icon"><span class="iconify" data-icon="mage:hashtag"></span></span>
+        <h2 class="chat-header-channel" id="chat-channel-name">allgemein</h2>
+        <span class="chat-header-divider" aria-hidden="true"></span>
+        <p class="chat-header-description">Allgemeiner Diskussionskanal für das Zeno-Projekt</p>
+      </div>
+      <div class="chat-header-actions">
+        <button class="header-action-btn" id="btn-search" title="Suche" aria-label="Suche"><span class="iconify" data-icon="mage:search"></span></button>
+        <button class="header-action-btn" id="btn-pins" title="Angeheftete Nachrichten" aria-label="Angeheftete Nachrichten"><span class="iconify" data-icon="mage:pin"></span></button>
+        <button class="header-action-btn" id="toggle-members" title="Mitgliederliste" aria-label="Mitgliederliste umschalten"><span class="iconify" data-icon="mage:users"></span></button>
+        <button class="header-action-btn" id="btn-channel-settings" title="Kanaleinstellungen" aria-label="Kanaleinstellungen"><span class="iconify" data-icon="mage:settings"></span></button>
+      </div>
+    </header>
+
+    <!-- Messages Container -->
+    <div class="messages-container" id="messages-container">
+
+      <!-- Date Separator -->
+      <div class="date-separator" role="separator">
+        <span class="date-separator-text">— 17. Juli 2026 —</span>
+      </div>
+
+      <!-- Message 1 -->
+      <article class="message" id="msg-1" data-author="MaxShield" data-timestamp="10:14">
+        <div class="message-avatar blue" aria-hidden="true">M</div>
+        <div class="message-body">
+          <header class="message-header">
+            <span class="message-author blue">MaxShield</span>
+            <time class="message-timestamp" datetime="2026-07-17T10:14:00">10:14</time>
+          </header>
+          <div class="message-content">
+            <p>Hat jemand schon den neuen SFrame-Branch getestet? Die Latenz im Voice ist deutlich besser.</p>
+          </div>
+        </div>
+      </article>
+
+      <!-- Message 2 -->
+      <article class="message" id="msg-2" data-author="LenaCrypt" data-timestamp="10:16">
+        <div class="message-avatar green" aria-hidden="true">L</div>
+        <div class="message-body">
+          <header class="message-header">
+            <span class="message-author green">LenaCrypt</span>
+            <time class="message-timestamp" datetime="2026-07-17T10:16:00">10:16</time>
+          </header>
+          <div class="message-content">
+            <p>Ja, funktioniert super! Hier ist mein Benchmark-Script:</p>
+            <div class="code-block-wrapper" data-language="rust">
+              <header class="code-block-header">
+                <span class="code-block-language">Rust</span>
+                <div class="code-block-actions">
+                  <button class="code-action-btn btn-open-editor" id="btn-open-editor-msg2" data-action="open-editor" title="Open in Editor">Open in Editor</button>
+                  <button class="code-action-btn" id="btn-run-snippet-msg2" data-action="run-snippet" title="Run Snippet">Run Snippet</button>
+                  <button class="code-action-btn" id="btn-suggest-edit-msg2" data-action="suggest-edit" title="Suggest Edit">Suggest Edit</button>
+                </div>
+              </header>
+<pre class="code-block"><code class="language-rust"><span class="kw">use</span> aegis_core::crypto::sframe;
+<span class="kw">use</span> std::time::Instant;
+
+<span class="kw">fn</span> <span class="fn">benchmark_encryption</span>() {
+    <span class="kw">let</span> key = sframe::generate_key();
+    <span class="kw">let</span> payload = <span class="kw">vec!</span>[<span class="lit">0u8</span>; <span class="lit">960</span>]; <span class="comment">// 20ms Opus frame</span>
+
+    <span class="kw">let</span> start = Instant::now();
+    <span class="kw">for</span> _ <span class="kw">in</span> <span class="lit">0</span>..<span class="lit">10_000</span> {
+        <span class="kw">let</span> _ = sframe::encrypt(&amp;key, &amp;payload);
+    }
+    <span class="fn">println!</span>(<span class="str">"10k encryptions: {:?}"</span>, start.elapsed());
+}</code></pre>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- Message 3 -->
+      <article class="message" id="msg-3" data-author="CipherNaut" data-timestamp="10:18">
+        <div class="message-avatar purple" aria-hidden="true">C</div>
+        <div class="message-body">
+          <header class="message-header">
+            <span class="message-author purple">CipherNaut</span>
+            <time class="message-timestamp" datetime="2026-07-17T10:18:00">10:18</time>
+          </header>
+          <div class="message-content">
+            <p>Nice! 🔥 Die Zahlen sehen vielversprechend aus. Ich merge den Branch heute Abend.</p>
+          </div>
+        </div>
+      </article>
+
+      <!-- Message 4 -->
+      <article class="message" id="msg-4" data-author="ZenoBot" data-timestamp="10:19">
+        <div class="message-avatar orange" aria-hidden="true">Z</div>
+        <div class="message-body">
+          <header class="message-header">
+            <span class="message-author orange">ZenoBot</span>
+            <span class="badge bot-badge">BOT</span>
+            <time class="message-timestamp" datetime="2026-07-17T10:19:00">10:19</time>
+          </header>
+          <div class="message-content">
+            <p>✅ CI Pipeline für <code class="inline-code">sframe-v2</code> erfolgreich. Build #1847 – alle 234 Tests bestanden.</p>
+          </div>
+        </div>
+      </article>
+
+      <!-- Message 5 -->
+      <article class="message" id="msg-5" data-author="MaxShield" data-timestamp="10:22">
+        <div class="message-avatar blue" aria-hidden="true">M</div>
+        <div class="message-body">
+          <header class="message-header">
+            <span class="message-author blue">MaxShield</span>
+            <time class="message-timestamp" datetime="2026-07-17T10:22:00">10:22</time>
+          </header>
+          <div class="message-content">
+            <p>Perfekt. Hat jemand schon das BYOS-Feature angeschaut? Ich hab meine Nextcloud angebunden.</p>
+            <div class="file-attachment" id="attachment-msg5" data-filename="benchmark_results.json" data-filesize="4.2 KB">
+              <span class="file-attachment-icon" aria-hidden="true"><span class="iconify" data-icon="mage:file-attachment"></span></span>
+              <div class="file-attachment-info">
+                <span class="file-attachment-name">benchmark_results.json</span>
+                <span class="file-attachment-size">4.2 KB</span>
+              </div>
+              <button class="file-attachment-download" id="btn-download-msg5" title="Herunterladen" aria-label="benchmark_results.json herunterladen"><span class="iconify" data-icon="mage:download"></span></button>
+            </div>
+          </div>
+        </div>
+      </article>
+
+    </div>
+
+    <!-- Message Input Area -->
+    <footer class="message-input-area" id="message-input-area">
+      <div class="message-input-container">
+        <button class="input-action-btn left" id="btn-attach-file" title="Datei anhängen" aria-label="Datei anhängen"><span class="iconify" data-icon="mage:plus"></span></button>
+        <div class="message-input-wrapper">
+          <input
+            type="text"
+            class="message-input"
+            id="message-input"
+            placeholder="Nachricht an # allgemein"
+            aria-label="Nachricht eingeben"
+            autocomplete="off"
+          >
+        </div>
+        <div class="input-actions-right">
+          <button class="input-action-btn" id="btn-code-share" title="Code teilen" aria-label="Code teilen"><span class="iconify" data-icon="mage:code"></span></button>
+          <button class="input-action-btn" id="btn-emoji" title="Emoji" aria-label="Emoji auswählen"><span class="iconify" data-icon="mage:emoji-happy"></span></button>
+          <button class="input-action-btn" id="btn-byos-file" title="Datei via BYOS" aria-label="Datei via BYOS anhängen"><span class="iconify" data-icon="mage:file-attachment"></span></button>
+        </div>
+      </div>
+    </footer>
+
+  </main>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       4. MEMBERS SIDEBAR
+       ═══════════════════════════════════════════════════════════════ -->
+  <aside class="members-sidebar" id="members-sidebar">
+
+    <!-- Role: Entwickler -->
+    <section class="member-role-group" data-role="entwickler">
+      <h3 class="role-group-header">ENTWICKLER — 3</h3>
+      <ul class="role-group-list">
+        <li>
+          <div class="member-item" id="member-maxshield" data-user="MaxShield" data-status="online">
+            <div class="member-avatar-wrapper">
+              <div class="member-avatar blue" aria-hidden="true">M</div>
+              <span class="status-dot online" title="Online"></span>
+            </div>
+            <span class="member-name">MaxShield</span>
+          </div>
+        </li>
+        <li>
+          <div class="member-item" id="member-lenacrypt" data-user="LenaCrypt" data-status="online">
+            <div class="member-avatar-wrapper">
+              <div class="member-avatar green" aria-hidden="true">L</div>
+              <span class="status-dot online" title="Online"></span>
+            </div>
+            <span class="member-name">LenaCrypt</span>
+          </div>
+        </li>
+        <li>
+          <div class="member-item" id="member-ciphernaut" data-user="CipherNaut" data-status="online">
+            <div class="member-avatar-wrapper">
+              <div class="member-avatar purple" aria-hidden="true">C</div>
+              <span class="status-dot online" title="Online"></span>
+            </div>
+            <span class="member-name">CipherNaut</span>
+            <span class="badge supporter-badge" title="Unterstützer">⭐</span>
+          </div>
+        </li>
+      </ul>
+    </section>
+
+    <!-- Role: Bots -->
+    <section class="member-role-group" data-role="bots">
+      <h3 class="role-group-header">BOTS — 1</h3>
+      <ul class="role-group-list">
+        <li>
+          <div class="member-item" id="member-zenobot" data-user="ZenoBot" data-status="online">
+            <div class="member-avatar-wrapper">
+              <div class="member-avatar orange" aria-hidden="true">Z</div>
+              <span class="status-dot online" title="Online"></span>
+            </div>
+            <span class="member-name">ZenoBot</span>
+            <span class="badge bot-badge">BOT</span>
+          </div>
+        </li>
+      </ul>
+    </section>
+
+    <!-- Role: Offline -->
+    <section class="member-role-group" data-role="offline">
+      <h3 class="role-group-header">OFFLINE — 2</h3>
+      <ul class="role-group-list">
+        <li>
+          <div class="member-item" id="member-darknode" data-user="DarkNode" data-status="offline">
+            <div class="member-avatar-wrapper">
+              <div class="member-avatar gray" aria-hidden="true">D</div>
+              <span class="status-dot offline" title="Offline"></span>
+            </div>
+            <span class="member-name offline">DarkNode</span>
+          </div>
+        </li>
+        <li>
+          <div class="member-item" id="member-quantumleap" data-user="QuantumLeap" data-status="offline">
+            <div class="member-avatar-wrapper">
+              <div class="member-avatar gray" aria-hidden="true">Q</div>
+              <span class="status-dot offline" title="Offline"></span>
+            </div>
+            <span class="member-name offline">QuantumLeap</span>
+          </div>
+        </li>
+      </ul>
+    </section>
+
+  </aside>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       5. CODE EDITOR MODAL
+       ═══════════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="editor-modal" role="dialog" aria-modal="true" aria-labelledby="editor-modal-title">
+    <div class="code-editor-modal">
+
+      <!-- Modal Header -->
+      <header class="editor-modal-header">
+        <div class="editor-modal-title-area">
+          <span class="editor-filename" id="editor-modal-title">benchmark.rs</span>
+          <span class="badge language-badge">Rust</span>
+        </div>
+        <button class="editor-close-btn modal-close" id="btn-close-editor" title="Schließen" aria-label="Editor schließen"><span class="iconify" data-icon="mage:multiply"></span></button>
+      </header>
+
+      <!-- Code Editor Area -->
+      <div class="editor-code-area" id="editor-code-area">
+<pre class="editor-code"><code class="language-rust"><span class="line-number"> 1</span>  <span class="kw">use</span> aegis_core::crypto::sframe;
+<span class="line-number"> 2</span>  <span class="kw">use</span> std::time::Instant;
+<span class="line-number"> 3</span>
+<span class="line-number"> 4</span>  <span class="kw">fn</span> <span class="fn">benchmark_encryption</span>() {
+<span class="line-number"> 5</span>      <span class="kw">let</span> key = sframe::generate_key();
+<span class="line-number"> 6</span>      <span class="kw">let</span> payload = <span class="kw">vec!</span>[<span class="lit">0u8</span>; <span class="lit">960</span>]; <span class="comment">// 20ms Opus frame</span>
+<span class="line-number"> 7</span>
+<span class="line-number"> 8</span>      <span class="kw">let</span> start = Instant::now();
+<span class="line-number"> 9</span>      <span class="kw">for</span> _ <span class="kw">in</span> <span class="lit">0</span>..<span class="lit">10_000</span> {
+<span class="line-number">10</span>          <span class="kw">let</span> _ = sframe::encrypt(&amp;key, &amp;payload);
+<span class="line-number">11</span>      }
+<span class="line-number">12</span>      <span class="fn">println!</span>(<span class="str">"10k encryptions: {:?}"</span>, start.elapsed());
+<span class="line-number">13</span>  }</code></pre>
+      </div>
+
+      <!-- Bottom Toolbar -->
+      <footer class="editor-modal-toolbar">
+        <button class="editor-toolbar-btn primary btn-run" id="btn-editor-run" title="Ausführen"><span class="iconify" data-icon="mage:play"></span> Run</button>
+        <button class="editor-toolbar-btn btn-copy" id="btn-editor-copy" title="Kopieren"><span class="iconify" data-icon="mage:copy"></span> Copy</button>
+        <button class="editor-toolbar-btn btn-suggest-edit" id="btn-editor-suggest" title="Änderung vorschlagen"><span class="iconify" data-icon="mage:message-round"></span> Suggest</button>
+        <button class="editor-toolbar-btn" id="btn-editor-external" title="Extern öffnen"><span class="iconify" data-icon="mage:external-link"></span></button>
+      </footer>
+
+      <!-- Editor Output Panel -->
+      <div class="editor-output hidden" id="editor-output"></div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       6. SETTINGS MODAL
+       ═══════════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <div class="settings-modal">
+      <!-- Settings Sidebar -->
+      <aside class="settings-sidebar">
+        <div class="settings-sidebar-header">BENUTZER-EINSTELLUNGEN</div>
+        <button class="settings-nav-item active" data-tab="profile">Mein Profil</button>
+        <button class="settings-nav-item" data-tab="appearance">Erscheinungsbild</button>
+        <button class="settings-nav-item" data-tab="byos">BYOS (Speicher)</button>
+        <button class="settings-nav-item" data-tab="security">Sicherheit & Keys</button>
+      </aside>
+      <!-- Settings Content -->
+      <main class="settings-content">
+        <!-- Close Button (Discord Style) -->
+        <div class="settings-close-wrapper">
+          <button class="settings-close-btn" id="btn-close-settings" title="Schließen" aria-label="Einstellungen schließen">
+            <span class="iconify" data-icon="mage:multiply"></span>
+          </button>
+          <span class="settings-close-label">ESC</span>
+        </div>
+          <!-- Tab: Profile -->
+          <div class="settings-tab-content" id="tab-profile">
+            <h3>Kryptografisches Profil</h3>
+            <div class="settings-profile-card">
+              <div class="profile-avatar-large">C</div>
+              <div class="profile-info-large">
+                <span class="profile-name">CipherNaut</span>
+                <span class="profile-status-badge">Unterstützer ⭐</span>
+              </div>
+            </div>
+            <div class="settings-form-group">
+              <label>Kryptografische ID (Ed25519 Public Key)</label>
+              <div class="key-display-wrapper">
+                <code class="key-display">0xA3F9D1E8B2C4F6A0C7D8E9F0A1B2C3D4E5F67890</code>
+                <button class="btn-copy-key" id="btn-copy-pubkey" title="Kopieren"><span class="iconify" data-icon="mage:copy"></span></button>
+              </div>
+            </div>
+            <div class="settings-form-group">
+              <label>Geräte-Kopplung (Device Pairing)</label>
+              <p class="settings-help-text">Kopple ein weiteres Gerät durch Scannen des Pairing-Codes.</p>
+              <button class="settings-btn" id="btn-show-pairing">Pairing starten</button>
+            </div>
+          </div>
+
+          <!-- Tab: Appearance -->
+          <div class="settings-tab-content hidden" id="tab-appearance">
+            <h3>Erscheinungsbild & Canvas</h3>
+            <div class="settings-form-group">
+              <label>Milchglas-Effekt (Glassmorphism)</label>
+              <div class="switch-control">
+                <span>Transparenz- und Blur-Effekte aktivieren</span>
+                <label class="switch">
+                  <input type="checkbox" id="settings-toggle-glass" checked>
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </div>
+            <div class="settings-form-group">
+              <label>Hintergrund-Presets</label>
+              <div class="color-presets" id="settings-color-presets">
+                <!-- Preset buttons will be updated in JS -->
+                <button class="preset-btn active" style="background-color: #18191B;"></button>
+                <button class="preset-btn" style="background-color: #0F1015;"></button>
+                <button class="preset-btn" style="background-color: #0F1411;"></button>
+                <button class="preset-btn" style="background-color: #150F1A;"></button>
+              </div>
+            </div>
+            <div class="settings-form-group">
+              <div class="custom-color-control">
+                <label for="settings-canvas-color">Eigene Hintergrundfarbe:</label>
+                <input type="color" id="settings-canvas-color" value="#18191B">
+              </div>
+            </div>
+            <div class="settings-form-group">
+              <div class="custom-color-control">
+                <label for="settings-glow-color">Radial-Glow Farbe:</label>
+                <input type="color" id="settings-glow-color" value="#3574F0">
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab: BYOS -->
+          <div class="settings-tab-content hidden" id="tab-byos">
+            <h3>Bring Your Own Storage (BYOS)</h3>
+            <p class="settings-help-text">Verbinde deinen eigenen Cloud-Speicher für Datei-Uploads über 10 MB.</p>
+            <div class="settings-form-group">
+              <label for="byos-provider">Speicher-Provider</label>
+              <select id="byos-provider" class="settings-select">
+                <option value="nextcloud">Nextcloud (WebDAV)</option>
+                <option value="s3">AWS S3 / MinIO</option>
+                <option value="dropbox">Dropbox API</option>
+              </select>
+            </div>
+            <div class="settings-form-group">
+              <label for="byos-url">Server-URL</label>
+              <input type="text" id="byos-url" class="settings-input" value="https://cloud.zeno-chat.de/remote.php/dav/files/">
+            </div>
+            <div class="settings-form-group">
+              <label for="byos-user">Benutzername / Key ID</label>
+              <input type="text" id="byos-user" class="settings-input" value="cipher_naut">
+            </div>
+            <button class="settings-btn primary" id="btn-save-byos">Verbindung testen & Speichern</button>
+          </div>
+
+          <!-- Tab: Security -->
+          <div class="settings-tab-content hidden" id="tab-security">
+            <h3>Sicherheit & Recovery</h3>
+            <div class="settings-form-group">
+              <label>Backup-Key (Seed Phrase)</label>
+              <p class="settings-help-text">Sichere deine 12-Wort-Seed-Phrase, um deine Identität auf neuen Geräten wiederherzustellen.</p>
+              <button class="settings-btn" id="btn-show-seed">Backup-Key anzeigen</button>
+            </div>
+            <div class="settings-form-group">
+              <label>Social Recovery (Treuhänder)</label>
+              <p class="settings-help-text">Teile deinen Key via Shamir's Secret Sharing auf 5 vertrauenswürdige Kontakte auf.</p>
+              <button class="settings-btn" id="btn-setup-recovery">Social Recovery einrichten</button>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       7. PROFILE MODAL
+       ═══════════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-card-name">
+    <div class="profile-modal-card">
+      <header class="profile-card-header">
+        <button class="modal-close" id="btn-close-profile" title="Schließen" aria-label="Profil schließen"><span class="iconify" data-icon="mage:multiply"></span></button>
+      </header>
+      <div class="profile-card-body">
+        <div class="profile-card-avatar" id="profile-card-avatar">M</div>
+        <h3 class="profile-card-name" id="profile-card-name">MaxShield</h3>
+        <span class="profile-card-role" id="profile-card-role">ENTWICKLER</span>
+        <div class="profile-card-status" id="profile-card-status">"Schreibe Benchmarks..."</div>
+        
+        <div class="profile-card-section">
+          <label>Kryptografischer Fingerprint</label>
+          <div class="fingerprint-display" id="profile-card-fingerprint">
+            0x8B2C4F6A0C7D8E9F0A1B2C3D4E5F67890
+          </div>
+        </div>
+
+        <div class="profile-card-actions">
+          <button class="profile-action-btn primary" id="btn-profile-dm">Sicheren Chat starten</button>
+          <button class="profile-action-btn" id="btn-profile-verify">Identität verifizieren</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>

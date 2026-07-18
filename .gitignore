@@ -1,0 +1,33 @@
+# Dependency directories
+node_modules/
+jspm_packages/
+web_modules/
+
+# Build and distribution outputs
+dist/
+dist-ssr/
+build/
+out/
+target/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.log
+
+# Editor configurations and temp files
+.vscode/
+.idea/
+*.suo
+*.ntvsca
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+
+# Tauri specific ignores
+desktop/src-tauri/target/
+desktop/src-tauri/binaries/
