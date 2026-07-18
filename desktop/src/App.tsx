@@ -24,12 +24,20 @@ interface Server {
   categories: Category[];
 }
 
+interface MessageAttachment {
+  name: string;
+  size: string;
+  dataUrl?: string;
+  type: string;
+}
+
 interface Message {
   author: string;
   text: string;
   time: string;
   color: string;
   code?: string;
+  attachment?: MessageAttachment;
 }
 
 interface Profile {
@@ -312,6 +320,15 @@ function getLanguageFromExtension(filename: string): string {
   }
 }
 
+const AVAILABLE_COMMANDS = [
+  { name: "/code", desc: "Monaco Editor mit neuer Datei öffnen", icon: "mage:code" },
+  { name: "/editor", desc: "Monaco Editor mit neuer Datei öffnen", icon: "mage:code" },
+  { name: "/theme", desc: "Design umschalten (dunkel/hell)", icon: "mage:moon" },
+  { name: "/mute", desc: "Mikrofon stumm- oder freischalten", icon: "mage:microphone-mute" },
+  { name: "/deafen", desc: "Audio stumm- oder freischalten", icon: "mage:volume-mute" },
+  { name: "/help", desc: "Hilfe-Informationen im Chat anzeigen", icon: "mage:information-circle" }
+];
+
 function getCurrentTimestamp(): string {
   const now = new Date();
   return now.toTimeString().slice(0, 5);
@@ -363,6 +380,9 @@ export default function App() {
   
   // Chat Input State
   const [inputText, setInputText] = useState<string>("");
+  const [pendingAttachment, setPendingAttachment] = useState<{ name: string; size: string; dataUrl?: string; type: string } | null>(null);
+  const chatAttachmentInputRef = useRef<HTMLInputElement | null>(null);
+  const [showCommandSuggestions, setShowCommandSuggestions] = useState<boolean>(false);
   
   // Voice Simulation State
   const [connectedVoice, setConnectedVoice] = useState<string | null>(null);
@@ -467,9 +487,11 @@ export default function App() {
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputText.trim()) return;
+    if (!inputText.trim() && !pendingAttachment) return;
 
     const trimmedInput = inputText.trim();
+    setShowCommandSuggestions(false);
+
     if (trimmedInput.startsWith("/code ") || trimmedInput.startsWith("/editor ")) {
       const spaceIdx = trimmedInput.indexOf(" ");
       const code = trimmedInput.substring(spaceIdx + 1);
@@ -490,13 +512,46 @@ export default function App() {
       setIsEditorOpen(true);
       setInputText("");
       return;
+    } else if (trimmedInput === "/theme") {
+      handleThemeToggle();
+      setInputText("");
+      return;
+    } else if (trimmedInput === "/mute") {
+      setMuted(!muted);
+      showToast(!muted ? "Mikrofon stummgeschaltet" : "Mikrofon aktiviert");
+      setInputText("");
+      return;
+    } else if (trimmedInput === "/deafen") {
+      setDeafened(!deafened);
+      showToast(!deafened ? "Audio stummgeschaltet" : "Audio aktiviert");
+      setInputText("");
+      return;
+    } else if (trimmedInput === "/help") {
+      const helpMsg: Message = {
+        author: "ZenoBot",
+        text: "Hier sind die verfügbaren Befehle:\n• /code - Monaco Editor öffnen\n• /theme - Design wechseln\n• /mute - Stumm schalten\n• /deafen - Audio deaktivieren\n• /help - Diese Liste anzeigen",
+        time: getCurrentTimestamp(),
+        color: "orange"
+      };
+      setChatMessages((prev) => ({
+        ...prev,
+        [activeChannel.id]: [...(prev[activeChannel.id] || []), helpMsg]
+      }));
+      setInputText("");
+      return;
     }
 
     const newMsg: Message = {
       author: "CipherNaut",
-      text: inputText,
+      text: inputText || (pendingAttachment ? `Datei gesendet: ${pendingAttachment.name}` : ""),
       time: getCurrentTimestamp(),
-      color: "purple"
+      color: "purple",
+      attachment: pendingAttachment ? {
+        name: pendingAttachment.name,
+        size: pendingAttachment.size,
+        dataUrl: pendingAttachment.dataUrl,
+        type: pendingAttachment.type
+      } : undefined
     };
 
     setChatMessages((prev) => ({
@@ -504,6 +559,7 @@ export default function App() {
       [activeChannel.id]: [...(prev[activeChannel.id] || []), newMsg]
     }));
     setInputText("");
+    setPendingAttachment(null);
   };
 
   const toggleCategory = (catName: string) => {
@@ -590,6 +646,51 @@ export default function App() {
       showToast(`Datei "${file.name}" geladen`);
     };
     reader.readAsText(file);
+  };
+
+  const handleSaveFile = () => {
+    try {
+      const blob = new Blob([editorCode], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = editorFilename;
+      link.click();
+      URL.revokeObjectURL(url);
+      
+      addRecentFile(editorFilename, editorCode, editorLanguage);
+      showToast(`Datei "${editorFilename}" erfolgreich gespeichert!`);
+    } catch (err: any) {
+      showToast(`Fehler beim Speichern: ${err.message}`);
+    }
+  };
+
+  const handleChatAttachmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const sizeKb = (file.size / 1024).toFixed(1);
+    const sizeStr = `${sizeKb} KB`;
+
+    if (file.type.startsWith("image/")) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setPendingAttachment({
+          name: file.name,
+          size: sizeStr,
+          dataUrl: event.target?.result as string,
+          type: file.type
+        });
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setPendingAttachment({
+        name: file.name,
+        size: sizeStr,
+        type: file.type
+      });
+    }
+    showToast(`Anhang "${file.name}" bereit zum Senden`);
   };
 
   const handleThemeToggle = () => {
@@ -987,6 +1088,41 @@ sys.stderr = io.StringIO()
                       </pre>
                     </div>
                   )}
+
+                  {/* Message Attachment Rendering */}
+                  {msg.attachment && (
+                    <div className="message-attachment-card">
+                      {msg.attachment.dataUrl ? (
+                        <div className="message-attachment-image-wrapper">
+                          <img src={msg.attachment.dataUrl} alt={msg.attachment.name} className="message-attachment-image" />
+                        </div>
+                      ) : (
+                        <div className="message-attachment-file-info">
+                          <Icon icon="mage:file-records" className="attachment-file-icon" />
+                          <div className="attachment-text-details">
+                            <span className="attachment-filename">{msg.attachment.name}</span>
+                            <span className="attachment-filesize">{msg.attachment.size}</span>
+                          </div>
+                          <button 
+                            className="attachment-download-btn" 
+                            onClick={() => {
+                              const blob = new Blob(["Simulierter Dateiinhalt"], { type: msg.attachment?.type || "text/plain" });
+                              const url = URL.createObjectURL(blob);
+                              const link = document.createElement("a");
+                              link.href = url;
+                              link.download = msg.attachment?.name || "file";
+                              link.click();
+                              URL.revokeObjectURL(url);
+                              showToast(`Download von "${msg.attachment?.name}" gestartet`);
+                            }}
+                            title="Herunterladen"
+                          >
+                            <Icon icon="mage:download" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </article>
@@ -995,9 +1131,71 @@ sys.stderr = io.StringIO()
         </div>
 
         {/* Message Input Footer */}
-        <footer className="message-input-area">
+        <footer className="message-input-area" style={{ position: "relative" }}>
+          {/* Hidden file input for attachments */}
+          <input 
+            type="file" 
+            ref={chatAttachmentInputRef} 
+            style={{ display: "none" }} 
+            onChange={handleChatAttachmentChange} 
+          />
+
+          {/* Slash Command Suggestions Popup */}
+          {showCommandSuggestions && (
+            <div className="command-suggestions-popup">
+              <header className="suggestions-header">
+                <span>Verfügbare Befehle</span>
+              </header>
+              <div className="suggestions-list">
+                {AVAILABLE_COMMANDS.filter((cmd) => cmd.name.toLowerCase().startsWith(inputText.toLowerCase())).map((cmd) => (
+                  <button 
+                    key={cmd.name}
+                    type="button"
+                    className="suggestion-item"
+                    onClick={() => {
+                      setInputText(cmd.name + " ");
+                      setShowCommandSuggestions(false);
+                      document.getElementById("chat-input-field")?.focus();
+                    }}
+                  >
+                    <span className="suggestion-icon"><Icon icon={cmd.icon} /></span>
+                    <div className="suggestion-details">
+                      <span className="suggestion-name">{cmd.name}</span>
+                      <span className="suggestion-desc">{cmd.desc}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Pending Attachment Preview */}
+          {pendingAttachment && (
+            <div className="pending-attachment-preview">
+              <div className="attachment-preview-content">
+                {pendingAttachment.dataUrl ? (
+                  <img src={pendingAttachment.dataUrl} alt="Vorschau" className="attachment-preview-img" />
+                ) : (
+                  <Icon icon="mage:file-records" className="attachment-preview-icon" />
+                )}
+                <div className="attachment-preview-info">
+                  <span className="attachment-preview-name">{pendingAttachment.name}</span>
+                  <span className="attachment-preview-size">{pendingAttachment.size}</span>
+                </div>
+              </div>
+              <button 
+                type="button" 
+                className="attachment-preview-remove" 
+                onClick={() => setPendingAttachment(null)}
+                title="Anhang entfernen"
+              >
+                <Icon icon="mage:multiply" />
+              </button>
+            </div>
+          )}
+
           <form className="message-input-container" onSubmit={handleSendMessage}>
-            <button className="input-action-btn" type="button" onClick={() => showToast("Anhänge hochladen erfordert BYOS")} title="Anhang hinzufügen">
+            <button className="input-action-btn" type="button" onClick={() => chatAttachmentInputRef.current?.click()} title="Anhang hinzufügen">
               <Icon icon="mage:plus" />
             </button>
             <div className="message-input-wrapper">
@@ -1007,7 +1205,12 @@ sys.stderr = io.StringIO()
                 id="chat-input-field"
                 placeholder={`Nachricht an # ${activeChannel.name}`}
                 value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setInputText(val);
+                  setShowCommandSuggestions(val.startsWith("/"));
+                }}
+                autoComplete="off"
               />
             </div>
             <div className="input-actions-right">
@@ -1259,6 +1462,13 @@ sys.stderr = io.StringIO()
                   title="Kopieren"
                 >
                   <Icon icon="mage:copy" /> Copy
+                </button>
+                <button 
+                  className="editor-toolbar-btn btn-save" 
+                  onClick={handleSaveFile} 
+                  title="Speichern"
+                >
+                  <Icon icon="mage:save" /> Save
                 </button>
                 <button 
                   className="editor-toolbar-btn btn-suggest-edit" 

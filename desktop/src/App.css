@@ -2131,4 +2131,226 @@ input:checked + .slider:before {
   padding: 12px;
 }
 
+/* ── Slash Command Suggestions Popup ── */
+.command-suggestions-popup {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 16px;
+  right: 16px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4), 0 10px 20px rgba(0, 0, 0, 0.3);
+  z-index: 100;
+  max-height: 250px;
+  overflow-y: auto;
+  animation: slideInUp 0.15s ease-out;
+}
+
+.suggestions-header {
+  padding: 8px 12px;
+  background-color: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+}
+
+.suggestions-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.suggestion-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+  transition: all var(--transition-fast);
+}
+
+.suggestion-item:hover,
+.suggestion-item:focus {
+  background-color: var(--bg-hover);
+}
+
+.suggestion-icon {
+  font-size: 16px;
+  color: var(--accent-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.suggestion-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.suggestion-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.suggestion-desc {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* ── Pending Attachment Preview Bar ── */
+.pending-attachment-preview {
+  margin: 0 16px 8px 16px;
+  padding: 8px 12px;
+  background-color: var(--bg-tertiary);
+  border: 1px dashed var(--accent-color);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  animation: fadeIn 0.2s ease-in;
+}
+
+.attachment-preview-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.attachment-preview-img {
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.attachment-preview-icon {
+  font-size: 24px;
+  color: var(--text-muted);
+}
+
+.attachment-preview-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.attachment-preview-name {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.attachment-preview-size {
+  font-size: 9px;
+  color: var(--text-muted);
+}
+
+.attachment-preview-remove {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all var(--transition-fast);
+}
+
+.attachment-preview-remove:hover {
+  background-color: rgba(224, 85, 85, 0.15);
+  color: var(--accent-danger);
+}
+
+/* ── Rendered Message Attachment Card ── */
+.message-attachment-card {
+  margin-top: 8px;
+  max-width: 300px;
+}
+
+.message-attachment-image-wrapper {
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  max-height: 200px;
+}
+
+.message-attachment-image {
+  width: 100%;
+  height: auto;
+  max-height: 200px;
+  object-fit: contain;
+  display: block;
+}
+
+.message-attachment-file-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.attachment-file-icon {
+  font-size: 28px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.attachment-text-details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.attachment-filename {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.attachment-filesize {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.attachment-download-btn {
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  padding: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.attachment-download-btn:hover {
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+  background-color: rgba(53, 116, 240, 0.1);
+}
+
 
