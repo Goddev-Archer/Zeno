@@ -338,6 +338,7 @@ export default function App() {
   // --- STATE ---
   const [servers, setServers] = useState<Server[]>(initialServers);
   const [activeServerId, setActiveServerId] = useState<string>(initialServers[0].id);
+  const [animatingServerId, setAnimatingServerId] = useState<string | null>(null);
   const activeServer = servers.find((s) => s.id === activeServerId) || servers[0];
   
   const [activeChannel, setActiveChannel] = useState<Channel>(initialServers[0].categories[0].channels[0]);
@@ -478,12 +479,16 @@ export default function App() {
 
   // --- CORE UI ACTIONS ---
   const handleServerSelect = (server: Server) => {
+    setAnimatingServerId(server.id);
     setActiveServerId(server.id);
     // Auto-select first text channel on server change
     const firstTextChan = server.categories.find((c) => c.type === "text")?.channels[0];
     if (firstTextChan) {
       setActiveChannel(firstTextChan);
     }
+    setTimeout(() => {
+      setAnimatingServerId(null);
+    }, 300);
   };
 
   const handleSendMessage = (e: React.FormEvent) => {
@@ -938,7 +943,7 @@ sys.stderr = io.StringIO()
           {servers.map((srv) => (
             <button
               key={srv.id}
-              className={`server-icon ${activeServer.id === srv.id ? "active" : ""}`}
+              className={`server-icon ${activeServer.id === srv.id ? "active" : ""} ${animatingServerId === srv.id ? "indicator-animate" : ""}`}
               onClick={() => handleServerSelect(srv)}
               title={srv.name}
             >
@@ -965,7 +970,7 @@ sys.stderr = io.StringIO()
           </button>
         </header>
 
-        <div className="channel-list">
+        <div className="channel-list" key={activeServer.id}>
           {activeServer.categories.map((cat) => {
             const isCollapsed = collapsedCategories[cat.name];
             return (
@@ -979,15 +984,16 @@ sys.stderr = io.StringIO()
                 
                 {!isCollapsed && (
                   <ul className="category-channels">
-                    {cat.channels.map((ch) => {
+                    {cat.channels.map((ch, idx) => {
                       const isText = cat.type === "text";
                       const isChannelActive = activeChannel.id === ch.id;
                       
                       return (
                         <li key={ch.id}>
                           <button
-                            className={`channel-item ${isChannelActive ? "active" : ""} ${!isText ? "voice-channel" : ""}`}
+                            className={`channel-item channel-item-animate ${isChannelActive ? "active" : ""} ${!isText ? "voice-channel" : ""}`}
                             onClick={() => isText ? setActiveChannel(ch) : handleJoinVoice(ch.id, ch.name)}
+                            style={{ "--idx": Math.min(idx, 6) } as React.CSSProperties}
                           >
                             <span className="channel-icon">
                               <Icon icon={isText ? "mage:hashtag" : "mage:volume-up"} />
@@ -1090,13 +1096,17 @@ sys.stderr = io.StringIO()
         </header>
 
         {/* Message Feed */}
-        <div className="messages-container">
+        <div className="messages-container" key={activeChannel.id}>
           <div className="date-separator" role="separator">
             <span className="date-separator-text">— Heute —</span>
           </div>
 
           {(chatMessages[activeChannel.id] || []).map((msg, i) => (
-            <article key={i} className="message visible">
+            <article 
+              key={i} 
+              className="message message-animate"
+              style={{ "--idx": Math.min(i, 6) } as React.CSSProperties}
+            >
               <div className={`message-avatar ${msg.color}`}>{msg.author[0]}</div>
               <div className="message-body">
                 <header className="message-header">
