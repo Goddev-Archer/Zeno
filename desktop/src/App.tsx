@@ -416,6 +416,7 @@ export default function App() {
   const [activeSettingsTab, setActiveSettingsTab] = useState<string>("profile");
   const [selectedUserProfile, setSelectedUserProfile] = useState<Profile | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState<boolean>(false);
+  const [isEditorDirty, setIsEditorDirty] = useState<boolean>(false);
   const [editorCode, setEditorCode] = useState<string>("");
   const [editorLanguage, setEditorLanguage] = useState<string>("rust");
   const [editorFilename, setEditorFilename] = useState<string>("main.rs");
@@ -1012,11 +1013,31 @@ return \`
       URL.revokeObjectURL(url);
       
       addRecentFile(editorFilename, editorCode, editorLanguage);
+      setIsEditorDirty(false);
       showToast(`Datei "${editorFilename}" erfolgreich gespeichert!`);
     } catch (err: any) {
       showToast(`Fehler beim Speichern: ${err.message}`);
     }
   };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        if (isEditorOpen) {
+          e.preventDefault();
+          handleSaveFile();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isEditorOpen, editorCode, editorFilename, editorLanguage]);
+
+  useEffect(() => {
+    if (!isEditorOpen) {
+      setIsEditorDirty(false);
+    }
+  }, [isEditorOpen]);
 
   const handleRenameFile = (newName: string) => {
     const trimmed = newName.trim();
@@ -2262,6 +2283,7 @@ sys.stderr = io.StringIO()
                       title="Klicke zum Umbenennen"
                     >
                       {editorFilename}
+                      {isEditorDirty && <span style={{ color: "var(--glow-color-1, #3574F0)", marginLeft: "6px", fontSize: "10px" }} title="Ungespeicherte Änderungen">●</span>}
                       <Icon icon="mage:edit" className="filename-edit-icon" style={{ marginLeft: "6px", fontSize: "12px", opacity: 0.6 }} />
                     </span>
                   )}
@@ -2278,7 +2300,10 @@ sys.stderr = io.StringIO()
                   language={editorLanguage}
                   theme="vs-dark"
                   value={editorCode}
-                  onChange={(val) => setEditorCode(val || "")}
+                  onChange={(val) => {
+                    setEditorCode(val || "");
+                    setIsEditorDirty(true);
+                  }}
                   options={{
                     minimap: { enabled: false },
                     fontSize: 13,
@@ -2302,9 +2327,9 @@ sys.stderr = io.StringIO()
                 <button 
                   className="editor-toolbar-btn btn-save" 
                   onClick={handleSaveFile} 
-                  title="Speichern"
+                  title="Speichern (Ctrl+S)"
                 >
-                  <Icon icon="mage:save" /> Save
+                  <Icon icon="lucide:save" /> Save {isEditorDirty && <span style={{ fontSize: "10px", color: "var(--glow-color-1, #3574F0)", marginLeft: "2px" }}>●</span>}
                 </button>
                 <button 
                   className="editor-toolbar-btn btn-suggest-edit" 
