@@ -2062,6 +2062,24 @@ sys.stderr = io.StringIO()
                           </div>
                         );
                       }
+                      if (gitError) {
+                        return (
+                          <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                            <div>
+                              <div style={{ fontSize: "9px", color: "#e05252", padding: "6px 8px", background: "rgba(224,82,82,0.1)", borderRadius: "var(--radius-sm)", marginBottom: "10px", border: "1px solid rgba(224,82,82,0.2)" }} title={gitError}>
+                                ⚠️ Kein lokales Git-Repo oder Befehl nicht verfügbar.
+                              </div>
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: "20px 10px", gap: "8px", marginTop: "10px" }}>
+                                <Icon icon="mage:code" style={{ fontSize: "24px", color: fgMuted }} />
+                                <span style={{ fontSize: "11px", color: fgMuted }}>Initialisiere ein Git-Repository (<code>git init</code>) im Workspace, um den Status anzuzeigen.</span>
+                              </div>
+                            </div>
+                            <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
+                              <button className="settings-btn" onClick={() => { fetchLiveGitData(); showToast("Git-Status aktualisiert"); }} style={{ fontSize: "11px", padding: "6px 12px" }}>Aktualisieren</button>
+                            </div>
+                          </div>
+                        );
+                      }
                       const displayBranch = liveGitStatus?.branch || "main (Simuliert)";
                       const isClean = liveGitStatus ? liveGitStatus.is_clean : true;
                       const commits = liveGitStatus && liveGitCommits.length > 0 ? liveGitCommits : [
@@ -2072,11 +2090,6 @@ sys.stderr = io.StringIO()
                       return (
                         <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                           <div>
-                            {gitError && (
-                              <div style={{ fontSize: "9px", color: "#e05252", padding: "6px 8px", background: "rgba(224,82,82,0.1)", borderRadius: "var(--radius-sm)", marginBottom: "10px", border: "1px solid rgba(224,82,82,0.2)" }} title={gitError}>
-                                ⚠️ Kein lokales Git-Repo oder Befehl nicht verfügbar.
-                              </div>
-                            )}
                             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px", borderBottom: `1px solid ${hasBg ? fgColor + "22" : "var(--border-color)"}`, paddingBottom: "10px" }}>
                               <div>
                                 <span style={{ fontSize: "10px", color: fgMuted, display: "block" }}>Branch</span>
