@@ -779,6 +779,7 @@ return \`
         if (config.weatherApiKey) setWeatherApiKey(config.weatherApiKey);
         if (config.githubToken) setGithubToken(config.githubToken);
         if (config.githubUser) setGithubUser(config.githubUser);
+        if (config.recentFiles) setRecentFiles(config.recentFiles);
       }
     } catch (e) {
       console.warn("Failed to load settings:", e);
@@ -796,7 +797,8 @@ return \`
         weatherApiUrl,
         weatherApiKey,
         githubToken,
-        githubUser
+        githubUser,
+        recentFiles
       });
       await safeInvoke("save_settings", { settings: payload });
     } catch (e) {
@@ -808,20 +810,9 @@ return \`
     if (settingsLoaded) {
       saveCurrentSettings();
     }
-  }, [widgets, dashboardLocation, weatherMode, weatherApiUrl, weatherApiKey, githubToken, githubUser, settingsLoaded]);
+  }, [widgets, dashboardLocation, weatherMode, weatherApiUrl, weatherApiKey, githubToken, githubUser, recentFiles, settingsLoaded]);
 
   // --- WORKSPACE FILESYSTEM (OPTION 2) ---
-  const refreshWorkspaceFiles = async () => {
-    try {
-      const files = await safeInvoke<{ name: string; language: string }[]>("list_workspace_files");
-      if (files) {
-        setRecentFiles(files.map(f => ({ name: f.name, language: f.language, code: "" })));
-      }
-    } catch (e) {
-      console.warn("Failed to list workspace files:", e);
-    }
-  };
-
   const openWorkspaceFile = async (name: string, language: string) => {
     try {
       const code = await safeInvoke<string>("read_workspace_file", { name });
@@ -832,9 +823,13 @@ return \`
       setEditorOutput("");
       setIsEditorOpen(true);
       setIsEditorDirty(false);
+      
+      setRecentFiles(prev => {
+        const filtered = prev.filter(f => f.name !== name);
+        return [{ name, language, code: "" }, ...filtered].slice(0, 10);
+      });
     } catch (e) {
       console.warn("Read workspace file failed, using memory:", e);
-      // Fallback
       setEditorFilename(name);
       setEditorLanguage(language);
       setEditorWorkflowStep("editor");
@@ -857,7 +852,11 @@ return \`
       setEditorCode(initialCode);
       setEditorWorkflowStep("editor");
       setIsEditorDirty(false);
-      refreshWorkspaceFiles();
+      
+      setRecentFiles(prev => {
+        const filtered = prev.filter(f => f.name !== filename);
+        return [{ name: filename, language: lang, code: "" }, ...filtered].slice(0, 10);
+      });
     } catch (e) {
       console.warn("Create file failed, using memory:", e);
       setEditorFilename(filename);
@@ -869,21 +868,14 @@ return \`
     }
   };
 
-  const deleteWorkspaceFile = async (name: string) => {
-    try {
-      await safeInvoke("delete_workspace_file", { name });
-      showToast(`Datei "${name}" gelöscht.`);
-      refreshWorkspaceFiles();
-    } catch (e) {
-      console.warn("Delete file failed, using memory:", e);
-      setRecentFiles(prev => prev.filter(f => f.name !== name));
-    }
+  const removeRecentFileFromHistory = (name: string) => {
+    setRecentFiles(prev => prev.filter(f => f.name !== name));
+    showToast(`Aus Historie entfernt: ${name}`);
   };
 
   // Initial load
   useEffect(() => {
     loadSavedSettings();
-    refreshWorkspaceFiles();
   }, []);
 
   // Fetch real weather data — wttr.in (no key, privacy-friendly) or user-supplied custom API
@@ -1301,15 +1293,14 @@ return \`
   };
 
   const handleDeleteCurrentFile = async () => {
-    if (window.confirm(`Möchtest du die Datei "${editorFilename}" wirklich aus dem Workspace löschen?`)) {
+    if (window.confirm(`Möchtest du die Datei "${editorFilename}" wirklich permanent von der Festplatte löschen?`)) {
       try {
         await safeInvoke("delete_workspace_file", { name: editorFilename });
         showToast(`Datei "${editorFilename}" gelöscht.`);
-        refreshWorkspaceFiles();
       } catch (e) {
-        setRecentFiles((prev) => prev.filter((f) => f.name !== editorFilename));
-        showToast(`Datei "${editorFilename}" gelöscht`);
+        showToast(`Datei "${editorFilename}" gelöscht (Simulation)`);
       }
+      setRecentFiles((prev) => prev.filter((f) => f.name !== editorFilename));
       setEditorCode("");
       setEditorFilename("main.rs");
       setEditorLanguage("rust");
@@ -2609,8 +2600,8 @@ sys.stderr = io.StringIO()
                       </div>
                       <span 
                         className="recent-file-delete-btn"
-                        onClick={(e) => { e.stopPropagation(); deleteWorkspaceFile(file.name); }}
-                        title="Datei löschen"
+                        onClick={(e) => { e.stopPropagation(); removeRecentFileFromHistory(file.name); }}
+                        title="Aus Historie entfernen"
                       >
                         <Icon icon="mage:trash-3" />
                       </span>
