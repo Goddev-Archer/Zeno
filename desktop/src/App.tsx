@@ -361,6 +361,29 @@ function getContrastColor(hex: string): string {
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.5 ? "#0d0f14" : "#f4f4f5";
 }
 
+interface LiveGitStatus {
+  branch: string;
+  is_clean: boolean;
+  modified: number;
+  added: number;
+  deleted: number;
+  untracked: number;
+}
+
+interface LiveGitCommit {
+  hash: string;
+  message: string;
+  date: string;
+}
+
+async function safeInvoke<T>(cmd: string, args?: any): Promise<T> {
+  if (typeof window !== "undefined" && (window as any).__TAURI_INTERNALS__) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke<T>(cmd, args);
+  }
+  throw new Error("Tauri-Umgebung nicht verfügbar.");
+}
+
 function getCurrentTimestamp(): string {
   const now = new Date();
   return now.toTimeString().slice(0, 5);
@@ -430,6 +453,29 @@ export default function App() {
       nightIcon: string;
     }>;
   } | null>(null);
+
+  const [liveGitStatus, setLiveGitStatus] = useState<LiveGitStatus | null>(null);
+  const [liveGitCommits, setLiveGitCommits] = useState<LiveGitCommit[]>([]);
+  const [gitError, setGitError] = useState<string | null>(null);
+
+  const fetchLiveGitData = async () => {
+    try {
+      setGitError(null);
+      const status = await safeInvoke<LiveGitStatus>("get_git_status");
+      setLiveGitStatus(status);
+      const log = await safeInvoke<LiveGitCommit[]>("get_git_log");
+      setLiveGitCommits(log);
+    } catch (e: any) {
+      console.warn("Git integration failed:", e);
+      setGitError(e.message || String(e));
+    }
+  };
+
+  useEffect(() => {
+    fetchLiveGitData();
+    const interval = setInterval(fetchLiveGitData, 15000);
+    return () => clearInterval(interval);
+  }, []);
   const [widgets, setWidgets] = useState<WidgetConfig[]>(DEFAULT_WIDGETS);
   const [dashboardEditMode, setDashboardEditMode] = useState<boolean>(false);
   const [editingWidgetId, setEditingWidgetId] = useState<string | null>(null);
@@ -1494,35 +1540,64 @@ sys.stderr = io.StringIO()
                         </div>
                       </div>
                     )}
-                    {widget.type === "git-status" && (
-                      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                        <div>
-                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px", borderBottom: `1px solid ${hasBg ? fgColor + "22" : "var(--border-color)"}`, paddingBottom: "10px" }}>
-                            <div>
-                              <span style={{ fontSize: "10px", color: fgMuted, display: "block" }}>Branch</span>
-                              <span style={{ fontSize: "12px", fontWeight: "600", color: "#F05032", display: "flex", alignItems: "center", gap: "4px" }}><Icon icon="mage:code" style={{ fontSize: "14px" }} /> main</span>
-                            </div>
-                            <div style={{ textAlign: "right" }}>
-                              <span style={{ fontSize: "10px", color: fgMuted, display: "block" }}>Status</span>
-                              <span className="badge" style={{ backgroundColor: "rgba(89,168,105,0.15)", color: "#59A869", border: "1px solid rgba(89,168,105,0.2)", fontSize: "10px", padding: "2px 6px" }}>Clean</span>
-                            </div>
-                          </div>
-                          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                            <span style={{ fontSize: "9px", fontWeight: "bold", textTransform: "uppercase", color: fgMuted, display: "block", marginBottom: "4px" }}>Letzte Commits</span>
-                            {[["5a69096", "Dashboard widget system: drag, resize, custom colors"], ["140a9f0", "feat(weather): three-mode weather widget"], ["0f551dc", "Add Monaco Editor runtime settings"]].map(([hash, msg]) => (
-                              <div key={hash} style={{ display: "flex", gap: "8px", fontSize: "11px" }}>
-                                <span style={{ color: "var(--glow-color-1,#3574F0)", fontFamily: "var(--font-mono)", fontWeight: "600", flexShrink: 0 }}>{hash}</span>
-                                <span style={{ color: fgColor, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{msg}</span>
+                    {widget.type === "git-status" && (() => {
+                      const displayBranch = liveGitStatus?.branch || "main (Simuliert)";
+                      const isClean = liveGitStatus ? liveGitStatus.is_clean : true;
+                      const commits = liveGitStatus && liveGitCommits.length > 0 ? liveGitCommits : [
+                        { hash: "5a69096", message: "Dashboard widget system: drag, resize, custom colors", date: "vor 2 Std." },
+                        { hash: "140a9f0", message: "feat(weather): three-mode weather widget", date: "vor 4 Std." },
+                        { hash: "0f551dc", message: "Add Monaco Editor runtime settings", date: "vor 1 Tag" }
+                      ];
+                      return (
+                        <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                          <div>
+                            {gitError && (
+                              <div style={{ fontSize: "9px", color: "#e05252", padding: "6px 8px", background: "rgba(224,82,82,0.1)", borderRadius: "var(--radius-sm)", marginBottom: "10px", border: "1px solid rgba(224,82,82,0.2)" }} title={gitError}>
+                                ⚠️ Kein lokales Git-Repo oder Befehl nicht verfügbar.
                               </div>
-                            ))}
+                            )}
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px", borderBottom: `1px solid ${hasBg ? fgColor + "22" : "var(--border-color)"}`, paddingBottom: "10px" }}>
+                              <div>
+                                <span style={{ fontSize: "10px", color: fgMuted, display: "block" }}>Branch</span>
+                                <span style={{ fontSize: "12px", fontWeight: "600", color: "#F05032", display: "flex", alignItems: "center", gap: "4px" }}><Icon icon="mage:code" style={{ fontSize: "14px" }} /> {displayBranch}</span>
+                              </div>
+                              <div style={{ textAlign: "right" }}>
+                                <span style={{ fontSize: "10px", color: fgMuted, display: "block" }}>Status</span>
+                                {isClean ? (
+                                  <span className="badge" style={{ backgroundColor: "rgba(89,168,105,0.15)", color: "#59A869", border: "1px solid rgba(89,168,105,0.2)", fontSize: "10px", padding: "2px 6px" }}>Clean</span>
+                                ) : (
+                                  <span className="badge" style={{ backgroundColor: "rgba(224,82,82,0.15)", color: "#e05252", border: "1px solid rgba(224,82,82,0.2)", fontSize: "10px", padding: "2px 6px" }}>
+                                    {liveGitStatus ? `${liveGitStatus.modified + liveGitStatus.added + liveGitStatus.deleted + liveGitStatus.untracked} Änderungen` : "Geändert"}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {liveGitStatus && !isClean && (
+                              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "12px", fontSize: "10px" }}>
+                                {liveGitStatus.modified > 0 && <span style={{ color: "#FFC66D" }}>{liveGitStatus.modified} modifiziert</span>}
+                                {liveGitStatus.added > 0 && <span style={{ color: "#59A869" }}>{liveGitStatus.added} neu</span>}
+                                {liveGitStatus.deleted > 0 && <span style={{ color: "#e05252" }}>{liveGitStatus.deleted} gelöscht</span>}
+                                {liveGitStatus.untracked > 0 && <span style={{ color: fgMuted }}>{liveGitStatus.untracked} unversioniert</span>}
+                              </div>
+                            )}
+                            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                              <span style={{ fontSize: "9px", fontWeight: "bold", textTransform: "uppercase", color: fgMuted, display: "block", marginBottom: "4px" }}>Letzte Commits</span>
+                              {commits.map((c) => (
+                                <div key={c.hash} style={{ display: "flex", gap: "8px", fontSize: "11px", alignItems: "center" }}>
+                                  <span style={{ color: "var(--glow-color-1,#3574F0)", fontFamily: "var(--font-mono)", fontWeight: "600", flexShrink: 0 }}>{c.hash}</span>
+                                  <span style={{ color: fgColor, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }} title={c.message}>{c.message}</span>
+                                  <span style={{ fontSize: "9px", color: fgMuted, flexShrink: 0 }}>{c.date}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
+                            <button className="settings-btn" onClick={() => { fetchLiveGitData(); showToast("Git-Status aktualisiert"); }} style={{ fontSize: "11px", padding: "6px 12px" }}>Aktualisieren</button>
+                            <button className="settings-btn" onClick={() => showToast("Zeno ist lokal und führt Push-Befehle nur über dein System-Git aus")} style={{ fontSize: "11px", padding: "6px 12px" }}>Push (Lokal)</button>
                           </div>
                         </div>
-                        <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
-                          <button className="settings-btn" onClick={() => showToast("Git Status: clean")} style={{ fontSize: "11px", padding: "6px 12px" }}>Status</button>
-                          <button className="settings-btn" onClick={() => showToast("Git Push simuliert")} style={{ fontSize: "11px", padding: "6px 12px" }}>Push</button>
-                        </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                     {widget.type === "weather" && (
                       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "10px" }}>
                         <div style={{ display: "flex", gap: "8px" }}>
