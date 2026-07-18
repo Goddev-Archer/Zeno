@@ -814,7 +814,7 @@ return \`
   const refreshWorkspaceFiles = async () => {
     try {
       const files = await safeInvoke<{ name: string; language: string }[]>("list_workspace_files");
-      if (files && files.length > 0) {
+      if (files) {
         setRecentFiles(files.map(f => ({ name: f.name, language: f.language, code: "" })));
       }
     } catch (e) {
