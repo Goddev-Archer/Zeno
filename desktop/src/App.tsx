@@ -1405,9 +1405,26 @@ sys.stderr = io.StringIO()
                   <div
                     key={widget.id}
                     draggable={dashboardEditMode}
-                    onDragStart={() => setDraggedWidgetId(widget.id)}
-                    onDragOver={(e) => { e.preventDefault(); }}
-                    onDrop={() => handleWidgetDrop(widget.id)}
+                    onDragStart={(e) => {
+                      setDraggedWidgetId(widget.id);
+                      if (e.dataTransfer) {
+                        e.dataTransfer.effectAllowed = "move";
+                        e.dataTransfer.setData("text/plain", widget.id);
+                      }
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      if (e.dataTransfer) {
+                        e.dataTransfer.dropEffect = "move";
+                      }
+                    }}
+                    onDragEnter={(e) => {
+                      e.preventDefault();
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      handleWidgetDrop(widget.id);
+                    }}
                     onDragEnd={() => setDraggedWidgetId(null)}
                     style={{ gridColumn: `span ${widget.colSpan}`, gridRow: `span ${widget.rowSpan}`, backgroundColor: cardBg, border: `1px solid ${hasBg ? "transparent" : "var(--border-color)"}`, borderRadius: "var(--radius-lg)", padding: "16px", display: "flex", flexDirection: "column", position: "relative", opacity: isDragging ? 0.4 : 1, transition: "opacity 0.2s, box-shadow 0.2s", boxShadow: dashboardEditMode ? "0 0 0 2px var(--glow-color-1,#3574F0)55" : "none", cursor: dashboardEditMode ? "grab" : "default", minHeight: widget.rowSpan === 2 ? "460px" : "220px" }}
                   >
