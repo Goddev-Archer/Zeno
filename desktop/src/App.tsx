@@ -596,6 +596,9 @@ return \`
       return [{ name, code, language: lang }, ...filtered].slice(0, 5);
     });
   };
+
+
+
   
   // Chat Input State
   const [inputText, setInputText] = useState<string>("");
@@ -645,6 +648,128 @@ return \`
     const interval = setInterval(updateTime, 10000);
     return () => clearInterval(interval);
   }, [dashboardLocation]);
+
+  // --- SETTINGS STORE (OPTION 3) ---
+  const [settingsLoaded, setSettingsLoaded] = useState<boolean>(false);
+
+  const loadSavedSettings = async () => {
+    try {
+      const data = await safeInvoke<string>("load_settings");
+      if (data && data !== "{}") {
+        const config = JSON.parse(data);
+        if (config.widgets) setWidgets(config.widgets);
+        if (config.dashboardLocation) setDashboardLocation(config.dashboardLocation);
+        if (config.weatherMode) setWeatherMode(config.weatherMode);
+        if (config.weatherApiUrl) setWeatherApiUrl(config.weatherApiUrl);
+        if (config.weatherApiKey) setWeatherApiKey(config.weatherApiKey);
+        if (config.githubToken) setGithubToken(config.githubToken);
+        if (config.githubUser) setGithubUser(config.githubUser);
+      }
+    } catch (e) {
+      console.warn("Failed to load settings:", e);
+    } finally {
+      setSettingsLoaded(true);
+    }
+  };
+
+  const saveCurrentSettings = async () => {
+    try {
+      const payload = JSON.stringify({
+        widgets,
+        dashboardLocation,
+        weatherMode,
+        weatherApiUrl,
+        weatherApiKey,
+        githubToken,
+        githubUser
+      });
+      await safeInvoke("save_settings", { settings: payload });
+    } catch (e) {
+      console.warn("Failed to save settings:", e);
+    }
+  };
+
+  useEffect(() => {
+    if (settingsLoaded) {
+      saveCurrentSettings();
+    }
+  }, [widgets, dashboardLocation, weatherMode, weatherApiUrl, weatherApiKey, githubToken, githubUser, settingsLoaded]);
+
+  // --- WORKSPACE FILESYSTEM (OPTION 2) ---
+  const refreshWorkspaceFiles = async () => {
+    try {
+      const files = await safeInvoke<{ name: string; language: string }[]>("list_workspace_files");
+      if (files && files.length > 0) {
+        setRecentFiles(files.map(f => ({ name: f.name, language: f.language, code: "" })));
+      }
+    } catch (e) {
+      console.warn("Failed to list workspace files:", e);
+    }
+  };
+
+  const openWorkspaceFile = async (name: string, language: string) => {
+    try {
+      const code = await safeInvoke<string>("read_workspace_file", { name });
+      setEditorFilename(name);
+      setEditorLanguage(language);
+      setEditorCode(code);
+      setEditorWorkflowStep("editor");
+      setEditorOutput("");
+      setIsEditorOpen(true);
+      setIsEditorDirty(false);
+    } catch (e) {
+      console.warn("Read workspace file failed, using memory:", e);
+      // Fallback
+      setEditorFilename(name);
+      setEditorLanguage(language);
+      setEditorWorkflowStep("editor");
+      setEditorOutput("");
+      setIsEditorOpen(true);
+      setIsEditorDirty(false);
+    }
+  };
+
+  const createNewWorkspaceFile = async (filename: string) => {
+    const lang = getLanguageFromExtension(filename);
+    const initialCode = filename.endsWith(".rs") ? "fn main() {\n    println!(\"Hello World!\");\n}" :
+                        filename.endsWith(".py") ? "print(\"Hello World!\")" :
+                        filename.endsWith(".js") || filename.endsWith(".ts") ? "console.log(\"Hello World!\");" : "";
+    try {
+      await safeInvoke("write_workspace_file", { name: filename, content: initialCode });
+      showToast(`Datei "${filename}" auf Festplatte erstellt.`);
+      setEditorFilename(filename);
+      setEditorLanguage(lang);
+      setEditorCode(initialCode);
+      setEditorWorkflowStep("editor");
+      setIsEditorDirty(false);
+      refreshWorkspaceFiles();
+    } catch (e) {
+      console.warn("Create file failed, using memory:", e);
+      setEditorFilename(filename);
+      setEditorLanguage(lang);
+      setEditorCode(initialCode);
+      setEditorWorkflowStep("editor");
+      setIsEditorDirty(false);
+      setRecentFiles(prev => [{ name: filename, language: lang, code: initialCode }, ...prev.filter(f => f.name !== filename)]);
+    }
+  };
+
+  const deleteWorkspaceFile = async (name: string) => {
+    try {
+      await safeInvoke("delete_workspace_file", { name });
+      showToast(`Datei "${name}" gelöscht.`);
+      refreshWorkspaceFiles();
+    } catch (e) {
+      console.warn("Delete file failed, using memory:", e);
+      setRecentFiles(prev => prev.filter(f => f.name !== name));
+    }
+  };
+
+  // Initial load
+  useEffect(() => {
+    loadSavedSettings();
+    refreshWorkspaceFiles();
+  }, []);
 
   // Fetch real weather data — wttr.in (no key, privacy-friendly) or user-supplied custom API
   const [weatherFetching, setWeatherFetching] = useState(false);
@@ -1060,21 +1185,21 @@ return \`
     showToast(`Datei umbenannt in "${trimmed}"`);
   };
 
-  const handleDeleteRecentFile = (e: React.MouseEvent, name: string) => {
-    e.stopPropagation();
-    setRecentFiles((prev) => prev.filter((f) => f.name !== name));
-    showToast(`Datei "${name}" gelöscht`);
-  };
-
-  const handleDeleteCurrentFile = () => {
+  const handleDeleteCurrentFile = async () => {
     if (window.confirm(`Möchtest du die Datei "${editorFilename}" wirklich aus dem Workspace löschen?`)) {
-      setRecentFiles((prev) => prev.filter((f) => f.name !== editorFilename));
+      try {
+        await safeInvoke("delete_workspace_file", { name: editorFilename });
+        showToast(`Datei "${editorFilename}" gelöscht.`);
+        refreshWorkspaceFiles();
+      } catch (e) {
+        setRecentFiles((prev) => prev.filter((f) => f.name !== editorFilename));
+        showToast(`Datei "${editorFilename}" gelöscht`);
+      }
       setEditorCode("");
       setEditorFilename("main.rs");
       setEditorLanguage("rust");
       setEditorWorkflowStep("select_action");
       setEditorOutput("");
-      showToast(`Datei "${editorFilename}" gelöscht`);
     }
   };
 
@@ -1623,7 +1748,7 @@ sys.stderr = io.StringIO()
                         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                           {recentFiles.map((file) => (
                             <div key={file.name} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", backgroundColor: hasBg ? fgColor + "11" : "var(--bg-tertiary)", borderRadius: "var(--radius-sm)", border: `1px solid ${hasBg ? fgColor + "22" : "var(--border-color)"}` }}>
-                              <div onClick={() => { setEditorFilename(file.name); setEditorLanguage(file.language); setEditorCode(file.code); setEditorWorkflowStep("editor"); setEditorOutput(""); setIsEditorOpen(true); }} style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", flex: 1, minWidth: 0 }}>
+                              <div onClick={() => openWorkspaceFile(file.name, file.language)} style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", flex: 1, minWidth: 0 }}>
                                 <Icon icon={file.language === "rust" ? "vscode-icons:file-type-rust" : file.language === "python" ? "vscode-icons:file-type-python" : file.language === "javascript" ? "vscode-icons:file-type-js" : "mage:file-records"} style={{ fontSize: "16px", flexShrink: 0 }} />
                                 <span style={{ fontSize: "12px", fontWeight: "500", color: fgColor, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{file.name}</span>
                               </div>
@@ -2153,13 +2278,7 @@ sys.stderr = io.StringIO()
                     <button 
                       key={file.name} 
                       className="recent-file-item"
-                      onClick={() => {
-                        setEditorFilename(file.name);
-                        setEditorLanguage(file.language);
-                        setEditorCode(file.code);
-                        setEditorWorkflowStep("editor");
-                        setEditorOutput("");
-                      }}
+                      onClick={() => openWorkspaceFile(file.name, file.language)}
                       style={{ position: "relative" }}
                     >
                       <Icon 
@@ -2183,8 +2302,8 @@ sys.stderr = io.StringIO()
                       </div>
                       <span 
                         className="recent-file-delete-btn"
-                        onClick={(e) => handleDeleteRecentFile(e, file.name)}
-                        title="Aus Historie löschen"
+                        onClick={(e) => { e.stopPropagation(); deleteWorkspaceFile(file.name); }}
+                        title="Datei löschen"
                       >
                         <Icon icon="mage:trash-3" />
                       </span>
@@ -2218,15 +2337,7 @@ sys.stderr = io.StringIO()
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       const input = e.currentTarget.value.trim() || "main.rs";
-                      const lang = getLanguageFromExtension(input);
-                      const initialCode = input.endsWith(".rs") ? "fn main() {\n    println!(\"Hello World!\");\n}" :
-                                    input.endsWith(".py") ? "print(\"Hello World!\")" :
-                                    input.endsWith(".js") || input.endsWith(".ts") ? "console.log(\"Hello World!\");" : "";
-                      setEditorFilename(input);
-                      setEditorLanguage(lang);
-                      setEditorCode(initialCode);
-                      setEditorWorkflowStep("editor");
-                      addRecentFile(input, initialCode, lang);
+                      createNewWorkspaceFile(input);
                     }
                   }}
                 />
@@ -2236,15 +2347,7 @@ sys.stderr = io.StringIO()
                     onClick={() => {
                       const inputEl = document.getElementById("editor-new-filename-field") as HTMLInputElement;
                       const input = inputEl?.value.trim() || "main.rs";
-                      const lang = getLanguageFromExtension(input);
-                      const initialCode = input.endsWith(".rs") ? "fn main() {\n    println!(\"Hello World!\");\n}" :
-                                    input.endsWith(".py") ? "print(\"Hello World!\")" :
-                                    input.endsWith(".js") || input.endsWith(".ts") ? "console.log(\"Hello World!\");" : "";
-                      setEditorFilename(input);
-                      setEditorLanguage(lang);
-                      setEditorCode(initialCode);
-                      setEditorWorkflowStep("editor");
-                      addRecentFile(input, initialCode, lang);
+                      createNewWorkspaceFile(input);
                     }}
                   >
                     Erstellen
