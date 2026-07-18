@@ -75,6 +75,8 @@ interface WidgetConfig {
   rowSpan: WidgetRowSpan;
   order: number;
   customCode: string;
+  gitMode?: "local" | "github";
+  gitRepo?: string;
 }
 
 // --- MOCK DATABASE ---
@@ -502,6 +504,7 @@ export default function App() {
         avatarUrl: data.avatar_url,
       });
       showToast(`GitHub-Verbindung hergestellt: @${data.login}`);
+      fetchGithubRepos(githubToken.trim());
     } catch (e: any) {
       console.error(e);
       showToast("GitHub-Verbindung fehlgeschlagen: " + (e.message || String(e)));
@@ -520,6 +523,118 @@ export default function App() {
     setWidgets((prev) => prev.map((w) => (w.id === id ? { ...w, ...patch } : w)));
   const deleteWidget = (id: string) =>
     setWidgets((prev) => prev.filter((w) => w.id !== id).map((w, i) => ({ ...w, order: i })));
+
+  // --- GITHUB REPOS & DETAILS STORE ---
+  const [githubRepos, setGithubRepos] = useState<{ fullName: string; name: string; stars: number }[]>([]);
+  const [githubRepoData, setGithubRepoData] = useState<Record<string, any>>({});
+  const [githubReposLoading, setGithubReposLoading] = useState<boolean>(false);
+  const [gitWidgetTabs, setGitWidgetTabs] = useState<Record<string, string>>({});
+
+  const fetchGithubRepos = async (token = githubToken) => {
+    if (!token.trim()) return;
+    setGithubReposLoading(true);
+    try {
+      const res = await fetch("https://api.github.com/user/repos?per_page=100&sort=updated", {
+        headers: {
+          Authorization: `Bearer ${token.trim()}`,
+          Accept: "application/vnd.github.v3+json",
+        },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const repos = data.map((r: any) => ({
+        fullName: r.full_name,
+        name: r.name,
+        stars: r.stargazers_count,
+      }));
+      setGithubRepos(repos);
+    } catch (e) {
+      console.warn("Failed to fetch GitHub repos:", e);
+    } finally {
+      setGithubReposLoading(false);
+    }
+  };
+
+  const fetchGithubRepoDetails = async (repo: string) => {
+    if (!githubToken.trim() || !repo) return;
+    try {
+      const headers = {
+        Authorization: `Bearer ${githubToken.trim()}`,
+        Accept: "application/vnd.github.v3+json",
+      };
+
+      const repoRes = await fetch(`https://api.github.com/repos/${repo}`, { headers });
+      if (!repoRes.ok) throw new Error(`Repo HTTP ${repoRes.status}`);
+      const repoInfo = await repoRes.json();
+
+      const commitsRes = await fetch(`https://api.github.com/repos/${repo}/commits?per_page=5`, { headers });
+      const commitsData = commitsRes.ok ? await commitsRes.json() : [];
+      const commits = commitsData.map((c: any) => ({
+        hash: c.sha.slice(0, 7),
+        message: c.commit.message.split("\n")[0],
+        date: new Date(c.commit.author.date).toLocaleDateString("de-DE", { day: "numeric", month: "short" }),
+      }));
+
+      const issuesRes = await fetch(`https://api.github.com/repos/${repo}/issues?state=open&per_page=5`, { headers });
+      const issuesData = issuesRes.ok ? await issuesRes.json() : [];
+      const issues = issuesData
+        .filter((i: any) => !i.pull_request)
+        .map((i: any) => ({
+          number: i.number,
+          title: i.title,
+          url: i.html_url,
+        }));
+
+      const pullsRes = await fetch(`https://api.github.com/repos/${repo}/pulls?state=open&per_page=5`, { headers });
+      const pullsData = pullsRes.ok ? await pullsRes.json() : [];
+      const pulls = pullsData.map((p: any) => ({
+        number: p.number,
+        title: p.title,
+        url: p.html_url,
+      }));
+
+      const branchesRes = await fetch(`https://api.github.com/repos/${repo}/branches?per_page=5`, { headers });
+      const branchesData = branchesRes.ok ? await branchesRes.json() : [];
+      const branches = branchesData.map((b: any) => b.name);
+
+      setGithubRepoData((prev) => ({
+        ...prev,
+        [repo]: {
+          stars: repoInfo.stargazers_count,
+          defaultBranch: repoInfo.default_branch,
+          description: repoInfo.description,
+          commits,
+          issues,
+          pulls,
+          branches,
+        },
+      }));
+    } catch (e) {
+      console.warn(`Failed to fetch details for ${repo}:`, e);
+    }
+  };
+
+  useEffect(() => {
+    if (!githubToken.trim()) return;
+    const activeGithubRepos = widgets
+      .filter(w => w.type === "git-status" && w.gitMode === "github" && w.gitRepo)
+      .map(w => w.gitRepo!);
+    if (activeGithubRepos.length === 0) return;
+    const fetchAllActive = () => {
+      activeGithubRepos.forEach(repo => {
+        fetchGithubRepoDetails(repo);
+      });
+    };
+    fetchAllActive();
+    const interval = setInterval(fetchAllActive, 30000);
+    return () => clearInterval(interval);
+  }, [widgets, githubToken]);
+
+  useEffect(() => {
+    if (githubToken.trim()) {
+      fetchGithubRepos();
+    }
+  }, [githubToken]);
 
   const moveWidget = (id: string, direction: "left" | "right") => {
     setWidgets((prev) => {
@@ -1733,6 +1848,57 @@ sys.stderr = io.StringIO()
                             <p style={{ fontSize: "9px", color: "var(--text-muted)", marginTop: "3px" }}>JS-Code der einen HTML-String zurückgibt (return).</p>
                           </div>
                         )}
+                        {widget.type === "git-status" && (
+                          <div>
+                            <label style={{ fontSize: "9px", fontWeight: "600", textTransform: "uppercase", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>Datenquelle</label>
+                            <select 
+                              className="settings-input" 
+                              value={widget.gitMode || "local"} 
+                              onChange={(e) => {
+                                const mode = e.target.value as "local" | "github";
+                                updateWidget(widget.id, { 
+                                  gitMode: mode,
+                                  title: mode === "github" ? "GitHub Repository" : "Git Repository Status"
+                                });
+                              }}
+                              style={{ width: "100%", fontSize: "11px", padding: "5px 8px", marginBottom: "8px" }}
+                            >
+                              <option value="local">Lokal (System-Git)</option>
+                              <option value="github">GitHub API (Cloud)</option>
+                            </select>
+                            
+                            {widget.gitMode === "github" && (
+                              <div>
+                                <label style={{ fontSize: "9px", fontWeight: "600", textTransform: "uppercase", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>Repository</label>
+                                {githubToken ? (
+                                  githubReposLoading ? (
+                                    <span style={{ fontSize: "10px", color: "var(--text-muted)" }}>Lade Repos...</span>
+                                  ) : (
+                                    <select
+                                      className="settings-input"
+                                      value={widget.gitRepo || ""}
+                                      onChange={(e) => {
+                                        const repo = e.target.value;
+                                        updateWidget(widget.id, { 
+                                          gitRepo: repo,
+                                          title: repo ? `GitHub: ${repo.split("/")[1]}` : "GitHub Repository"
+                                        });
+                                      }}
+                                      style={{ width: "100%", fontSize: "11px", padding: "5px 8px" }}
+                                    >
+                                      <option value="">-- Wähle Repo --</option>
+                                      {githubRepos.map((r) => (
+                                        <option key={r.fullName} value={r.fullName}>{r.fullName}</option>
+                                      ))}
+                                    </select>
+                                  )
+                                ) : (
+                                  <p style={{ fontSize: "9px", color: "#e05252" }}>Trage zuerst deinen GitHub-Token in den Einstellungen ein.</p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                     <div style={{ display: "flex", flexDirection: "column", flex: 1, pointerEvents: dashboardEditMode ? "none" : "auto", height: "100%", minHeight: 0 }}>
@@ -1764,6 +1930,143 @@ sys.stderr = io.StringIO()
                       </div>
                     )}
                     {widget.type === "git-status" && (() => {
+                      const isGithub = widget.gitMode === "github";
+                      if (isGithub) {
+                        const repoName = widget.gitRepo;
+                        if (!githubToken.trim()) {
+                          return (
+                            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: "8px", textAlign: "center", padding: "16px" }}>
+                              <Icon icon="mage:github" style={{ fontSize: "28px", color: fgMuted }} />
+                              <span style={{ fontSize: "11px", color: fgMuted }}>Kein GitHub-Token konfiguriert. Trage ihn in den Einstellungen ein.</span>
+                            </div>
+                          );
+                        }
+                        if (!repoName) {
+                          return (
+                            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: "8px", textAlign: "center", padding: "16px" }}>
+                              <Icon icon="mage:settings" style={{ fontSize: "28px", color: fgMuted }} />
+                              <span style={{ fontSize: "11px", color: fgMuted }}>Kein Repository ausgewählt. Klicke oben rechts auf das Zahnrad im Edit-Modus.</span>
+                            </div>
+                          );
+                        }
+                        const data = githubRepoData[repoName];
+                        if (!data) {
+                          return (
+                            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: "8px", padding: "20px" }}>
+                              <span style={{ width: "20px", height: "20px", border: "2px solid rgba(255,255,255,0.2)", borderTopColor: "var(--glow-color-1,#3574F0)", borderRadius: "50%", animation: "spin 0.8s linear infinite", display: "inline-block" }} />
+                              <span style={{ fontSize: "11px", color: fgMuted }}>Lade Repository-Daten...</span>
+                            </div>
+                          );
+                        }
+                        const activeTab = gitWidgetTabs[widget.id] || "commits";
+                        const setActiveTab = (tab: string) => setGitWidgetTabs(prev => ({ ...prev, [widget.id]: tab }));
+                        return (
+                          <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between", height: "100%", minHeight: 0 }}>
+                            <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", paddingBottom: "10px", borderBottom: `1px solid ${hasBg ? fgColor + "22" : "var(--border-color)"}` }}>
+                                <div>
+                                  <span style={{ fontSize: "10px", color: fgMuted, display: "block" }}>Default Branch</span>
+                                  <span style={{ fontSize: "12px", fontWeight: "600", color: "#F05032", display: "flex", alignItems: "center", gap: "4px" }}>
+                                    <Icon icon="mage:code" style={{ fontSize: "14px" }} /> {data.defaultBranch || "main"}
+                                  </span>
+                                </div>
+                                <div style={{ textAlign: "right" }}>
+                                  <span style={{ fontSize: "10px", color: fgMuted, display: "block" }}>Sterne</span>
+                                  <span style={{ fontSize: "12px", fontWeight: "700", color: "#FFC66D", display: "flex", alignItems: "center", gap: "4px", justifyContent: "flex-end" }}>
+                                    ⭐ {data.stars} Stars
+                                  </span>
+                                </div>
+                              </div>
+                              <div style={{ display: "flex", gap: "4px", marginBottom: "12px", borderBottom: `1px solid ${hasBg ? fgColor + "11" : "rgba(255,255,255,0.05)"}`, paddingBottom: "4px" }}>
+                                {[
+                                  { id: "commits", label: "Commits" },
+                                  { id: "issues", label: `Issues (${data.issues?.length || 0})` },
+                                  { id: "pulls", label: `PRs (${data.pulls?.length || 0})` },
+                                  { id: "branches", label: "Branches" }
+                                ].map(tab => (
+                                  <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id)}
+                                    style={{
+                                      fontSize: "10px",
+                                      padding: "4px 8px",
+                                      background: activeTab === tab.id ? (hasBg ? fgColor + "22" : "var(--bg-tertiary)") : "none",
+                                      border: "none",
+                                      borderRadius: "4px",
+                                      color: activeTab === tab.id ? fgColor : fgMuted,
+                                      cursor: "pointer",
+                                      fontWeight: "600",
+                                      transition: "all 0.15s"
+                                    }}
+                                  >
+                                    {tab.label}
+                                  </button>
+                                ))}
+                              </div>
+                              <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+                                {activeTab === "commits" && (
+                                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                    {data.commits && data.commits.map((c: any) => (
+                                      <div key={c.hash} style={{ display: "flex", gap: "8px", fontSize: "11px", alignItems: "center" }}>
+                                        <span style={{ color: "var(--glow-color-1,#3574F0)", fontFamily: "var(--font-mono)", fontWeight: "600", flexShrink: 0 }}>{c.hash}</span>
+                                        <span style={{ color: fgColor, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }} title={c.message}>{c.message}</span>
+                                        <span style={{ fontSize: "9px", color: fgMuted, flexShrink: 0 }}>{c.date}</span>
+                                      </div>
+                                    ))}
+                                    {(!data.commits || data.commits.length === 0) && (
+                                      <span style={{ fontSize: "11px", color: fgMuted }}>Keine Commits vorhanden.</span>
+                                    )}
+                                  </div>
+                                )}
+                                {activeTab === "issues" && (
+                                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                    {data.issues && data.issues.map((i: any) => (
+                                      <a key={i.number} href={i.url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", gap: "6px", fontSize: "11px", textDecoration: "none", color: fgColor, alignItems: "center" }}>
+                                        <span style={{ color: "#e05252", fontWeight: "600", flexShrink: 0 }}>#{i.number}</span>
+                                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }} title={i.title}>{i.title}</span>
+                                      </a>
+                                    ))}
+                                    {(!data.issues || data.issues.length === 0) && (
+                                      <span style={{ fontSize: "11px", color: "#59A869", fontWeight: "600" }}>✓ Keine offenen Issues!</span>
+                                    )}
+                                  </div>
+                                )}
+                                {activeTab === "pulls" && (
+                                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                    {data.pulls && data.pulls.map((p: any) => (
+                                      <a key={p.number} href={p.url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", gap: "6px", fontSize: "11px", textDecoration: "none", color: fgColor, alignItems: "center" }}>
+                                        <span style={{ color: "#59A869", fontWeight: "600", flexShrink: 0 }}>#{p.number}</span>
+                                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }} title={p.title}>{p.title}</span>
+                                      </a>
+                                    ))}
+                                    {(!data.pulls || data.pulls.length === 0) && (
+                                      <span style={{ fontSize: "11px", color: fgMuted }}>Keine offenen Pull Requests.</span>
+                                    )}
+                                  </div>
+                                )}
+                                {activeTab === "branches" && (
+                                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                                    {data.branches && data.branches.map((b: string) => (
+                                      <span key={b} className="badge" style={{ backgroundColor: "rgba(53,116,240,0.1)", color: "var(--glow-color-1,#3574F0)", border: "1px solid rgba(53,116,240,0.2)", fontSize: "10px", padding: "3px 8px", borderRadius: "4px" }}>
+                                        {b}
+                                      </span>
+                                    ))}
+                                    {(!data.branches || data.branches.length === 0) && (
+                                      <span style={{ fontSize: "11px", color: fgMuted }}>Keine Branches geladen.</span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
+                              <button className="settings-btn" onClick={() => { fetchGithubRepoDetails(repoName); showToast("GitHub-Daten aktualisiert"); }} style={{ fontSize: "11px", padding: "6px 12px" }}>Aktualisieren</button>
+                              <a href={`https://github.com/${repoName}`} target="_blank" rel="noopener noreferrer" className="settings-btn primary" style={{ fontSize: "11px", padding: "6px 12px", textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                Auf GitHub öffnen
+                              </a>
+                            </div>
+                          </div>
+                        );
+                      }
                       const displayBranch = liveGitStatus?.branch || "main (Simuliert)";
                       const isClean = liveGitStatus ? liveGitStatus.is_clean : true;
                       const commits = liveGitStatus && liveGitCommits.length > 0 ? liveGitCommits : [
