@@ -1450,12 +1450,12 @@ sys.stderr = io.StringIO()
                         )}
                       </div>
                     )}
-                    <div className="card-header" style={{ display: "flex", alignItems: "center", gap: "8px", borderBottom: `1px solid ${hasBg ? fgColor + "22" : "var(--border-color)"}`, paddingBottom: "10px", marginBottom: "12px" }}>
+                    <div className="card-header" style={{ display: "flex", alignItems: "center", gap: "8px", borderBottom: `1px solid ${hasBg ? fgColor + "22" : "var(--border-color)"}`, paddingBottom: "10px", marginBottom: "12px", paddingRight: dashboardEditMode ? "56px" : "0px" }}>
+                      {dashboardEditMode && <span style={{ fontSize: "14px", color: fgMuted, cursor: "grab", userSelect: "none" }} title="Ziehen zum Verschieben">⠿</span>}
                       <span style={{ fontSize: "18px", color: hasBg ? fgColor : "var(--accent-color)" }}>
                         <Icon icon={widget.type === "recent-files" ? "mage:file-records" : widget.type === "git-status" ? "mage:github" : widget.type === "weather" ? "mage:sun" : widget.type === "privacy-guard" ? "mage:shield" : "mage:code"} />
                       </span>
-                      <h3 style={{ fontSize: "13px", fontWeight: "600", color: fgColor, flex: 1 }}>{widget.title}</h3>
-                      {dashboardEditMode && <span style={{ fontSize: "14px", color: "var(--text-muted)", cursor: "grab", userSelect: "none" }}>⠿</span>}
+                      <h3 style={{ fontSize: "13px", fontWeight: "600", color: fgColor, flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{widget.title}</h3>
                     </div>
                     {widget.type === "recent-files" && (
                       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
