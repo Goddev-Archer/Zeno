@@ -1932,15 +1932,19 @@ sys.stderr = io.StringIO()
                     {widget.type === "git-status" && (() => {
                       const isGithub = widget.gitMode === "github";
                       if (isGithub) {
-                        const repoName = widget.gitRepo;
                         if (!githubToken.trim()) {
                           return (
-                            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: "8px", textAlign: "center", padding: "16px" }}>
-                              <Icon icon="mage:github" style={{ fontSize: "28px", color: fgMuted }} />
-                              <span style={{ fontSize: "11px", color: fgMuted }}>Kein GitHub-Token konfiguriert. Trage ihn in den Einstellungen ein.</span>
+                            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", position: "relative", height: "100%", width: "100%", overflow: "hidden", borderRadius: "8px" }}>
+                              <img 
+                                src="/github_placeholder.jpg" 
+                                alt="Hier könnten Ihre Repos angezeigt werden" 
+                                style={{ width: "100%", height: "100%", objectFit: "cover", position: "absolute", top: 0, left: 0 }} 
+                              />
+                              <div style={{ position: "absolute", inset: 0, border: "1px solid rgba(255,255,255,0.05)", pointerEvents: "none" }} />
                             </div>
                           );
                         }
+                        const repoName = widget.gitRepo;
                         if (!repoName) {
                           return (
                             <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: "8px", textAlign: "center", padding: "16px" }}>
