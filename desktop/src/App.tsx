@@ -367,6 +367,14 @@ export default function App() {
   const [isRenaming, setIsRenaming] = useState<boolean>(false);
   const [editorWorkflowStep, setEditorWorkflowStep] = useState<"select_action" | "input_filename" | "editor">("select_action");
   const [editorOutput, setEditorOutput] = useState<string>("");
+  const [editorRuntimes, setEditorRuntimes] = useState<Record<string, "installed" | "not_installed" | "installing">>({
+    javascript: "installed",
+    typescript: "installed",
+    python: "not_installed",
+    rust: "not_installed",
+    csharp: "not_installed",
+    cpp: "not_installed"
+  });
   const [recentFiles, setRecentFiles] = useState<RecentFile[]>([
     { name: "main.rs", code: "fn main() {\n    println!(\"Hello World!\");\n}", language: "rust" },
     { name: "index.js", code: "console.log(\"Hello Zeno!\");", language: "javascript" },
@@ -710,6 +718,22 @@ export default function App() {
     }
   };
 
+  const handleInstallRuntime = (lang: string) => {
+    setEditorRuntimes((prev) => ({ ...prev, [lang]: "installing" }));
+    showToast(`Herunterladen der ${lang.toUpperCase()}-Umgebung gestartet...`);
+    setTimeout(() => {
+      setEditorRuntimes((prev) => ({ ...prev, [lang]: "installed" }));
+      showToast(`Laufzeitumgebung für ${lang.toUpperCase()} erfolgreich installiert!`);
+    }, 2000);
+  };
+
+  const handleDeleteRuntime = (lang: string) => {
+    if (window.confirm(`Möchtest du die Laufzeitumgebung für ${lang.toUpperCase()} deinstallieren?`)) {
+      setEditorRuntimes((prev) => ({ ...prev, [lang]: "not_installed" }));
+      showToast(`Laufzeitumgebung für ${lang.toUpperCase()} entfernt.`);
+    }
+  };
+
   const handleChatAttachmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -748,6 +772,15 @@ export default function App() {
   const handleEditorRun = () => {
     const codeToRun = editorCode;
     const lang = editorLanguage.toLowerCase();
+
+    const runtimeStatus = editorRuntimes[lang] || "installed";
+    if (runtimeStatus === "not_installed") {
+      setEditorOutput(`Fehler: Die Laufzeitumgebung für "${lang.toUpperCase()}" ist nicht installiert.\n\nBitte gehe in die Einstellungen (Zahnrad-Symbol unten links) -> Registerkarte "Monaco-Editor" und klicke auf "Download & Installieren", um diese Laufzeitunterstützung einzubinden.`);
+      return;
+    } else if (runtimeStatus === "installing") {
+      setEditorOutput(`Laufzeitumgebung für "${lang.toUpperCase()}" wird momentan heruntergeladen und installiert...\nBitte warte kurz und versuche es dann erneut.`);
+      return;
+    }
 
     if (lang === "javascript" || lang === "typescript") {
       setEditorOutput("Kompiliere & starte JS/TS Sandbox...");
@@ -1621,6 +1654,12 @@ sys.stderr = io.StringIO()
             >
               Sicherheit & Keys
             </button>
+            <button 
+              className={`settings-nav-item ${activeSettingsTab === "editor" ? "active" : ""}`} 
+              onClick={() => setActiveSettingsTab("editor")}
+            >
+              Monaco-Editor
+            </button>
           </aside>
 
           <main className="settings-content">
@@ -1761,6 +1800,70 @@ sys.stderr = io.StringIO()
                     <label>Social Recovery (Treuhänder)</label>
                     <p className="settings-help-text">Teile deinen Key via Shamir's Secret Sharing auf 5 vertrauenswürdige Kontakte auf.</p>
                     <button className="settings-btn" onClick={() => showToast("Social Recovery Setup gestartet")}>Social Recovery einrichten</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab: Monaco-Editor */}
+              {activeSettingsTab === "editor" && (
+                <div className="settings-tab-content" id="tab-editor">
+                  <h3>Monaco-Editor Laufzeitumgebungen</h3>
+                  <p className="settings-help-text">
+                    Verwalte hier die clientseitigen Sandboxen und Compiler-Bibliotheken für verschiedene Programmiersprachen.
+                  </p>
+
+                  <div className="runtime-settings-list" style={{ marginTop: "20px", display: "flex", flexDirection: "column", gap: "16px" }}>
+                    {[
+                      { id: "javascript", name: "JavaScript / TypeScript Sandbox", desc: "Native isolierte Sandbox-Laufzeit im Web Worker. Keine Downloads erforderlich.", size: "0 MB (integriert)", icon: "vscode-icons:file-type-js" },
+                      { id: "python", name: "Python WebAssembly Playground (Pyodide)", desc: "Lokale Python-Ausführung über den Pyodide WASM-Interpreter.", size: "12.8 MB", icon: "vscode-icons:file-type-python" },
+                      { id: "rust", name: "Rust Compiler Simulator & Aegis Crypto", desc: "Rust-Laufzeitsimulation und lokale Aegis Kryptografie-Pakete.", size: "4.5 MB", icon: "vscode-icons:file-type-rust" },
+                      { id: "csharp", name: ".NET Sandbox Simulator (C#)", desc: ".NET CLR Simulator zur clientseitigen Ausführung von C#-Codeblöcken.", size: "8.2 MB", icon: "vscode-icons:file-type-csharp" },
+                      { id: "cpp", name: "C / C++ Compiler Simulator (WASM-based)", desc: "WebAssembly-basierter gcc/g++-Simulator zur lokalen Code-Validierung.", size: "6.1 MB", icon: "vscode-icons:file-type-cpp" }
+                    ].map((rt) => {
+                      const status = editorRuntimes[rt.id];
+                      return (
+                        <div key={rt.id} className="runtime-card" style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "16px",
+                          backgroundColor: "var(--bg-tertiary)",
+                          border: "1px solid var(--border-color)",
+                          borderRadius: "var(--radius-md)",
+                          gap: "16px"
+                        }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                            <Icon icon={rt.icon} style={{ fontSize: "28px", flexShrink: 0 }} />
+                            <div style={{ display: "flex", flexDirection: "column" }}>
+                              <span style={{ fontSize: "13px", fontWeight: "600", color: "var(--text-primary)" }}>{rt.name}</span>
+                              <span style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>{rt.desc}</span>
+                              <span style={{ fontSize: "9px", color: "var(--glow-color-1, #3574F0)", fontWeight: "600", marginTop: "4px" }}>Größe: {rt.size}</span>
+                            </div>
+                          </div>
+                          
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
+                            {status === "installed" ? (
+                              <>
+                                <span className="badge" style={{ backgroundColor: "rgba(89, 168, 105, 0.15)", color: "#59A869", border: "1px solid rgba(89, 168, 105, 0.3)" }}>Bereit</span>
+                                {rt.id !== "javascript" && (
+                                  <button className="settings-btn" onClick={() => handleDeleteRuntime(rt.id)} style={{ padding: "6px 12px", color: "var(--accent-danger)" }}>Deinstallieren</button>
+                                )}
+                              </>
+                            ) : status === "installing" ? (
+                              <>
+                                <span className="badge" style={{ backgroundColor: "rgba(255, 198, 109, 0.15)", color: "#FFC66D", border: "1px solid rgba(255, 198, 109, 0.3)" }}>Installiert...</span>
+                                <div className="spinner" style={{ width: "16px", height: "16px", border: "2px solid var(--border-color)", borderTopColor: "var(--accent-color)", borderRadius: "50%", animation: "zeno-pulse 1s linear infinite" }} />
+                              </>
+                            ) : (
+                              <>
+                                <span className="badge" style={{ backgroundColor: "rgba(255, 255, 255, 0.05)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>Nicht installiert</span>
+                                <button className="settings-btn primary" onClick={() => handleInstallRuntime(rt.id)} style={{ padding: "6px 12px" }}>Download & Installieren</button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
