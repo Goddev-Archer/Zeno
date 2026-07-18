@@ -1545,7 +1545,8 @@ sys.stderr = io.StringIO()
                         )}
                       </div>
                     )}
-                    <div className="card-header" style={{ display: "flex", alignItems: "center", gap: "8px", borderBottom: `1px solid ${hasBg ? fgColor + "22" : "var(--border-color)"}`, paddingBottom: "10px", marginBottom: "12px", paddingRight: dashboardEditMode ? "56px" : "0px" }}>
+                    <div style={{ display: "flex", flexDirection: "column", flex: 1, pointerEvents: dashboardEditMode ? "none" : "auto", height: "100%", minHeight: 0 }}>
+                      <div className="card-header" style={{ display: "flex", alignItems: "center", gap: "8px", borderBottom: `1px solid ${hasBg ? fgColor + "22" : "var(--border-color)"}`, paddingBottom: "10px", marginBottom: "12px", paddingRight: dashboardEditMode ? "56px" : "0px" }}>
                       {dashboardEditMode && <span style={{ fontSize: "14px", color: fgMuted, cursor: "grab", userSelect: "none" }} title="Ziehen zum Verschieben">⠿</span>}
                       <span style={{ fontSize: "18px", color: hasBg ? fgColor : "var(--accent-color)" }}>
                         <Icon icon={widget.type === "recent-files" ? "mage:file-records" : widget.type === "git-status" ? "mage:github" : widget.type === "weather" ? "mage:sun" : widget.type === "privacy-guard" ? "mage:shield" : "mage:code"} />
@@ -1771,6 +1772,7 @@ sys.stderr = io.StringIO()
                         />
                       </div>
                     )}
+                    </div>
                   </div>
                 );
               })}
