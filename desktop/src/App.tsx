@@ -407,10 +407,23 @@ export default function App() {
     csharp: "not_installed",
     cpp: "not_installed"
   });
-  const [weatherMode, setWeatherMode] = useState<"simulated" | "wttr" | "custom">("simulated");
+  const [weatherMode, setWeatherMode] = useState<"wttr" | "custom">("wttr");
   const [weatherApiKey, setWeatherApiKey] = useState<string>("");
   const [weatherApiUrl, setWeatherApiUrl] = useState<string>("https://api.openweathermap.org/data/2.5/weather?q={city}&appid={key}&units=metric&lang=de");
-  const [realWeatherData, setRealWeatherData] = useState<{ temp: string; condition: string; icon: string; humidity: string; wind: string } | null>(null);
+  const [realWeatherData, setRealWeatherData] = useState<{
+    temp: string;
+    condition: string;
+    icon: string;
+    humidity: string;
+    wind: string;
+    forecast?: Array<{
+      date: string;
+      tempMin: string;
+      tempMax: string;
+      condition: string;
+      icon: string;
+    }>;
+  } | null>(null);
   const [widgets, setWidgets] = useState<WidgetConfig[]>(DEFAULT_WIDGETS);
   const [dashboardEditMode, setDashboardEditMode] = useState<boolean>(false);
   const [editingWidgetId, setEditingWidgetId] = useState<string | null>(null);
@@ -519,25 +532,11 @@ return \`
     return () => clearInterval(interval);
   }, [dashboardLocation]);
 
-  const getMockWeather = (loc: string) => {
-    const l = loc.toLowerCase();
-    if (l.includes("tokyo") || l.includes("tokio")) {
-      return { temp: "26°C", condition: "Klar & Windig", icon: "mage:sun", humidity: "54%", wind: "18 km/h" };
-    } else if (l.includes("new york") || l.includes("nyc")) {
-      return { temp: "22°C", condition: "Leicht bewölkt", icon: "mage:cloudy", humidity: "62%", wind: "14 km/h" };
-    } else if (l.includes("london")) {
-      return { temp: "16°C", condition: "Regnerisch / Sprühregen", icon: "mage:volume-mute", humidity: "88%", wind: "22 km/h" };
-    } else {
-      return { temp: "19°C", condition: "Sonnig / Heiter", icon: "mage:sun", humidity: "45%", wind: "10 km/h" };
-    }
-  };
-
   // Fetch real weather data — wttr.in (no key, privacy-friendly) or user-supplied custom API
   const [weatherFetching, setWeatherFetching] = useState(false);
   const fetchRealWeather = async () => {
     if (!dashboardLocation.trim()) { showToast("Bitte einen Standort eingeben."); return; }
     setWeatherFetching(true);
-    setRealWeatherData(null);
     try {
       if (weatherMode === "wttr") {
         // wttr.in: city name only, no API key, open source, self-hostable
@@ -560,7 +559,32 @@ return \`
         else if (code >= 700 && code < 800) icon = "mage:cloudy";
         else if (code === 800) icon = "mage:sun";
         else if (code > 800) icon = "mage:cloudy";
-        setRealWeatherData({ temp: tempC + "°C", condition: desc, icon, humidity, wind: windKmph });
+
+        // Parse 3-day forecast
+        const forecast = (data.weather || []).map((day: any) => {
+          const midHour = day.hourly?.[4] || day.hourly?.[0];
+          const fCode = parseInt(midHour?.weatherCode || "800", 10);
+          const fDesc = midHour?.lang_de?.[0]?.value || midHour?.weatherDesc?.[0]?.value || "Unbekannt";
+          let fIcon = "mage:sun";
+          if (fCode >= 200 && fCode < 300) fIcon = "mage:lightning";
+          else if (fCode >= 300 && fCode < 700) fIcon = "mage:cloudy";
+          else if (fCode >= 700 && fCode < 800) fIcon = "mage:cloudy";
+          else if (fCode > 800) fIcon = "mage:cloudy";
+
+          const dateObj = new Date(day.date);
+          const weekday = dateObj.toLocaleDateString('de-DE', { weekday: 'short' });
+          const formattedDate = dateObj.toLocaleDateString('de-DE', { day: 'numeric', month: 'short' });
+
+          return {
+            date: `${weekday}, ${formattedDate}`,
+            tempMin: day.mintempC + "°C",
+            tempMax: day.maxtempC + "°C",
+            condition: fDesc,
+            icon: fIcon
+          };
+        });
+
+        setRealWeatherData({ temp: tempC + "°C", condition: desc, icon, humidity, wind: windKmph, forecast });
         showToast(`Wetterdaten für ${dashboardLocation} aktualisiert (wttr.in)`);
       } else if (weatherMode === "custom") {
         if (!weatherApiKey.trim() && weatherApiUrl.includes("{key}")) {
@@ -595,6 +619,10 @@ return \`
       setWeatherFetching(false);
     }
   };
+
+  useEffect(() => {
+    fetchRealWeather();
+  }, [weatherMode]);
 
   // --- DYNAMIC BACKGROUND & THEME SYNC ---
   useEffect(() => {
@@ -1458,9 +1486,16 @@ sys.stderr = io.StringIO()
                     {widget.type === "weather" && (
                       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "10px" }}>
                         <div style={{ display: "flex", gap: "8px" }}>
-                          <input type="text" className="settings-input" placeholder="Standort (z. B. Berlin)" value={dashboardLocation} onChange={(e) => { setDashboardLocation(e.target.value); setRealWeatherData(null); }} style={{ flex: 1, padding: "6px 10px", fontSize: "12px", maxWidth: "none" }} />
-                          <select className="settings-input" value={weatherMode} onChange={(e) => { setWeatherMode(e.target.value as "simulated" | "wttr" | "custom"); setRealWeatherData(null); }} style={{ padding: "6px 8px", fontSize: "11px", width: "auto", flexShrink: 0 }}>
-                            <option value="simulated">Simuliert</option>
+                          <input
+                            type="text"
+                            className="settings-input"
+                            placeholder="Standort (z. B. Berlin) + Enter"
+                            value={dashboardLocation}
+                            onChange={(e) => { setDashboardLocation(e.target.value); setRealWeatherData(null); }}
+                            onKeyDown={(e) => { if (e.key === "Enter") fetchRealWeather(); }}
+                            style={{ flex: 1, padding: "6px 10px", fontSize: "12px", maxWidth: "none" }}
+                          />
+                          <select className="settings-input" value={weatherMode} onChange={(e) => { setWeatherMode(e.target.value as "wttr" | "custom"); setRealWeatherData(null); }} style={{ padding: "6px 8px", fontSize: "11px", width: "auto", flexShrink: 0 }}>
                             <option value="wttr">wttr.in</option>
                             <option value="custom">Custom API</option>
                           </select>
@@ -1471,33 +1506,58 @@ sys.stderr = io.StringIO()
                             <input type="password" className="settings-input" placeholder="API-Key" value={weatherApiKey} onChange={(e) => setWeatherApiKey(e.target.value)} style={{ fontSize: "11px", padding: "5px 8px", maxWidth: "none" }} />
                           </div>
                         )}
-                        {(() => {
-                          const w = realWeatherData ?? getMockWeather(dashboardLocation);
-                          const isReal = !!realWeatherData;
-                          return (
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", backgroundColor: hasBg ? fgColor + "11" : "var(--bg-tertiary)", borderRadius: "var(--radius-md)", border: `1px solid ${isReal ? "rgba(89,168,105,0.3)" : hasBg ? fgColor + "22" : "var(--border-color)"}` }}>
+                        {!realWeatherData ? (
+                          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "8px", padding: "20px", textAlign: "center" }}>
+                            {weatherFetching ? (
+                              <>
+                                <span style={{ width: "20px", height: "20px", border: "2px solid rgba(255,255,255,0.2)", borderTopColor: "var(--glow-color-1,#3574F0)", borderRadius: "50%", animation: "spin 0.8s linear infinite", display: "inline-block" }} />
+                                <span style={{ fontSize: "11px", color: fgMuted }}>Lade Wetterdaten...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Icon icon="mage:sun" style={{ fontSize: "28px", color: fgMuted }} />
+                                <span style={{ fontSize: "11px", color: fgMuted }}>Keine Wetterdaten geladen</span>
+                              </>
+                            )}
+                          </div>
+                        ) : (
+                          <>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", backgroundColor: hasBg ? fgColor + "11" : "var(--bg-tertiary)", borderRadius: "var(--radius-md)", border: `1px solid ${hasBg ? fgColor + "22" : "var(--border-color)"}` }}>
                               <div>
-                                <span style={{ fontSize: "24px", fontWeight: "700", display: "block", color: fgColor }}>{w.temp}</span>
+                                <span style={{ fontSize: "24px", fontWeight: "700", display: "block", color: fgColor }}>{realWeatherData.temp}</span>
                                 <span style={{ fontSize: "12px", fontWeight: "600", color: fgMuted }}>{dashboardLocation}</span>
                                 <span style={{ fontSize: "10px", display: "block", color: "var(--glow-color-1,#3574F0)", marginTop: "4px" }}>{dashboardTime}</span>
                               </div>
                               <div style={{ textAlign: "right" }}>
-                                <Icon icon={w.icon} style={{ fontSize: "28px", color: "#FFC66D", display: "block", marginLeft: "auto", marginBottom: "2px" }} />
-                                <span style={{ fontSize: "11px", color: fgColor, display: "block" }}>{w.condition}</span>
-                                <span style={{ fontSize: "9px", color: fgMuted, display: "block" }}>{w.humidity} / {w.wind}</span>
+                                <Icon icon={realWeatherData.icon} style={{ fontSize: "28px", color: "#FFC66D", display: "block", marginLeft: "auto", marginBottom: "2px" }} />
+                                <span style={{ fontSize: "11px", color: fgColor, display: "block" }}>{realWeatherData.condition}</span>
+                                <span style={{ fontSize: "9px", color: fgMuted, display: "block" }}>{realWeatherData.humidity} / {realWeatherData.wind}</span>
                               </div>
                             </div>
-                          );
-                        })()}
-                        {weatherMode !== "simulated" && (
-                          <button className="settings-btn primary" onClick={fetchRealWeather} disabled={weatherFetching} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", fontSize: "11px", padding: "6px 12px" }}>
-                            {weatherFetching ? "Lade..." : "Aktualisieren"}
-                          </button>
+
+                            {realWeatherData.forecast && realWeatherData.forecast.length > 0 && (
+                              <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: `1px solid ${hasBg ? fgColor + "22" : "var(--border-color)"}` }}>
+                                <span style={{ fontSize: "9px", fontWeight: "bold", textTransform: "uppercase", color: fgMuted, display: "block", marginBottom: "6px" }}>3-Tage-Vorhersage (wttr.in)</span>
+                                <div style={{ display: "flex", gap: "6px", justifyContent: "space-between" }}>
+                                  {realWeatherData.forecast.map((f, idx) => (
+                                    <div key={idx} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", padding: "6px", backgroundColor: hasBg ? fgColor + "08" : "var(--bg-tertiary)", borderRadius: "var(--radius-sm)", border: `1px solid ${hasBg ? fgColor + "15" : "var(--border-color)"}`, textAlign: "center" }}>
+                                      <span style={{ fontSize: "9px", fontWeight: "600", color: fgColor }}>{f.date}</span>
+                                      <Icon icon={f.icon} style={{ fontSize: "16px", color: "#FFC66D", margin: "2px 0" }} />
+                                      <span style={{ fontSize: "10px", fontWeight: "700", color: fgColor }}>{f.tempMax}</span>
+                                      <span style={{ fontSize: "8px", color: fgMuted }}>{f.tempMin}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </>
                         )}
+                        <button className="settings-btn primary" onClick={fetchRealWeather} disabled={weatherFetching} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", fontSize: "11px", padding: "6px 12px" }}>
+                          {weatherFetching ? "Lade..." : "Aktualisieren"}
+                        </button>
                         <p style={{ fontSize: "9px", color: fgMuted, lineHeight: "1.4", marginTop: "auto" }}>
-                          {weatherMode === "simulated" && "Vollstaendig offline."}
-                          {weatherMode === "wttr" && "wttr.in: kein Account, kein Tracking."}
-                          {weatherMode === "custom" && "API-Key bleibt lokal."}
+                          {weatherMode === "wttr" && "🌐 wttr.in: kein Account, kein Tracking."}
+                          {weatherMode === "custom" && "🔑 API-Key bleibt lokal."}
                         </p>
                       </div>
                     )}
