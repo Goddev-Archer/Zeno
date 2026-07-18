@@ -420,8 +420,14 @@ export default function App() {
       date: string;
       tempMin: string;
       tempMax: string;
-      condition: string;
-      icon: string;
+      morningTemp: string;
+      morningIcon: string;
+      noonTemp: string;
+      noonIcon: string;
+      eveningTemp: string;
+      eveningIcon: string;
+      nightTemp: string;
+      nightIcon: string;
     }>;
   } | null>(null);
   const [widgets, setWidgets] = useState<WidgetConfig[]>(DEFAULT_WIDGETS);
@@ -560,27 +566,44 @@ return \`
         else if (code === 800) icon = "mage:sun";
         else if (code > 800) icon = "mage:cloudy";
 
-        // Parse 3-day forecast
+        // Parse 3-day forecast with 1/4 day temperatures
         const forecast = (data.weather || []).map((day: any) => {
-          const midHour = day.hourly?.[4] || day.hourly?.[0];
-          const fCode = parseInt(midHour?.weatherCode || "800", 10);
-          const fDesc = midHour?.lang_de?.[0]?.value || midHour?.weatherDesc?.[0]?.value || "Unbekannt";
-          let fIcon = "mage:sun";
-          if (fCode >= 200 && fCode < 300) fIcon = "mage:lightning";
-          else if (fCode >= 300 && fCode < 700) fIcon = "mage:cloudy";
-          else if (fCode >= 700 && fCode < 800) fIcon = "mage:cloudy";
-          else if (fCode > 800) fIcon = "mage:cloudy";
-
           const dateObj = new Date(day.date);
           const weekday = dateObj.toLocaleDateString('de-DE', { weekday: 'short' });
           const formattedDate = dateObj.toLocaleDateString('de-DE', { day: 'numeric', month: 'short' });
+
+          const getHourData = (index: number) => {
+            const h = day.hourly?.[index] || {};
+            const code = parseInt(h.weatherCode || "800", 10);
+            let hIcon = "mage:sun";
+            if (code >= 200 && code < 300) hIcon = "mage:lightning";
+            else if (code >= 300 && code < 700) hIcon = "mage:cloudy";
+            else if (code >= 700 && code < 800) hIcon = "mage:cloudy";
+            else if (code > 800) hIcon = "mage:cloudy";
+
+            return {
+              temp: h.tempC ? h.tempC + "°C" : "?°C",
+              icon: hIcon
+            };
+          };
+
+          const night = getHourData(0); // 00:00
+          const morning = getHourData(2); // 06:00
+          const noon = getHourData(4); // 12:00
+          const evening = getHourData(6); // 18:00
 
           return {
             date: `${weekday}, ${formattedDate}`,
             tempMin: day.mintempC + "°C",
             tempMax: day.maxtempC + "°C",
-            condition: fDesc,
-            icon: fIcon
+            morningTemp: morning.temp,
+            morningIcon: morning.icon,
+            noonTemp: noon.temp,
+            noonIcon: noon.icon,
+            eveningTemp: evening.temp,
+            eveningIcon: evening.icon,
+            nightTemp: night.temp,
+            nightIcon: night.icon
           };
         });
 
@@ -1536,15 +1559,35 @@ sys.stderr = io.StringIO()
                             </div>
 
                             {realWeatherData.forecast && realWeatherData.forecast.length > 0 && (
-                              <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: `1px solid ${hasBg ? fgColor + "22" : "var(--border-color)"}` }}>
-                                <span style={{ fontSize: "9px", fontWeight: "bold", textTransform: "uppercase", color: fgMuted, display: "block", marginBottom: "6px" }}>3-Tage-Vorhersage (wttr.in)</span>
-                                <div style={{ display: "flex", gap: "6px", justifyContent: "space-between" }}>
+                              <div style={{ marginTop: "10px", paddingTop: "10px", borderTop: `1px solid ${hasBg ? fgColor + "22" : "var(--border-color)"}` }}>
+                                <span style={{ fontSize: "9px", fontWeight: "bold", textTransform: "uppercase", color: fgMuted, display: "block", marginBottom: "8px" }}>3-Tage-Vorhersage (wttr.in)</span>
+                                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                                  <div style={{ display: "grid", gridTemplateColumns: "1.2fr repeat(4, 1fr)", gap: "4px", paddingBottom: "4px", borderBottom: `1px solid ${hasBg ? fgColor + "15" : "var(--border-color)"}`, fontSize: "8px", fontWeight: "bold", textTransform: "uppercase", color: fgMuted, textAlign: "center" }}>
+                                    <div style={{ textAlign: "left" }}>Tag</div>
+                                    <div>Nacht</div>
+                                    <div>Morgen</div>
+                                    <div>Mittag</div>
+                                    <div>Abend</div>
+                                  </div>
                                   {realWeatherData.forecast.map((f, idx) => (
-                                    <div key={idx} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", padding: "6px", backgroundColor: hasBg ? fgColor + "08" : "var(--bg-tertiary)", borderRadius: "var(--radius-sm)", border: `1px solid ${hasBg ? fgColor + "15" : "var(--border-color)"}`, textAlign: "center" }}>
-                                      <span style={{ fontSize: "9px", fontWeight: "600", color: fgColor }}>{f.date}</span>
-                                      <Icon icon={f.icon} style={{ fontSize: "16px", color: "#FFC66D", margin: "2px 0" }} />
-                                      <span style={{ fontSize: "10px", fontWeight: "700", color: fgColor }}>{f.tempMax}</span>
-                                      <span style={{ fontSize: "8px", color: fgMuted }}>{f.tempMin}</span>
+                                    <div key={idx} style={{ display: "grid", gridTemplateColumns: "1.2fr repeat(4, 1fr)", gap: "4px", alignItems: "center", padding: "6px 0", borderBottom: idx < 2 ? `1px solid ${hasBg ? fgColor + "10" : "rgba(255,255,255,0.05)"}` : "none", textAlign: "center" }}>
+                                      <div style={{ textAlign: "left", fontSize: "10px", fontWeight: "600", color: fgColor }}>{f.date}</div>
+                                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
+                                        <Icon icon={f.nightIcon} style={{ fontSize: "12px", color: "#FFC66D" }} />
+                                        <span style={{ fontSize: "9px", color: fgColor, fontWeight: "500" }}>{f.nightTemp}</span>
+                                      </div>
+                                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
+                                        <Icon icon={f.morningIcon} style={{ fontSize: "12px", color: "#FFC66D" }} />
+                                        <span style={{ fontSize: "9px", color: fgColor, fontWeight: "500" }}>{f.morningTemp}</span>
+                                      </div>
+                                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
+                                        <Icon icon={f.noonIcon} style={{ fontSize: "12px", color: "#FFC66D" }} />
+                                        <span style={{ fontSize: "9px", color: fgColor, fontWeight: "500" }}>{f.noonTemp}</span>
+                                      </div>
+                                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
+                                        <Icon icon={f.eveningIcon} style={{ fontSize: "12px", color: "#FFC66D" }} />
+                                        <span style={{ fontSize: "9px", color: fgColor, fontWeight: "500" }}>{f.eveningTemp}</span>
+                                      </div>
                                     </div>
                                   ))}
                                 </div>
