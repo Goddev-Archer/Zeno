@@ -518,6 +518,26 @@ export default function App() {
     setWidgets((prev) => prev.map((w) => (w.id === id ? { ...w, ...patch } : w)));
   const deleteWidget = (id: string) =>
     setWidgets((prev) => prev.filter((w) => w.id !== id).map((w, i) => ({ ...w, order: i })));
+
+  const moveWidget = (id: string, direction: "left" | "right") => {
+    setWidgets((prev) => {
+      const sorted = [...prev].sort((a, b) => a.order - b.order);
+      const index = sorted.findIndex((w) => w.id === id);
+      if (index === -1) return prev;
+      const newIndex = direction === "left" ? index - 1 : index + 1;
+      if (newIndex < 0 || newIndex >= sorted.length) return prev;
+      
+      const currentOrder = sorted[index].order;
+      const targetOrder = sorted[newIndex].order;
+      
+      return prev.map((w) => {
+        if (w.id === id) return { ...w, order: targetOrder };
+        if (w.id === sorted[newIndex].id) return { ...w, order: currentOrder };
+        return w;
+      });
+    });
+  };
+
   const addCustomWidget = () => {
     const id = "w-custom-" + Date.now();
     const defaultCode = `// Das Widget wird in einer sicheren Sandbox ausgeführt.
@@ -1506,12 +1526,28 @@ sys.stderr = io.StringIO()
                     onDragEnd={() => setDraggedWidgetId(null)}
                     style={{ gridColumn: `span ${widget.colSpan}`, gridRow: `span ${widget.rowSpan}`, backgroundColor: cardBg, border: `1px solid ${hasBg ? "transparent" : "var(--border-color)"}`, borderRadius: "var(--radius-lg)", padding: "16px", display: "flex", flexDirection: "column", position: "relative", opacity: isDragging ? 0.4 : 1, transition: "opacity 0.2s, box-shadow 0.2s", boxShadow: dashboardEditMode ? "0 0 0 2px var(--glow-color-1,#3574F0)55" : "none", cursor: dashboardEditMode ? "grab" : "default", minHeight: widget.rowSpan === 2 ? "460px" : "220px" }}
                   >
-                    {dashboardEditMode && (
-                      <div style={{ position: "absolute", top: "8px", right: "8px", display: "flex", gap: "4px", zIndex: 10 }}>
-                        <button onClick={() => setEditingWidgetId(editingWidgetId === widget.id ? null : widget.id)} style={{ background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "6px", padding: "4px 6px", cursor: "pointer", color: "var(--text-primary)", fontSize: "13px", display: "flex", alignItems: "center" }}><Icon icon="mage:settings" /></button>
-                        <button onClick={() => deleteWidget(widget.id)} style={{ background: "rgba(200,50,50,0.12)", border: "1px solid rgba(200,50,50,0.25)", borderRadius: "6px", padding: "4px 6px", cursor: "pointer", color: "#e05252", fontSize: "13px", display: "flex", alignItems: "center" }}><Icon icon="mage:trash" /></button>
-                      </div>
-                    )}
+                    {dashboardEditMode && (() => {
+                      const sorted = [...widgets].sort((a, b) => a.order - b.order);
+                      const idx = sorted.findIndex((w) => w.id === widget.id);
+                      const isFirst = idx === 0;
+                      const isLast = idx === sorted.length - 1;
+                      return (
+                        <div style={{ position: "absolute", top: "8px", right: "8px", display: "flex", gap: "4px", zIndex: 10, pointerEvents: "auto" }}>
+                          {!isFirst && (
+                            <button onClick={() => moveWidget(widget.id, "left")} title="Nach vorne verschieben" style={{ background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "6px", padding: "4px 6px", cursor: "pointer", color: "var(--text-primary)", fontSize: "13px", display: "flex", alignItems: "center" }}>
+                              <Icon icon="mage:chevron-left" />
+                            </button>
+                          )}
+                          {!isLast && (
+                            <button onClick={() => moveWidget(widget.id, "right")} title="Nach hinten verschieben" style={{ background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "6px", padding: "4px 6px", cursor: "pointer", color: "var(--text-primary)", fontSize: "13px", display: "flex", alignItems: "center" }}>
+                              <Icon icon="mage:chevron-right" />
+                            </button>
+                          )}
+                          <button onClick={() => setEditingWidgetId(editingWidgetId === widget.id ? null : widget.id)} style={{ background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "6px", padding: "4px 6px", cursor: "pointer", color: "var(--text-primary)", fontSize: "13px", display: "flex", alignItems: "center" }}><Icon icon="mage:settings" /></button>
+                          <button onClick={() => deleteWidget(widget.id)} style={{ background: "rgba(200,50,50,0.12)", border: "1px solid rgba(200,50,50,0.25)", borderRadius: "6px", padding: "4px 6px", cursor: "pointer", color: "#e05252", fontSize: "13px", display: "flex", alignItems: "center" }}><Icon icon="mage:trash" /></button>
+                        </div>
+                      );
+                    })()}
                     {dashboardEditMode && editingWidgetId === widget.id && (
                       <div style={{ position: "absolute", top: "44px", right: "8px", width: "240px", background: "var(--bg-primary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-md)", padding: "12px", zIndex: 20, boxShadow: "0 8px 32px rgba(0,0,0,0.45)", display: "flex", flexDirection: "column", gap: "10px" }}>
                         <span style={{ fontSize: "10px", fontWeight: "700", textTransform: "uppercase", color: "var(--text-muted)", letterSpacing: "0.6px" }}>Widget-Einstellungen</span>
