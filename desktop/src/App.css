@@ -223,6 +223,26 @@ ul, ol {
 .home-button {
   font-size: 18px;
   background-color: var(--bg-tertiary);
+  transition: all var(--transition-normal);
+}
+
+.home-button img {
+  transition: transform var(--transition-normal), filter var(--transition-normal);
+}
+
+.home-button:hover img {
+  transform: scale(1.15);
+}
+
+.home-button.active {
+  background-color: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.home-button.active img {
+  transform: scale(1.15);
+  filter: drop-shadow(0 0 8px var(--glow-color-1, #3574F0));
 }
 
 .add-server {
