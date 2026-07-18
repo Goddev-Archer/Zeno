@@ -514,6 +514,7 @@ export default function App() {
   const [dashboardEditMode, setDashboardEditMode] = useState<boolean>(false);
   const [editingWidgetId, setEditingWidgetId] = useState<string | null>(null);
   const [draggedWidgetId, setDraggedWidgetId] = useState<string | null>(null);
+  const [swappingWidgetIds, setSwappingWidgetIds] = useState<string[]>([]);
   const updateWidget = (id: string, patch: Partial<WidgetConfig>) =>
     setWidgets((prev) => prev.map((w) => (w.id === id ? { ...w, ...patch } : w)));
   const deleteWidget = (id: string) =>
@@ -529,10 +530,16 @@ export default function App() {
       
       const currentOrder = sorted[index].order;
       const targetOrder = sorted[newIndex].order;
+      const targetId = sorted[newIndex].id;
+      
+      setSwappingWidgetIds([id, targetId]);
+      setTimeout(() => {
+        setSwappingWidgetIds([]);
+      }, 350);
       
       return prev.map((w) => {
         if (w.id === id) return { ...w, order: targetOrder };
-        if (w.id === sorted[newIndex].id) return { ...w, order: currentOrder };
+        if (w.id === targetId) return { ...w, order: currentOrder };
         return w;
       });
     });
@@ -1524,6 +1531,7 @@ sys.stderr = io.StringIO()
                       handleWidgetDrop(widget.id);
                     }}
                     onDragEnd={() => setDraggedWidgetId(null)}
+                    className={swappingWidgetIds.includes(widget.id) ? "widget-swapping" : ""}
                     style={{ gridColumn: `span ${widget.colSpan}`, gridRow: `span ${widget.rowSpan}`, backgroundColor: cardBg, border: `1px solid ${hasBg ? "transparent" : "var(--border-color)"}`, borderRadius: "var(--radius-lg)", padding: "16px", display: "flex", flexDirection: "column", position: "relative", opacity: isDragging ? 0.4 : 1, transition: "opacity 0.2s, box-shadow 0.2s", boxShadow: dashboardEditMode ? "0 0 0 2px var(--glow-color-1,#3574F0)55" : "none", cursor: dashboardEditMode ? "grab" : "default", minHeight: widget.rowSpan === 2 ? "460px" : "220px" }}
                   >
                     {dashboardEditMode && (() => {

@@ -2473,4 +2473,25 @@ input:checked + .slider:before {
   color: var(--accent-danger);
 }
 
+/* --- WIDGET SWAP ANIMATIONS --- */
+@keyframes widget-swap {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0px var(--glow-color-1, #3574F0);
+  }
+  50% {
+    transform: scale(0.96);
+    box-shadow: 0 0 16px 4px var(--glow-color-1, #3574F0);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: none;
+  }
+}
+
+.widget-swapping {
+  animation: widget-swap 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
+  z-index: 15;
+}
+
 
