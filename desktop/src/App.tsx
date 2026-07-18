@@ -1482,11 +1482,13 @@ sys.stderr = io.StringIO()
                     key={widget.id}
                     draggable={dashboardEditMode}
                     onDragStart={(e) => {
-                      setDraggedWidgetId(widget.id);
                       if (e.dataTransfer) {
                         e.dataTransfer.effectAllowed = "move";
                         e.dataTransfer.setData("text/plain", widget.id);
                       }
+                      setTimeout(() => {
+                        setDraggedWidgetId(widget.id);
+                      }, 0);
                     }}
                     onDragOver={(e) => {
                       e.preventDefault();
