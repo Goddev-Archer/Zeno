@@ -1467,10 +1467,6 @@ sys.stderr = io.StringIO()
                   <Icon icon={dashboardEditMode ? "mage:check" : "mage:settings"} />
                   {dashboardEditMode ? "Fertig" : "Dashboard bearbeiten"}
                 </button>
-                <div className="dashboard-logo-badge" style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 12px", backgroundColor: "var(--bg-secondary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-md)" }}>
-                  <img src="/zeno_logo.svg" alt="Zeno Logo" className="dashboard-logo" style={{ width: "24px", height: "24px", borderRadius: "4px" }} />
-                  <span className="logo-text" style={{ fontSize: "12px", fontWeight: "700", letterSpacing: "1px", color: "var(--text-primary)" }}>ZENO</span>
-                </div>
               </div>
             </header>
 
