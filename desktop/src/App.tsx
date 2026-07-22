@@ -5437,7 +5437,7 @@ sys.stderr = io.StringIO()
 
       {/* 7. CUSTOM WASM RUNTIME MODAL */}
       <div className={`modal-overlay ${isCustomWasmModalOpen ? "open" : ""}`}>
-        <div className="settings-modal" style={{ width: "500px", height: "auto", minHeight: "340px", borderRadius: "12px", padding: "24px", position: "relative" }}>
+        <div className="zeno-dialog-modal" style={{ width: "500px", height: "auto", minHeight: "340px", borderRadius: "12px", padding: "24px", position: "relative" }}>
           <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-color)", paddingBottom: "12px", marginBottom: "16px" }}>
             <h3 style={{ fontSize: "16px", fontWeight: "700", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "8px" }}>
               <Icon icon="mage:box-3d" style={{ color: "var(--accent-color)" }} />
@@ -5507,7 +5507,7 @@ sys.stderr = io.StringIO()
 
       {/* 8. IDE PROJECT WIZARD MODAL */}
       <div className={`modal-overlay ${isIdeProjectWizardOpen ? "open" : ""}`}>
-        <div className="settings-modal" style={{ width: "600px", height: "auto", borderRadius: "12px", padding: "24px", position: "relative" }}>
+        <div className="zeno-dialog-modal" style={{ width: "600px", height: "auto", borderRadius: "12px", padding: "24px", position: "relative" }}>
           <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-color)", paddingBottom: "12px", marginBottom: "16px" }}>
             <h3 style={{ fontSize: "16px", fontWeight: "700", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "8px" }}>
               <Icon icon="mage:box-3d" style={{ color: "var(--accent-color)" }} />
@@ -5566,7 +5566,7 @@ sys.stderr = io.StringIO()
 
       {/* 9. IDE CREATE ITEM MODAL */}
       <div className={`modal-overlay ${isIdeNewItemModalOpen ? "open" : ""}`}>
-        <div className="settings-modal" style={{ width: "400px", height: "auto", borderRadius: "12px", padding: "20px", position: "relative" }}>
+        <div className="zeno-dialog-modal" style={{ width: "400px", height: "auto", borderRadius: "12px", padding: "20px", position: "relative" }}>
           <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-color)", paddingBottom: "10px", marginBottom: "14px" }}>
             <h3 style={{ fontSize: "14px", fontWeight: "700", color: "var(--text-primary)" }}>
               {ideNewItemType === "file" ? "Neue Datei erstellen" : "Neuer Ordner erstellen"}
