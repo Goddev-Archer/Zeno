@@ -5368,8 +5368,12 @@ sys.stderr = io.StringIO()
                     <button
                       className="settings-btn"
                       onClick={() => {
-                        window.open(activeBrowserTab.activeUrl, "_blank");
-                        showToast("Im Nativen Tauri WebView2 Fenster geöffnet!");
+                        safeInvoke("open_native_webview", { url: activeBrowserTab.activeUrl, title: activeBrowserTab.title })
+                          .then(() => showToast("In nativem Zeno Privacy Window geöffnet!"))
+                          .catch(() => {
+                            window.open(activeBrowserTab.activeUrl, "_blank");
+                            showToast("Im Standard-Browser geöffnet (außerhalb von Tauri)!");
+                          });
                       }}
                       style={{ fontSize: "10px", padding: "2px 8px", color: "var(--accent-color)" }}
                     >

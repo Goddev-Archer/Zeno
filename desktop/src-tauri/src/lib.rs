@@ -310,6 +310,28 @@ fn load_settings(app: tauri::AppHandle) -> Result<String, String> {
         .map_err(|e| format!("Fehler beim Laden der Einstellungen: {}", e))
 }
 
+#[tauri::command]
+fn open_native_webview(app: tauri::AppHandle, url: String, title: String) -> Result<(), String> {
+    let parsed_url = url.parse().map_err(|e| format!("Ungültige URL: {}", e))?;
+    
+    if let Some(window) = app.get_webview_window("browser_win") {
+        let _ = window.navigate(parsed_url);
+        let _ = window.set_title(&title);
+        let _ = window.set_focus();
+    } else {
+        let _window = tauri::WebviewWindowBuilder::new(
+            &app,
+            "browser_win",
+            tauri::WebviewUrl::External(parsed_url)
+        )
+        .title(title)
+        .inner_size(1000.0, 700.0)
+        .build()
+        .map_err(|e| format!("Fehler beim Erstellen des Fensters: {}", e))?;
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -323,7 +345,8 @@ pub fn run() {
             write_workspace_file,
             delete_workspace_file,
             load_settings,
-            save_settings
+            save_settings,
+            open_native_webview
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
