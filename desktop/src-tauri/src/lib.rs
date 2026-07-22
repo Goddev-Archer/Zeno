@@ -342,10 +342,10 @@ fn update_native_browser(
     width: f64,
     height: f64,
 ) -> Result<(), String> {
-    let main_window = app.get_webview_window("main")
+    let main_window = app.get_window("main")
         .ok_or_else(|| "Hauptfenster nicht gefunden.".to_string())?;
         
-    if let Some(child) = app.get_webview_window("native_browser") {
+    if let Some(child) = app.get_webview("native_browser") {
         if !visible {
             let _ = child.hide();
             let _ = child.set_position(tauri::Position::Logical(tauri::LogicalPosition { x: -10000.0, y: -10000.0 }));
@@ -364,17 +364,16 @@ fn update_native_browser(
         let u = url.unwrap_or_else(|| "about:blank".to_string());
         let parsed_url = u.parse().map_err(|e| format!("Ungültige URL: {}", e))?;
         
-        let _child = tauri::WebviewWindowBuilder::new(
-            &app,
+        let builder = tauri::WebviewBuilder::new(
             "native_browser",
             tauri::WebviewUrl::External(parsed_url)
-        )
-        .parent(&main_window).map_err(|e| e.to_string())?
-        .decorations(false)
-        .position(x, y)
-        .inner_size(width, height)
-        .build()
-        .map_err(|e| format!("Fehler beim Erstellen des Fensters: {}", e))?;
+        );
+        
+        let _child = main_window.add_child(
+            builder,
+            tauri::LogicalPosition::new(x, y),
+            tauri::LogicalSize::new(width, height)
+        ).map_err(|e| format!("Fehler beim Erstellen der Webview: {}", e))?;
     }
     Ok(())
 }
