@@ -292,6 +292,8 @@ interface WidgetConfig {
   rowSpan: WidgetRowSpan;
   order: number;
   customCode: string;
+  gitMode?: "local" | "github";
+  gitRepo?: string;
 }
 
 // --- MULTI-LANGUAGE INTELLISENSE ENGINE FOR MONACO ---
@@ -815,6 +817,29 @@ function getContrastColor(hex: string): string {
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.5 ? "#0d0f14" : "#f4f4f5";
 }
 
+interface LiveGitStatus {
+  branch: string;
+  is_clean: boolean;
+  modified: number;
+  added: number;
+  deleted: number;
+  untracked: number;
+}
+
+interface LiveGitCommit {
+  hash: string;
+  message: string;
+  date: string;
+}
+
+async function safeInvoke<T>(cmd: string, args?: any): Promise<T> {
+  if (typeof window !== "undefined" && (window as any).__TAURI_INTERNALS__) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke<T>(cmd, args);
+  }
+  throw new Error("Tauri-Umgebung nicht verfügbar.");
+}
+
 function getCurrentTimestamp(): string {
   const now = new Date();
   return now.toTimeString().slice(0, 5);
@@ -847,6 +872,7 @@ export default function App() {
   const [activeSettingsTab, setActiveSettingsTab] = useState<string>("profile");
   const [selectedUserProfile, setSelectedUserProfile] = useState<Profile | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState<boolean>(false);
+  const [isEditorDirty, setIsEditorDirty] = useState<boolean>(false);
   const [editorCode, setEditorCode] = useState<string>("");
   const [editorLanguage, setEditorLanguage] = useState<string>("rust");
   const [editorFilename, setEditorFilename] = useState<string>("main.rs");
@@ -1113,14 +1139,211 @@ export default function App() {
       nightIcon: string;
     }>;
   } | null>(null);
+
+  const [liveGitStatus, setLiveGitStatus] = useState<LiveGitStatus | null>(null);
+  const [liveGitCommits, setLiveGitCommits] = useState<LiveGitCommit[]>([]);
+  const [gitError, setGitError] = useState<string | null>(null);
+
+  const fetchLiveGitData = async () => {
+    try {
+      setGitError(null);
+      const status = await safeInvoke<LiveGitStatus>("get_git_status");
+      setLiveGitStatus(status);
+      const log = await safeInvoke<LiveGitCommit[]>("get_git_log");
+      setLiveGitCommits(log);
+    } catch (e: any) {
+      console.warn("Git integration failed:", e);
+      setGitError(e.message || String(e));
+    }
+  };
+
+  useEffect(() => {
+    fetchLiveGitData();
+    const interval = setInterval(fetchLiveGitData, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const [githubToken, setGithubToken] = useState<string>("");
+  const [githubUser, setGithubUser] = useState<{ login: string; name: string | null; avatarUrl: string } | null>(null);
+  const [githubConnecting, setGithubConnecting] = useState<boolean>(false);
+
+  const testGithubConnection = async () => {
+    if (!githubToken.trim()) return;
+    setGithubConnecting(true);
+    try {
+      const res = await fetch("https://api.github.com/user", {
+        headers: {
+          Authorization: `Bearer ${githubToken.trim()}`,
+          Accept: "application/vnd.github.v3+json",
+        },
+      });
+      if (!res.ok) {
+        throw new Error(`GitHub API Fehler: HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      setGithubUser({
+        login: data.login,
+        name: data.name,
+        avatarUrl: data.avatar_url,
+      });
+      showToast(`GitHub-Verbindung hergestellt: @${data.login}`);
+      fetchGithubRepos(githubToken.trim());
+    } catch (e: any) {
+      console.error(e);
+      showToast("GitHub-Verbindung fehlgeschlagen: " + (e.message || String(e)));
+      setGithubUser(null);
+    } finally {
+      setGithubConnecting(false);
+    }
+  };
+
   const [widgets, setWidgets] = useState<WidgetConfig[]>(DEFAULT_WIDGETS);
   const [dashboardEditMode, setDashboardEditMode] = useState<boolean>(false);
   const [editingWidgetId, setEditingWidgetId] = useState<string | null>(null);
   const [draggedWidgetId, setDraggedWidgetId] = useState<string | null>(null);
+  const [swappingWidgetIds, setSwappingWidgetIds] = useState<string[]>([]);
   const updateWidget = (id: string, patch: Partial<WidgetConfig>) =>
     setWidgets((prev) => prev.map((w) => (w.id === id ? { ...w, ...patch } : w)));
   const deleteWidget = (id: string) =>
     setWidgets((prev) => prev.filter((w) => w.id !== id).map((w, i) => ({ ...w, order: i })));
+
+  // --- GITHUB REPOS & DETAILS STORE ---
+  const [githubRepos, setGithubRepos] = useState<{ fullName: string; name: string; stars: number }[]>([]);
+  const [githubRepoData, setGithubRepoData] = useState<Record<string, any>>({});
+  const [githubReposLoading, setGithubReposLoading] = useState<boolean>(false);
+  const [gitWidgetTabs, setGitWidgetTabs] = useState<Record<string, string>>({});
+
+  const fetchGithubRepos = async (token = githubToken) => {
+    if (!token.trim()) return;
+    setGithubReposLoading(true);
+    try {
+      const res = await fetch("https://api.github.com/user/repos?per_page=100&sort=updated", {
+        headers: {
+          Authorization: `Bearer ${token.trim()}`,
+          Accept: "application/vnd.github.v3+json",
+        },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const repos = data.map((r: any) => ({
+        fullName: r.full_name,
+        name: r.name,
+        stars: r.stargazers_count,
+      }));
+      setGithubRepos(repos);
+    } catch (e) {
+      console.warn("Failed to fetch GitHub repos:", e);
+    } finally {
+      setGithubReposLoading(false);
+    }
+  };
+
+  const fetchGithubRepoDetails = async (repo: string) => {
+    if (!githubToken.trim() || !repo) return;
+    try {
+      const headers = {
+        Authorization: `Bearer ${githubToken.trim()}`,
+        Accept: "application/vnd.github.v3+json",
+      };
+
+      const repoRes = await fetch(`https://api.github.com/repos/${repo}`, { headers });
+      if (!repoRes.ok) throw new Error(`Repo HTTP ${repoRes.status}`);
+      const repoInfo = await repoRes.json();
+
+      const commitsRes = await fetch(`https://api.github.com/repos/${repo}/commits?per_page=5`, { headers });
+      const commitsData = commitsRes.ok ? await commitsRes.json() : [];
+      const commits = commitsData.map((c: any) => ({
+        hash: c.sha.slice(0, 7),
+        message: c.commit.message.split("\n")[0],
+        date: new Date(c.commit.author.date).toLocaleDateString("de-DE", { day: "numeric", month: "short" }),
+      }));
+
+      const issuesRes = await fetch(`https://api.github.com/repos/${repo}/issues?state=open&per_page=5`, { headers });
+      const issuesData = issuesRes.ok ? await issuesRes.json() : [];
+      const issues = issuesData
+        .filter((i: any) => !i.pull_request)
+        .map((i: any) => ({
+          number: i.number,
+          title: i.title,
+          url: i.html_url,
+        }));
+
+      const pullsRes = await fetch(`https://api.github.com/repos/${repo}/pulls?state=open&per_page=5`, { headers });
+      const pullsData = pullsRes.ok ? await pullsRes.json() : [];
+      const pulls = pullsData.map((p: any) => ({
+        number: p.number,
+        title: p.title,
+        url: p.html_url,
+      }));
+
+      const branchesRes = await fetch(`https://api.github.com/repos/${repo}/branches?per_page=5`, { headers });
+      const branchesData = branchesRes.ok ? await branchesRes.json() : [];
+      const branches = branchesData.map((b: any) => b.name);
+
+      setGithubRepoData((prev) => ({
+        ...prev,
+        [repo]: {
+          stars: repoInfo.stargazers_count,
+          defaultBranch: repoInfo.default_branch,
+          description: repoInfo.description,
+          commits,
+          issues,
+          pulls,
+          branches,
+        },
+      }));
+    } catch (e) {
+      console.warn(`Failed to fetch details for ${repo}:`, e);
+    }
+  };
+
+  useEffect(() => {
+    if (!githubToken.trim()) return;
+    const activeGithubRepos = widgets
+      .filter(w => w.type === "git-status" && w.gitMode === "github" && w.gitRepo)
+      .map(w => w.gitRepo!);
+    if (activeGithubRepos.length === 0) return;
+    const fetchAllActive = () => {
+      activeGithubRepos.forEach(repo => {
+        fetchGithubRepoDetails(repo);
+      });
+    };
+    fetchAllActive();
+    const interval = setInterval(fetchAllActive, 30000);
+    return () => clearInterval(interval);
+  }, [widgets, githubToken]);
+
+  useEffect(() => {
+    if (githubToken.trim()) {
+      fetchGithubRepos();
+    }
+  }, [githubToken]);
+
+  const moveWidget = (id: string, direction: "left" | "right") => {
+    setWidgets((prev) => {
+      const sorted = [...prev].sort((a, b) => a.order - b.order);
+      const index = sorted.findIndex((w) => w.id === id);
+      if (index === -1) return prev;
+      const newIndex = direction === "left" ? index - 1 : index + 1;
+      if (newIndex < 0 || newIndex >= sorted.length) return prev;
+      
+      const currentOrder = sorted[index].order;
+      const targetOrder = sorted[newIndex].order;
+      const targetId = sorted[newIndex].id;
+      
+      setSwappingWidgetIds([id, targetId]);
+      setTimeout(() => {
+        setSwappingWidgetIds([]);
+      }, 350);
+      
+      return prev.map((w) => {
+        if (w.id === id) return { ...w, order: targetOrder };
+        if (w.id === targetId) return { ...w, order: currentOrder };
+        return w;
+      });
+    });
+  };
+
   const addCustomWidget = () => {
     const id = "w-custom-" + Date.now();
     const defaultCode = `// Das Widget wird in einer sicheren Sandbox ausgeführt.
@@ -1171,6 +1394,9 @@ return \`
       return [{ name, code, language: lang }, ...filtered].slice(0, 5);
     });
   };
+
+
+
   
   // Chat Input State
   const [inputText, setInputText] = useState<string>("");
@@ -1220,6 +1446,120 @@ return \`
     const interval = setInterval(updateTime, 10000);
     return () => clearInterval(interval);
   }, [dashboardLocation]);
+
+  // --- SETTINGS STORE (OPTION 3) ---
+  const [settingsLoaded, setSettingsLoaded] = useState<boolean>(false);
+
+  const loadSavedSettings = async () => {
+    try {
+      const data = await safeInvoke<string>("load_settings");
+      if (data && data !== "{}") {
+        const config = JSON.parse(data);
+        if (config.widgets) setWidgets(config.widgets);
+        if (config.dashboardLocation) setDashboardLocation(config.dashboardLocation);
+        if (config.weatherMode) setWeatherMode(config.weatherMode);
+        if (config.weatherApiUrl) setWeatherApiUrl(config.weatherApiUrl);
+        if (config.weatherApiKey) setWeatherApiKey(config.weatherApiKey);
+        if (config.githubToken) setGithubToken(config.githubToken);
+        if (config.githubUser) setGithubUser(config.githubUser);
+        if (config.recentFiles) setRecentFiles(config.recentFiles);
+      }
+    } catch (e) {
+      console.warn("Failed to load settings:", e);
+    } finally {
+      setSettingsLoaded(true);
+    }
+  };
+
+  const saveCurrentSettings = async () => {
+    try {
+      const payload = JSON.stringify({
+        widgets,
+        dashboardLocation,
+        weatherMode,
+        weatherApiUrl,
+        weatherApiKey,
+        githubToken,
+        githubUser,
+        recentFiles
+      });
+      await safeInvoke("save_settings", { settings: payload });
+    } catch (e) {
+      console.warn("Failed to save settings:", e);
+    }
+  };
+
+  useEffect(() => {
+    if (settingsLoaded) {
+      saveCurrentSettings();
+    }
+  }, [widgets, dashboardLocation, weatherMode, weatherApiUrl, weatherApiKey, githubToken, githubUser, recentFiles, settingsLoaded]);
+
+  // --- WORKSPACE FILESYSTEM (OPTION 2) ---
+  const openWorkspaceFile = async (name: string, language: string) => {
+    try {
+      const code = await safeInvoke<string>("read_workspace_file", { name });
+      setEditorFilename(name);
+      setEditorLanguage(language);
+      setEditorCode(code);
+      setEditorWorkflowStep("editor");
+      setEditorOutput("");
+      setIsEditorOpen(true);
+      setIsEditorDirty(false);
+      
+      setRecentFiles(prev => {
+        const filtered = prev.filter(f => f.name !== name);
+        return [{ name, language, code: "" }, ...filtered].slice(0, 10);
+      });
+    } catch (e) {
+      console.warn("Read workspace file failed, using memory:", e);
+      setEditorFilename(name);
+      setEditorLanguage(language);
+      setEditorWorkflowStep("editor");
+      setEditorOutput("");
+      setIsEditorOpen(true);
+      setIsEditorDirty(false);
+    }
+  };
+
+  const createNewWorkspaceFile = async (filename: string) => {
+    const lang = getLanguageFromExtension(filename);
+    const initialCode = filename.endsWith(".rs") ? "fn main() {\n    println!(\"Hello World!\");\n}" :
+                        filename.endsWith(".py") ? "print(\"Hello World!\")" :
+                        filename.endsWith(".js") || filename.endsWith(".ts") ? "console.log(\"Hello World!\");" : "";
+    try {
+      await safeInvoke("write_workspace_file", { name: filename, content: initialCode });
+      showToast(`Datei "${filename}" auf Festplatte erstellt.`);
+      setEditorFilename(filename);
+      setEditorLanguage(lang);
+      setEditorCode(initialCode);
+      setEditorWorkflowStep("editor");
+      setIsEditorDirty(false);
+      
+      setRecentFiles(prev => {
+        const filtered = prev.filter(f => f.name !== filename);
+        return [{ name: filename, language: lang, code: "" }, ...filtered].slice(0, 10);
+      });
+    } catch (e) {
+      console.warn("Create file failed, using memory:", e);
+      setEditorFilename(filename);
+      setEditorLanguage(lang);
+      setEditorCode(initialCode);
+      setEditorWorkflowStep("editor");
+      setIsEditorDirty(false);
+      setRecentFiles(prev => [{ name: filename, language: lang, code: initialCode }, ...prev.filter(f => f.name !== filename)]);
+    }
+  };
+
+  const removeRecentFileFromHistory = (name: string) => {
+    setRecentFiles(prev => prev.filter(f => f.name !== name));
+    showToast(`Aus Historie entfernt: ${name}`);
+  };
+
+  // Initial load
+  useEffect(() => {
+    loadSavedSettings();
+  }, []);
 
   // Fetch real weather data — wttr.in (no key, privacy-friendly) or user-supplied custom API
   const [weatherFetching, setWeatherFetching] = useState(false);
@@ -1590,11 +1930,31 @@ return \`
       URL.revokeObjectURL(url);
       
       addRecentFile(editorFilename, editorCode, editorLanguage);
+      setIsEditorDirty(false);
       showToast(`Datei "${editorFilename}" erfolgreich gespeichert!`);
     } catch (err: any) {
       showToast(`Fehler beim Speichern: ${err.message}`);
     }
   };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        if (isEditorOpen) {
+          e.preventDefault();
+          handleSaveFile();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isEditorOpen, editorCode, editorFilename, editorLanguage]);
+
+  useEffect(() => {
+    if (!isEditorOpen) {
+      setIsEditorDirty(false);
+    }
+  }, [isEditorOpen]);
 
   const handleRenameFile = (newName: string) => {
     const trimmed = newName.trim();
@@ -1617,21 +1977,20 @@ return \`
     showToast(`Datei umbenannt in "${trimmed}"`);
   };
 
-  const handleDeleteRecentFile = (e: React.MouseEvent, name: string) => {
-    e.stopPropagation();
-    setRecentFiles((prev) => prev.filter((f) => f.name !== name));
-    showToast(`Datei "${name}" gelöscht`);
-  };
-
-  const handleDeleteCurrentFile = () => {
-    if (window.confirm(`Möchtest du die Datei "${editorFilename}" wirklich aus dem Workspace löschen?`)) {
+  const handleDeleteCurrentFile = async () => {
+    if (window.confirm(`Möchtest du die Datei "${editorFilename}" wirklich permanent von der Festplatte löschen?`)) {
+      try {
+        await safeInvoke("delete_workspace_file", { name: editorFilename });
+        showToast(`Datei "${editorFilename}" gelöscht.`);
+      } catch (e) {
+        showToast(`Datei "${editorFilename}" gelöscht (Simulation)`);
+      }
       setRecentFiles((prev) => prev.filter((f) => f.name !== editorFilename));
       setEditorCode("");
       setEditorFilename("main.rs");
       setEditorLanguage("rust");
       setEditorWorkflowStep("select_action");
       setEditorOutput("");
-      showToast(`Datei "${editorFilename}" gelöscht`);
     }
   };
 
@@ -2696,10 +3055,6 @@ sys.stderr = io.StringIO()
                   <Icon icon={dashboardEditMode ? "mage:check" : "mage:settings"} />
                   {dashboardEditMode ? "Fertig" : "Dashboard bearbeiten"}
                 </button>
-                <div className="dashboard-logo-badge" style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 12px", backgroundColor: "var(--bg-secondary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-md)" }}>
-                  <img src="/zeno_logo.svg" alt="Zeno Logo" className="dashboard-logo" style={{ width: "24px", height: "24px", borderRadius: "4px" }} />
-                  <span className="logo-text" style={{ fontSize: "12px", fontWeight: "700", letterSpacing: "1px", color: "var(--text-primary)" }}>ZENO</span>
-                </div>
               </div>
             </header>
 
@@ -2715,11 +3070,13 @@ sys.stderr = io.StringIO()
                     key={widget.id}
                     draggable={dashboardEditMode}
                     onDragStart={(e) => {
-                      setDraggedWidgetId(widget.id);
                       if (e.dataTransfer) {
                         e.dataTransfer.effectAllowed = "move";
                         e.dataTransfer.setData("text/plain", widget.id);
                       }
+                      setTimeout(() => {
+                        setDraggedWidgetId(widget.id);
+                      }, 0);
                     }}
                     onDragOver={(e) => {
                       e.preventDefault();
@@ -2735,14 +3092,31 @@ sys.stderr = io.StringIO()
                       handleWidgetDrop(widget.id);
                     }}
                     onDragEnd={() => setDraggedWidgetId(null)}
+                    className={swappingWidgetIds.includes(widget.id) ? "widget-swapping" : ""}
                     style={{ gridColumn: `span ${widget.colSpan}`, gridRow: `span ${widget.rowSpan}`, backgroundColor: cardBg, border: `1px solid ${hasBg ? "transparent" : "var(--border-color)"}`, borderRadius: "var(--radius-lg)", padding: "16px", display: "flex", flexDirection: "column", position: "relative", opacity: isDragging ? 0.4 : 1, transition: "opacity 0.2s, box-shadow 0.2s", boxShadow: dashboardEditMode ? "0 0 0 2px var(--glow-color-1,#3574F0)55" : "none", cursor: dashboardEditMode ? "grab" : "default", minHeight: widget.rowSpan === 2 ? "460px" : "220px" }}
                   >
-                    {dashboardEditMode && (
-                      <div style={{ position: "absolute", top: "8px", right: "8px", display: "flex", gap: "4px", zIndex: 10 }}>
-                        <button onClick={() => setEditingWidgetId(editingWidgetId === widget.id ? null : widget.id)} style={{ background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "6px", padding: "4px 6px", cursor: "pointer", color: "var(--text-primary)", fontSize: "13px", display: "flex", alignItems: "center" }}><Icon icon="mage:settings" /></button>
-                        <button onClick={() => deleteWidget(widget.id)} style={{ background: "rgba(200,50,50,0.12)", border: "1px solid rgba(200,50,50,0.25)", borderRadius: "6px", padding: "4px 6px", cursor: "pointer", color: "#e05252", fontSize: "13px", display: "flex", alignItems: "center" }}><Icon icon="mage:trash" /></button>
-                      </div>
-                    )}
+                    {dashboardEditMode && (() => {
+                      const sorted = [...widgets].sort((a, b) => a.order - b.order);
+                      const idx = sorted.findIndex((w) => w.id === widget.id);
+                      const isFirst = idx === 0;
+                      const isLast = idx === sorted.length - 1;
+                      return (
+                        <div style={{ position: "absolute", top: "8px", right: "8px", display: "flex", gap: "4px", zIndex: 10, pointerEvents: "auto" }}>
+                          {!isFirst && (
+                            <button onClick={() => moveWidget(widget.id, "left")} title="Nach vorne verschieben" style={{ background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "6px", padding: "4px 6px", cursor: "pointer", color: "var(--text-primary)", fontSize: "13px", display: "flex", alignItems: "center" }}>
+                              <Icon icon="mage:chevron-left" />
+                            </button>
+                          )}
+                          {!isLast && (
+                            <button onClick={() => moveWidget(widget.id, "right")} title="Nach hinten verschieben" style={{ background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "6px", padding: "4px 6px", cursor: "pointer", color: "var(--text-primary)", fontSize: "13px", display: "flex", alignItems: "center" }}>
+                              <Icon icon="mage:chevron-right" />
+                            </button>
+                          )}
+                          <button onClick={() => setEditingWidgetId(editingWidgetId === widget.id ? null : widget.id)} style={{ background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "6px", padding: "4px 6px", cursor: "pointer", color: "var(--text-primary)", fontSize: "13px", display: "flex", alignItems: "center" }}><Icon icon="mage:settings" /></button>
+                          <button onClick={() => deleteWidget(widget.id)} style={{ background: "rgba(200,50,50,0.12)", border: "1px solid rgba(200,50,50,0.25)", borderRadius: "6px", padding: "4px 6px", cursor: "pointer", color: "#e05252", fontSize: "13px", display: "flex", alignItems: "center" }}><Icon icon="mage:trash" /></button>
+                        </div>
+                      );
+                    })()}
                     {dashboardEditMode && editingWidgetId === widget.id && (
                       <div style={{ position: "absolute", top: "44px", right: "8px", width: "240px", background: "var(--bg-primary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-md)", padding: "12px", zIndex: 20, boxShadow: "0 8px 32px rgba(0,0,0,0.45)", display: "flex", flexDirection: "column", gap: "10px" }}>
                         <span style={{ fontSize: "10px", fontWeight: "700", textTransform: "uppercase", color: "var(--text-muted)", letterSpacing: "0.6px" }}>Widget-Einstellungen</span>
@@ -2774,9 +3148,61 @@ sys.stderr = io.StringIO()
                             <p style={{ fontSize: "9px", color: "var(--text-muted)", marginTop: "3px" }}>JS-Code der einen HTML-String zurückgibt (return).</p>
                           </div>
                         )}
+                        {widget.type === "git-status" && (
+                          <div>
+                            <label style={{ fontSize: "9px", fontWeight: "600", textTransform: "uppercase", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>Datenquelle</label>
+                            <select 
+                              className="settings-input" 
+                              value={widget.gitMode || "local"} 
+                              onChange={(e) => {
+                                const mode = e.target.value as "local" | "github";
+                                updateWidget(widget.id, { 
+                                  gitMode: mode,
+                                  title: mode === "github" ? "GitHub Repository" : "Git Repository Status"
+                                });
+                              }}
+                              style={{ width: "100%", fontSize: "11px", padding: "5px 8px", marginBottom: "8px" }}
+                            >
+                              <option value="local">Lokal (System-Git)</option>
+                              <option value="github">GitHub API (Cloud)</option>
+                            </select>
+                            
+                            {widget.gitMode === "github" && (
+                              <div>
+                                <label style={{ fontSize: "9px", fontWeight: "600", textTransform: "uppercase", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>Repository</label>
+                                {githubToken ? (
+                                  githubReposLoading ? (
+                                    <span style={{ fontSize: "10px", color: "var(--text-muted)" }}>Lade Repos...</span>
+                                  ) : (
+                                    <select
+                                      className="settings-input"
+                                      value={widget.gitRepo || ""}
+                                      onChange={(e) => {
+                                        const repo = e.target.value;
+                                        updateWidget(widget.id, { 
+                                          gitRepo: repo,
+                                          title: repo ? `GitHub: ${repo.split("/")[1]}` : "GitHub Repository"
+                                        });
+                                      }}
+                                      style={{ width: "100%", fontSize: "11px", padding: "5px 8px" }}
+                                    >
+                                      <option value="">-- Wähle Repo --</option>
+                                      {githubRepos.map((r) => (
+                                        <option key={r.fullName} value={r.fullName}>{r.fullName}</option>
+                                      ))}
+                                    </select>
+                                  )
+                                ) : (
+                                  <p style={{ fontSize: "9px", color: "#e05252" }}>Trage zuerst deinen GitHub-Token in den Einstellungen ein.</p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
-                    <div className="card-header" style={{ display: "flex", alignItems: "center", gap: "8px", borderBottom: `1px solid ${hasBg ? fgColor + "22" : "var(--border-color)"}`, paddingBottom: "10px", marginBottom: "12px", paddingRight: dashboardEditMode ? "56px" : "0px" }}>
+                    <div style={{ display: "flex", flexDirection: "column", flex: 1, pointerEvents: dashboardEditMode ? "none" : "auto", height: "100%", minHeight: 0 }}>
+                      <div className="card-header" style={{ display: "flex", alignItems: "center", gap: "8px", borderBottom: `1px solid ${hasBg ? fgColor + "22" : "var(--border-color)"}`, paddingBottom: "10px", marginBottom: "12px", paddingRight: dashboardEditMode ? "56px" : "0px" }}>
                       {dashboardEditMode && <span style={{ fontSize: "14px", color: fgMuted, cursor: "grab", userSelect: "none" }} title="Ziehen zum Verschieben">⠿</span>}
                       <span style={{ fontSize: "18px", color: hasBg ? fgColor : "var(--accent-color)" }}>
                         <Icon icon={widget.type === "recent-files" ? "mage:file-records" : widget.type === "git-status" ? "mage:github" : widget.type === "weather" ? "mage:sun" : widget.type === "privacy-guard" ? "mage:shield" : "mage:code"} />
@@ -2788,7 +3214,7 @@ sys.stderr = io.StringIO()
                         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                           {recentFiles.map((file) => (
                             <div key={file.name} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", backgroundColor: hasBg ? fgColor + "11" : "var(--bg-tertiary)", borderRadius: "var(--radius-sm)", border: `1px solid ${hasBg ? fgColor + "22" : "var(--border-color)"}` }}>
-                              <div onClick={() => { setEditorFilename(file.name); setEditorLanguage(file.language); setEditorCode(file.code); setEditorWorkflowStep("editor"); setEditorOutput(""); setIsEditorOpen(true); }} style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", flex: 1, minWidth: 0 }}>
+                              <div onClick={() => openWorkspaceFile(file.name, file.language)} style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", flex: 1, minWidth: 0 }}>
                                 <Icon icon={file.language === "rust" ? "vscode-icons:file-type-rust" : file.language === "python" ? "vscode-icons:file-type-python" : file.language === "javascript" ? "vscode-icons:file-type-js" : "mage:file-records"} style={{ fontSize: "16px", flexShrink: 0 }} />
                                 <span style={{ fontSize: "12px", fontWeight: "500", color: fgColor, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{file.name}</span>
                               </div>
@@ -2803,35 +3229,218 @@ sys.stderr = io.StringIO()
                         </div>
                       </div>
                     )}
-                    {widget.type === "git-status" && (
-                      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                        <div>
-                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px", borderBottom: `1px solid ${hasBg ? fgColor + "22" : "var(--border-color)"}`, paddingBottom: "10px" }}>
-                            <div>
-                              <span style={{ fontSize: "10px", color: fgMuted, display: "block" }}>Branch</span>
-                              <span style={{ fontSize: "12px", fontWeight: "600", color: "#F05032", display: "flex", alignItems: "center", gap: "4px" }}><Icon icon="mage:code" style={{ fontSize: "14px" }} /> main</span>
+                    {widget.type === "git-status" && (() => {
+                      const isGithub = widget.gitMode === "github";
+                      if (isGithub) {
+                        if (!githubToken.trim()) {
+                          return (
+                            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", position: "relative", height: "100%", width: "100%", overflow: "hidden", borderRadius: "8px" }}>
+                              <img 
+                                src="/github_placeholder.jpg" 
+                                alt="Hier könnten Ihre Repos angezeigt werden" 
+                                style={{ width: "100%", height: "100%", objectFit: "cover", position: "absolute", top: 0, left: 0 }} 
+                              />
+                              <div style={{ position: "absolute", inset: 0, border: "1px solid rgba(255,255,255,0.05)", pointerEvents: "none" }} />
                             </div>
-                            <div style={{ textAlign: "right" }}>
-                              <span style={{ fontSize: "10px", color: fgMuted, display: "block" }}>Status</span>
-                              <span className="badge" style={{ backgroundColor: "rgba(89,168,105,0.15)", color: "#59A869", border: "1px solid rgba(89,168,105,0.2)", fontSize: "10px", padding: "2px 6px" }}>Clean</span>
+                          );
+                        }
+                        const repoName = widget.gitRepo;
+                        if (!repoName) {
+                          return (
+                            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: "8px", textAlign: "center", padding: "16px" }}>
+                              <Icon icon="mage:settings" style={{ fontSize: "28px", color: fgMuted }} />
+                              <span style={{ fontSize: "11px", color: fgMuted }}>Kein Repository ausgewählt. Klicke oben rechts auf das Zahnrad im Edit-Modus.</span>
                             </div>
-                          </div>
-                          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                            <span style={{ fontSize: "9px", fontWeight: "bold", textTransform: "uppercase", color: fgMuted, display: "block", marginBottom: "4px" }}>Letzte Commits</span>
-                            {[["5a69096", "Dashboard widget system: drag, resize, custom colors"], ["140a9f0", "feat(weather): three-mode weather widget"], ["0f551dc", "Add Monaco Editor runtime settings"]].map(([hash, msg]) => (
-                              <div key={hash} style={{ display: "flex", gap: "8px", fontSize: "11px" }}>
-                                <span style={{ color: "var(--glow-color-1,#3574F0)", fontFamily: "var(--font-mono)", fontWeight: "600", flexShrink: 0 }}>{hash}</span>
-                                <span style={{ color: fgColor, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{msg}</span>
+                          );
+                        }
+                        const data = githubRepoData[repoName];
+                        if (!data) {
+                          return (
+                            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: "8px", padding: "20px" }}>
+                              <span style={{ width: "20px", height: "20px", border: "2px solid rgba(255,255,255,0.2)", borderTopColor: "var(--glow-color-1,#3574F0)", borderRadius: "50%", animation: "spin 0.8s linear infinite", display: "inline-block" }} />
+                              <span style={{ fontSize: "11px", color: fgMuted }}>Lade Repository-Daten...</span>
+                            </div>
+                          );
+                        }
+                        const activeTab = gitWidgetTabs[widget.id] || "commits";
+                        const setActiveTab = (tab: string) => setGitWidgetTabs(prev => ({ ...prev, [widget.id]: tab }));
+                        return (
+                          <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between", height: "100%", minHeight: 0 }}>
+                            <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", paddingBottom: "10px", borderBottom: `1px solid ${hasBg ? fgColor + "22" : "var(--border-color)"}` }}>
+                                <div>
+                                  <span style={{ fontSize: "10px", color: fgMuted, display: "block" }}>Default Branch</span>
+                                  <span style={{ fontSize: "12px", fontWeight: "600", color: "#F05032", display: "flex", alignItems: "center", gap: "4px" }}>
+                                    <Icon icon="mage:code" style={{ fontSize: "14px" }} /> {data.defaultBranch || "main"}
+                                  </span>
+                                </div>
+                                <div style={{ textAlign: "right" }}>
+                                  <span style={{ fontSize: "10px", color: fgMuted, display: "block" }}>Sterne</span>
+                                  <span style={{ fontSize: "12px", fontWeight: "700", color: "#FFC66D", display: "flex", alignItems: "center", gap: "4px", justifyContent: "flex-end" }}>
+                                    ⭐ {data.stars} Stars
+                                  </span>
+                                </div>
                               </div>
-                            ))}
+                              <div style={{ display: "flex", gap: "4px", marginBottom: "12px", borderBottom: `1px solid ${hasBg ? fgColor + "11" : "rgba(255,255,255,0.05)"}`, paddingBottom: "4px" }}>
+                                {[
+                                  { id: "commits", label: "Commits" },
+                                  { id: "issues", label: `Issues (${data.issues?.length || 0})` },
+                                  { id: "pulls", label: `PRs (${data.pulls?.length || 0})` },
+                                  { id: "branches", label: "Branches" }
+                                ].map(tab => (
+                                  <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id)}
+                                    style={{
+                                      fontSize: "10px",
+                                      padding: "4px 8px",
+                                      background: activeTab === tab.id ? (hasBg ? fgColor + "22" : "var(--bg-tertiary)") : "none",
+                                      border: "none",
+                                      borderRadius: "4px",
+                                      color: activeTab === tab.id ? fgColor : fgMuted,
+                                      cursor: "pointer",
+                                      fontWeight: "600",
+                                      transition: "all 0.15s"
+                                    }}
+                                  >
+                                    {tab.label}
+                                  </button>
+                                ))}
+                              </div>
+                              <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+                                {activeTab === "commits" && (
+                                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                    {data.commits && data.commits.map((c: any) => (
+                                      <div key={c.hash} style={{ display: "flex", gap: "8px", fontSize: "11px", alignItems: "center" }}>
+                                        <span style={{ color: "var(--glow-color-1,#3574F0)", fontFamily: "var(--font-mono)", fontWeight: "600", flexShrink: 0 }}>{c.hash}</span>
+                                        <span style={{ color: fgColor, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }} title={c.message}>{c.message}</span>
+                                        <span style={{ fontSize: "9px", color: fgMuted, flexShrink: 0 }}>{c.date}</span>
+                                      </div>
+                                    ))}
+                                    {(!data.commits || data.commits.length === 0) && (
+                                      <span style={{ fontSize: "11px", color: fgMuted }}>Keine Commits vorhanden.</span>
+                                    )}
+                                  </div>
+                                )}
+                                {activeTab === "issues" && (
+                                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                    {data.issues && data.issues.map((i: any) => (
+                                      <a key={i.number} href={i.url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", gap: "6px", fontSize: "11px", textDecoration: "none", color: fgColor, alignItems: "center" }}>
+                                        <span style={{ color: "#e05252", fontWeight: "600", flexShrink: 0 }}>#{i.number}</span>
+                                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }} title={i.title}>{i.title}</span>
+                                      </a>
+                                    ))}
+                                    {(!data.issues || data.issues.length === 0) && (
+                                      <span style={{ fontSize: "11px", color: "#59A869", fontWeight: "600" }}>✓ Keine offenen Issues!</span>
+                                    )}
+                                  </div>
+                                )}
+                                {activeTab === "pulls" && (
+                                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                    {data.pulls && data.pulls.map((p: any) => (
+                                      <a key={p.number} href={p.url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", gap: "6px", fontSize: "11px", textDecoration: "none", color: fgColor, alignItems: "center" }}>
+                                        <span style={{ color: "#59A869", fontWeight: "600", flexShrink: 0 }}>#{p.number}</span>
+                                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }} title={p.title}>{p.title}</span>
+                                      </a>
+                                    ))}
+                                    {(!data.pulls || data.pulls.length === 0) && (
+                                      <span style={{ fontSize: "11px", color: fgMuted }}>Keine offenen Pull Requests.</span>
+                                    )}
+                                  </div>
+                                )}
+                                {activeTab === "branches" && (
+                                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                                    {data.branches && data.branches.map((b: string) => (
+                                      <span key={b} className="badge" style={{ backgroundColor: "rgba(53,116,240,0.1)", color: "var(--glow-color-1,#3574F0)", border: "1px solid rgba(53,116,240,0.2)", fontSize: "10px", padding: "3px 8px", borderRadius: "4px" }}>
+                                        {b}
+                                      </span>
+                                    ))}
+                                    {(!data.branches || data.branches.length === 0) && (
+                                      <span style={{ fontSize: "11px", color: fgMuted }}>Keine Branches geladen.</span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
+                              <button className="settings-btn" onClick={() => { fetchGithubRepoDetails(repoName); showToast("GitHub-Daten aktualisiert"); }} style={{ fontSize: "11px", padding: "6px 12px" }}>Aktualisieren</button>
+                              <a href={`https://github.com/${repoName}`} target="_blank" rel="noopener noreferrer" className="settings-btn primary" style={{ fontSize: "11px", padding: "6px 12px", textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                Auf GitHub öffnen
+                              </a>
+                            </div>
+                          </div>
+                        );
+                      }
+                      if (gitError) {
+                        return (
+                          <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                            <div>
+                              <div style={{ fontSize: "9px", color: "#e05252", padding: "6px 8px", background: "rgba(224,82,82,0.1)", borderRadius: "var(--radius-sm)", marginBottom: "10px", border: "1px solid rgba(224,82,82,0.2)" }} title={gitError}>
+                                ⚠️ Kein lokales Git-Repo oder Befehl nicht verfügbar.
+                              </div>
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: "20px 10px", gap: "8px", marginTop: "10px" }}>
+                                <Icon icon="mage:code" style={{ fontSize: "24px", color: fgMuted }} />
+                                <span style={{ fontSize: "11px", color: fgMuted }}>Initialisiere ein Git-Repository (<code>git init</code>) im Workspace, um den Status anzuzeigen.</span>
+                              </div>
+                            </div>
+                            <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
+                              <button className="settings-btn" onClick={() => { fetchLiveGitData(); showToast("Git-Status aktualisiert"); }} style={{ fontSize: "11px", padding: "6px 12px" }}>Aktualisieren</button>
+                            </div>
+                          </div>
+                        );
+                      }
+                      const displayBranch = liveGitStatus?.branch || "main (Simuliert)";
+                      const isClean = liveGitStatus ? liveGitStatus.is_clean : true;
+                      const commits = liveGitStatus && liveGitCommits.length > 0 ? liveGitCommits : [
+                        { hash: "5a69096", message: "Dashboard widget system: drag, resize, custom colors", date: "vor 2 Std." },
+                        { hash: "140a9f0", message: "feat(weather): three-mode weather widget", date: "vor 4 Std." },
+                        { hash: "0f551dc", message: "Add Monaco Editor runtime settings", date: "vor 1 Tag" }
+                      ];
+                      return (
+                        <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                          <div>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px", borderBottom: `1px solid ${hasBg ? fgColor + "22" : "var(--border-color)"}`, paddingBottom: "10px" }}>
+                              <div>
+                                <span style={{ fontSize: "10px", color: fgMuted, display: "block" }}>Branch</span>
+                                <span style={{ fontSize: "12px", fontWeight: "600", color: "#F05032", display: "flex", alignItems: "center", gap: "4px" }}><Icon icon="mage:code" style={{ fontSize: "14px" }} /> {displayBranch}</span>
+                              </div>
+                              <div style={{ textAlign: "right" }}>
+                                <span style={{ fontSize: "10px", color: fgMuted, display: "block" }}>Status</span>
+                                {isClean ? (
+                                  <span className="badge" style={{ backgroundColor: "rgba(89,168,105,0.15)", color: "#59A869", border: "1px solid rgba(89,168,105,0.2)", fontSize: "10px", padding: "2px 6px" }}>Clean</span>
+                                ) : (
+                                  <span className="badge" style={{ backgroundColor: "rgba(224,82,82,0.15)", color: "#e05252", border: "1px solid rgba(224,82,82,0.2)", fontSize: "10px", padding: "2px 6px" }}>
+                                    {liveGitStatus ? `${liveGitStatus.modified + liveGitStatus.added + liveGitStatus.deleted + liveGitStatus.untracked} Änderungen` : "Geändert"}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {liveGitStatus && !isClean && (
+                              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "12px", fontSize: "10px" }}>
+                                {liveGitStatus.modified > 0 && <span style={{ color: "#FFC66D" }}>{liveGitStatus.modified} modifiziert</span>}
+                                {liveGitStatus.added > 0 && <span style={{ color: "#59A869" }}>{liveGitStatus.added} neu</span>}
+                                {liveGitStatus.deleted > 0 && <span style={{ color: "#e05252" }}>{liveGitStatus.deleted} gelöscht</span>}
+                                {liveGitStatus.untracked > 0 && <span style={{ color: fgMuted }}>{liveGitStatus.untracked} unversioniert</span>}
+                              </div>
+                            )}
+                            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                              <span style={{ fontSize: "9px", fontWeight: "bold", textTransform: "uppercase", color: fgMuted, display: "block", marginBottom: "4px" }}>Letzte Commits</span>
+                              {commits.map((c) => (
+                                <div key={c.hash} style={{ display: "flex", gap: "8px", fontSize: "11px", alignItems: "center" }}>
+                                  <span style={{ color: "var(--glow-color-1,#3574F0)", fontFamily: "var(--font-mono)", fontWeight: "600", flexShrink: 0 }}>{c.hash}</span>
+                                  <span style={{ color: fgColor, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }} title={c.message}>{c.message}</span>
+                                  <span style={{ fontSize: "9px", color: fgMuted, flexShrink: 0 }}>{c.date}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
+                            <button className="settings-btn" onClick={() => { fetchLiveGitData(); showToast("Git-Status aktualisiert"); }} style={{ fontSize: "11px", padding: "6px 12px" }}>Aktualisieren</button>
+                            <button className="settings-btn" onClick={() => showToast("Zeno ist lokal und führt Push-Befehle nur über dein System-Git aus")} style={{ fontSize: "11px", padding: "6px 12px" }}>Push (Lokal)</button>
                           </div>
                         </div>
-                        <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
-                          <button className="settings-btn" onClick={() => showToast("Git Status: clean")} style={{ fontSize: "11px", padding: "6px 12px" }}>Status</button>
-                          <button className="settings-btn" onClick={() => showToast("Git Push simuliert")} style={{ fontSize: "11px", padding: "6px 12px" }}>Push</button>
-                        </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                     {widget.type === "weather" && (
                       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "10px" }}>
                         <div style={{ display: "flex", gap: "8px" }}>
@@ -2973,6 +3582,7 @@ sys.stderr = io.StringIO()
                         />
                       </div>
                     )}
+                    </div>
                   </div>
                 );
               })}
@@ -3991,13 +4601,7 @@ sys.stderr = io.StringIO()
                     <button 
                       key={file.name} 
                       className="recent-file-item"
-                      onClick={() => {
-                        setEditorFilename(file.name);
-                        setEditorLanguage(file.language);
-                        setEditorCode(file.code);
-                        setEditorWorkflowStep("editor");
-                        setEditorOutput("");
-                      }}
+                      onClick={() => openWorkspaceFile(file.name, file.language)}
                       style={{ position: "relative" }}
                     >
                       <Icon 
@@ -4021,8 +4625,8 @@ sys.stderr = io.StringIO()
                       </div>
                       <span 
                         className="recent-file-delete-btn"
-                        onClick={(e) => handleDeleteRecentFile(e, file.name)}
-                        title="Aus Historie löschen"
+                        onClick={(e) => { e.stopPropagation(); removeRecentFileFromHistory(file.name); }}
+                        title="Aus Historie entfernen"
                       >
                         <Icon icon="mage:trash-3" />
                       </span>
@@ -4056,15 +4660,7 @@ sys.stderr = io.StringIO()
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       const input = e.currentTarget.value.trim() || "main.rs";
-                      const lang = getLanguageFromExtension(input);
-                      const initialCode = input.endsWith(".rs") ? "fn main() {\n    println!(\"Hello World!\");\n}" :
-                                    input.endsWith(".py") ? "print(\"Hello World!\")" :
-                                    input.endsWith(".js") || input.endsWith(".ts") ? "console.log(\"Hello World!\");" : "";
-                      setEditorFilename(input);
-                      setEditorLanguage(lang);
-                      setEditorCode(initialCode);
-                      setEditorWorkflowStep("editor");
-                      addRecentFile(input, initialCode, lang);
+                      createNewWorkspaceFile(input);
                     }
                   }}
                 />
@@ -4074,15 +4670,7 @@ sys.stderr = io.StringIO()
                     onClick={() => {
                       const inputEl = document.getElementById("editor-new-filename-field") as HTMLInputElement;
                       const input = inputEl?.value.trim() || "main.rs";
-                      const lang = getLanguageFromExtension(input);
-                      const initialCode = input.endsWith(".rs") ? "fn main() {\n    println!(\"Hello World!\");\n}" :
-                                    input.endsWith(".py") ? "print(\"Hello World!\")" :
-                                    input.endsWith(".js") || input.endsWith(".ts") ? "console.log(\"Hello World!\");" : "";
-                      setEditorFilename(input);
-                      setEditorLanguage(lang);
-                      setEditorCode(initialCode);
-                      setEditorWorkflowStep("editor");
-                      addRecentFile(input, initialCode, lang);
+                      createNewWorkspaceFile(input);
                     }}
                   >
                     Erstellen
@@ -4121,6 +4709,7 @@ sys.stderr = io.StringIO()
                       title="Klicke zum Umbenennen"
                     >
                       {editorFilename}
+                      {isEditorDirty && <span style={{ color: "var(--glow-color-1, #3574F0)", marginLeft: "6px", fontSize: "10px" }} title="Ungespeicherte Änderungen">●</span>}
                       <Icon icon="mage:edit" className="filename-edit-icon" style={{ marginLeft: "6px", fontSize: "12px", opacity: 0.6 }} />
                     </span>
                   )}
@@ -4137,7 +4726,10 @@ sys.stderr = io.StringIO()
                   language={editorLanguage}
                   theme={theme === "light" ? "zeno-light-theme" : "zeno-dark-theme"}
                   value={editorCode}
-                  onChange={(val) => setEditorCode(val || "")}
+                  onChange={(val) => {
+                    setEditorCode(val || "");
+                    setIsEditorDirty(true);
+                  }}
                   onMount={(_, monaco) => setupZenoIntelliSense(monaco)}
                   options={{
                     minimap: { enabled: false },
@@ -4169,9 +4761,9 @@ sys.stderr = io.StringIO()
                 <button 
                   className="editor-toolbar-btn btn-save" 
                   onClick={handleSaveFile} 
-                  title="Speichern"
+                  title="Speichern (Ctrl+S)"
                 >
-                  <Icon icon="mage:save" /> Save
+                  <Icon icon="lucide:save" /> Save {isEditorDirty && <span style={{ fontSize: "10px", color: "var(--glow-color-1, #3574F0)", marginLeft: "2px" }}>●</span>}
                 </button>
                 <button 
                   className="editor-toolbar-btn btn-suggest-edit" 
@@ -4247,6 +4839,12 @@ sys.stderr = io.StringIO()
               onClick={() => setActiveSettingsTab("editor")}
             >
               Monaco-Editor
+            </button>
+            <button 
+              className={`settings-nav-item ${activeSettingsTab === "github" ? "active" : ""}`} 
+              onClick={() => setActiveSettingsTab("github")}
+            >
+              GitHub-Integration
             </button>
           </aside>
 
@@ -4452,6 +5050,89 @@ sys.stderr = io.StringIO()
                         </div>
                       );
                     })}
+                  </div>
+                </div>
+              )}
+
+              {/* Tab: GitHub-Integration */}
+              {activeSettingsTab === "github" && (
+                <div className="settings-tab-content" id="tab-github">
+                  <h3>GitHub-Integration (100% lokal & privat)</h3>
+                  <p className="settings-help-text">
+                    Verbinde dein GitHub-Konto direkt über deinen Webbrowser mit der GitHub-API. 
+                    <strong> Wichtig:</strong> Dein Token verbleibt ausschließlich lokal auf diesem Gerät im Speicher der App. 
+                    Es wird niemals an einen Zeno-Server gesendet.
+                  </p>
+
+                  <div className="settings-form-group" style={{ marginTop: "20px" }}>
+                    <label>Personal Access Token (PAT)</label>
+                    <p className="settings-help-text">
+                      Erstelle ein Token mit <code>repo</code>-Rechten auf GitHub, um deinen Repository-Status abzufragen und Commits einzusehen.
+                    </p>
+                    <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+                      <input 
+                        type="password" 
+                        className="settings-input" 
+                        placeholder="ghp_..." 
+                        value={githubToken} 
+                        onChange={(e) => {
+                          setGithubToken(e.target.value);
+                          setGithubUser(null);
+                        }}
+                        style={{ flex: 1, maxWidth: "none" }}
+                      />
+                      <button 
+                        className="settings-btn primary" 
+                        onClick={testGithubConnection} 
+                        disabled={githubConnecting || !githubToken.trim()}
+                        style={{ flexShrink: 0 }}
+                      >
+                        {githubConnecting ? "Verbinde..." : "Verbindung testen"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {githubUser && (
+                    <div style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "12px",
+                      marginTop: "16px",
+                      padding: "12px",
+                      backgroundColor: "rgba(89, 168, 105, 0.1)",
+                      border: "1px solid rgba(89, 168, 105, 0.3)",
+                      borderRadius: "var(--radius-md)"
+                    }}>
+                      <img 
+                        src={githubUser.avatarUrl} 
+                        alt="GitHub Avatar" 
+                        style={{ width: "36px", height: "36px", borderRadius: "50%", border: "2px solid #59A869" }}
+                      />
+                      <div style={{ display: "flex", flexDirection: "column" }}>
+                        <span style={{ fontSize: "12px", fontWeight: "700", color: "#59A869" }}>✓ Erfolgreich verbunden</span>
+                        <span style={{ fontSize: "11px", color: "var(--text-primary)", fontWeight: "600" }}>
+                          {githubUser.name || githubUser.login} (@{githubUser.login})
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{
+                    marginTop: "24px",
+                    padding: "16px",
+                    backgroundColor: "var(--bg-tertiary)",
+                    border: "1px solid var(--border-color)",
+                    borderRadius: "var(--radius-lg)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px"
+                  }}>
+                    <span style={{ fontSize: "10px", fontWeight: "700", textTransform: "uppercase", color: "var(--text-muted)", letterSpacing: "0.5px" }}>Sicherheitsprotokoll & Transparenz</span>
+                    <ul style={{ fontSize: "11px", color: "var(--text-muted)", paddingLeft: "16px", lineHeight: "1.6" }}>
+                      <li>Direct-Client-Request: Keine API-Proxy-Server oder Cloud-Gateways. Die Anfrage erfolgt direkt von deiner lokalen IP zu GitHub.</li>
+                      <li>Speicherort: Der Token wird ausschließlich in deiner lokalen Desktop-App-Sandbox gespeichert.</li>
+                      <li>Minimalberechtigung: Verwende am besten ein feinkörniges (Fine-grained) Token mit Nur-Lese-Rechten auf ausgewählte Repositories.</li>
+                    </ul>
                   </div>
                 </div>
               )}
