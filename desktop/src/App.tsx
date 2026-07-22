@@ -1119,6 +1119,55 @@ export default function App() {
     );
     setBrowserAddressInput(cleanedUrl);
   };
+
+  useEffect(() => {
+    const placeholder = document.getElementById("native-browser-placeholder");
+    if (!placeholder || !isPrivacyBrowserOpen || browserViewMode !== "live") {
+      safeInvoke("update_native_browser", {
+        visible: false,
+        url: null,
+        x: -10000.0,
+        y: -10000.0,
+        width: 0.0,
+        height: 0.0
+      }).catch(() => {});
+      return;
+    }
+
+    const updatePosition = () => {
+      const rect = placeholder.getBoundingClientRect();
+      safeInvoke("update_native_browser", {
+        visible: true,
+        url: activeBrowserTab.activeUrl,
+        x: rect.left,
+        y: rect.top,
+        width: rect.width,
+        height: rect.height
+      }).catch(() => {});
+    };
+
+    updatePosition();
+
+    window.addEventListener("resize", updatePosition);
+    
+    const observer = new ResizeObserver(() => {
+      updatePosition();
+    });
+    observer.observe(placeholder);
+
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      observer.disconnect();
+      safeInvoke("update_native_browser", {
+        visible: false,
+        url: null,
+        x: -10000.0,
+        y: -10000.0,
+        width: 0.0,
+        height: 0.0
+      }).catch(() => {});
+    };
+  }, [isPrivacyBrowserOpen, browserViewMode, activeBrowserTab.activeUrl, activeTabId]);
   const [editorRuntimes, setEditorRuntimes] = useState<Record<string, "installed" | "not_installed" | "installing">>({
     javascript: "installed",
     typescript: "installed",
@@ -5357,27 +5406,25 @@ sys.stderr = io.StringIO()
               {/* View Mode: Live WebView vs Privacy Audit Report */}
               {browserViewMode === "live" ? (
                 <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%", width: "100%", position: "relative" }}>
-                  <iframe
-                    src={activeBrowserTab.activeUrl}
-                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-                    style={{ width: "100%", height: "100%", border: "none", background: "#FFFFFF" }}
-                    title="Live Webview"
+                  <div
+                    id="native-browser-placeholder"
+                    style={{ flex: 1, width: "100%", height: "100%", background: "#111214" }}
                   />
                   <div style={{ padding: "6px 14px", backgroundColor: "rgba(43,45,48,0.95)", borderTop: "1px solid var(--border-color)", display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "10px", color: "var(--text-muted)" }}>
-                    <span>💡 <strong>Hinweis:</strong> Manche Webseiten (z. B. Google, YouTube) blockieren `iframe`-Einbettung über `X-Frame-Options`.</span>
+                    <span>💡 <strong>Status:</strong> Native child webview gedockt (umgeht Iframe-Blockierung).</span>
                     <button
                       className="settings-btn"
                       onClick={() => {
                         safeInvoke("open_native_webview", { url: activeBrowserTab.activeUrl, title: activeBrowserTab.title })
-                          .then(() => showToast("In nativem Zeno Privacy Window geöffnet!"))
+                          .then(() => showToast("In separatem nativem Fenster geöffnet!"))
                           .catch(() => {
                             window.open(activeBrowserTab.activeUrl, "_blank");
-                            showToast("Im Standard-Browser geöffnet (außerhalb von Tauri)!");
+                            showToast("Im Standard-Browser geöffnet!");
                           });
                       }}
                       style={{ fontSize: "10px", padding: "2px 8px", color: "var(--accent-color)" }}
                     >
-                      🚀 In Nativer Tauri WebView2 öffnen
+                      🚀 In separatem Fenster öffnen
                     </button>
                   </div>
                 </div>

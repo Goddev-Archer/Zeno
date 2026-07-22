@@ -332,6 +332,53 @@ fn open_native_webview(app: tauri::AppHandle, url: String, title: String) -> Res
     Ok(())
 }
 
+#[tauri::command]
+fn update_native_browser(
+    app: tauri::AppHandle,
+    visible: bool,
+    url: Option<String>,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+) -> Result<(), String> {
+    let main_window = app.get_webview_window("main")
+        .ok_or_else(|| "Hauptfenster nicht gefunden.".to_string())?;
+        
+    if let Some(child) = app.get_webview_window("native_browser") {
+        if !visible {
+            let _ = child.hide();
+            let _ = child.set_position(tauri::Position::Logical(tauri::LogicalPosition { x: -10000.0, y: -10000.0 }));
+            let _ = child.set_size(tauri::Size::Logical(tauri::LogicalSize { width: 0.0, height: 0.0 }));
+        } else {
+            let _ = child.show();
+            let _ = child.set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }));
+            let _ = child.set_size(tauri::Size::Logical(tauri::LogicalSize { width, height }));
+            if let Some(u) = url {
+                if let Ok(parsed_url) = u.parse() {
+                    let _ = child.navigate(parsed_url);
+                }
+            }
+        }
+    } else if visible {
+        let u = url.unwrap_or_else(|| "about:blank".to_string());
+        let parsed_url = u.parse().map_err(|e| format!("Ungültige URL: {}", e))?;
+        
+        let _child = tauri::WebviewWindowBuilder::new(
+            &app,
+            "native_browser",
+            tauri::WebviewUrl::External(parsed_url)
+        )
+        .parent(&main_window).map_err(|e| e.to_string())?
+        .decorations(false)
+        .position(x, y)
+        .inner_size(width, height)
+        .build()
+        .map_err(|e| format!("Fehler beim Erstellen des Fensters: {}", e))?;
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -346,7 +393,8 @@ pub fn run() {
             delete_workspace_file,
             load_settings,
             save_settings,
-            open_native_webview
+            open_native_webview,
+            update_native_browser
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
