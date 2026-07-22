@@ -120,24 +120,25 @@ ul, ol {
 /* ── App Grid Layout ───────────────────────────────────────── */
 .app-layout {
   display: grid;
-  grid-template-columns: 70px 240px 1fr auto;
+  grid-template-columns: 72px 240px 1fr auto;
   grid-template-rows: 100%;
   height: 100vh;
   width: 100vw;
-  padding: 8px; /* Padding around all islands */
+  padding: 8px 8px 8px 0; /* Server sidebar flush to the left/top/bottom canvas */
   background-color: transparent;
   overflow: hidden;
 }
 
 /* ============================================================
-   1. SERVER SIDEBAR
+   1. SERVER SIDEBAR (Lies flat on background)
    ============================================================ */
 .server-sidebar {
   grid-column: 1;
-  background-color: var(--bg-primary);
-  background-image: var(--noise-texture);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
+  background-color: transparent; /* Lies directly on canvas background */
+  background-image: none;
+  border: none;
+  border-right: 1px solid var(--border-color); /* Clean separator line */
+  border-radius: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -145,14 +146,14 @@ ul, ol {
   gap: 10px;
   z-index: 10;
   overflow-y: auto;
-  margin-right: 8px; /* Gap between islands */
-  transition: background-color var(--transition-normal), backdrop-filter var(--transition-normal);
+  margin-right: 8px; /* Gap to next panel */
+  transition: background-color var(--transition-normal);
 }
 
 .glass-effect .server-sidebar {
-  background-color: color-mix(in srgb, var(--bg-primary) 82%, transparent);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background-color: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .server-icon {

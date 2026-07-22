@@ -62,6 +62,223 @@ interface RecentFile {
   language: string;
 }
 
+interface IdeFile {
+  name: string;
+  path: string;
+  code: string;
+  language: string;
+  isFolder: boolean;
+}
+
+// --- PRIVACY BROWSER TYPES ---
+interface BrowserTab {
+  id: string;
+  title: string;
+  url: string;
+  activeUrl: string;
+  favicon: string;
+  blockedTrackers: number;
+  httpsEnforced: boolean;
+  strippedParams: string[];
+}
+
+const KNOWN_TRACKING_PARAMS = [
+  "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "utm_id",
+  "fbclid", "gclid", "msclkid", "ttclid", "si", "igsh", "ref", "_hsenc", "mc_eid",
+  "twclid", "yclid"
+];
+
+function cleanUrl(rawUrl: string): { cleanedUrl: string; strippedParams: string[] } {
+  try {
+    const validUrl = rawUrl.startsWith("http://") || rawUrl.startsWith("https://") ? rawUrl : `https://${rawUrl}`;
+    const parsed = new URL(validUrl);
+    const strippedParams: string[] = [];
+    const searchParams = new URLSearchParams(parsed.search);
+
+    KNOWN_TRACKING_PARAMS.forEach((param) => {
+      if (searchParams.has(param)) {
+        strippedParams.push(param);
+        searchParams.delete(param);
+      }
+    });
+
+    parsed.search = searchParams.toString();
+    return { cleanedUrl: parsed.toString(), strippedParams };
+  } catch {
+    return { cleanedUrl: rawUrl, strippedParams: [] };
+  }
+}
+
+// --- WASM RUNTIME HUB TYPES & CATALOG ---
+interface HubRuntimeItem {
+  id: string;
+  langKey: string;
+  name: string;
+  version: string;
+  size: string;
+  provider: "Zeno Community Index" | "WAPM Registry" | "Zeno Core" | "Custom WASM";
+  providerIcon: string;
+  badgeColor: string;
+  description: string;
+  tags: string[];
+  sampleFile: string;
+  sampleCode: string;
+  icon: string;
+}
+
+const HUB_RUNTIMES_CATALOG: HubRuntimeItem[] = [
+  {
+    id: "golang",
+    langKey: "golang",
+    name: "Golang WASM Compiler",
+    version: "v1.22.4",
+    size: "14.2 MB",
+    provider: "Zeno Community Index",
+    providerIcon: "⭐",
+    badgeColor: "#3574F0",
+    description: "Nativer Go-Compiler für WebAssembly. Kompiliert Go-Codeblöcke direkt in der Browser-WASI Sandbox.",
+    tags: ["#golang", "#wasi", "#systems"],
+    sampleFile: "main.go",
+    sampleCode: "package main\n\nimport \"fmt\"\n\nfunc main() {\n    fmt.Println(\"Hello Zeno Go WASM!\")\n}",
+    icon: "vscode-icons:file-type-go"
+  },
+  {
+    id: "ruby",
+    langKey: "ruby",
+    name: "Ruby.wasm (CRuby Engine)",
+    version: "v3.3.1",
+    size: "9.8 MB",
+    provider: "WAPM Registry",
+    providerIcon: "📦",
+    badgeColor: "#EDA200",
+    description: "Offizieller CRuby-WASM Interpreter von der Ruby Core Org. Unterstützt eval, stdlib & Gems.",
+    tags: ["#ruby", "#scripting", "#wapm"],
+    sampleFile: "script.rb",
+    sampleCode: "puts 'Hello Zeno Ruby WASM!'\nputs 'Kryptografische Session aktiv'",
+    icon: "vscode-icons:file-type-ruby"
+  },
+  {
+    id: "perl",
+    langKey: "perl",
+    name: "Perl 5 WASM Interpreter",
+    version: "v5.38.2",
+    size: "5.4 MB",
+    provider: "WAPM Registry",
+    providerIcon: "📦",
+    badgeColor: "#EDA200",
+    description: "Perl 5 Interpreter kompiliert nach WASI. Führe Perl-Scripts & Regex in isolierter Umgebung aus.",
+    tags: ["#perl", "#scripting", "#text"],
+    sampleFile: "test.pl",
+    sampleCode: "use strict;\nuse warnings;\n\nprint \"Hello Zeno Perl WASM!\\n\";",
+    icon: "vscode-icons:file-type-perl"
+  },
+  {
+    id: "php",
+    langKey: "php",
+    name: "PHP 8.3 CLI (PHP-WASM)",
+    version: "v8.3.6",
+    size: "8.1 MB",
+    provider: "Zeno Community Index",
+    providerIcon: "⭐",
+    badgeColor: "#3574F0",
+    description: "PHP 8.3 CLI & Engine in WebAssembly. Führe PHP-Skripte vollkommen clientseitig ohne Server aus.",
+    tags: ["#php", "#web", "#scripting"],
+    sampleFile: "index.php",
+    sampleCode: "<?php\necho \"Hello Zeno PHP 8.3 WASM!\";\n?>",
+    icon: "vscode-icons:file-type-php"
+  },
+  {
+    id: "zig",
+    langKey: "zig",
+    name: "Zig Toolchain (WASI Target)",
+    version: "v0.12.0",
+    size: "18.5 MB",
+    provider: "Zeno Community Index",
+    providerIcon: "⭐",
+    badgeColor: "#3574F0",
+    description: "Zig Compiler & Build-System für WASI. Kompiliere extrem performanten & sicheren Zig-Code.",
+    tags: ["#zig", "#systems", "#lowlevel"],
+    sampleFile: "main.zig",
+    sampleCode: "const std = @import(\"std\");\n\npub fn main() void {\n    std.debug.print(\"Hello Zeno Zig WASM!\\n\", .{});\n}",
+    icon: "vscode-icons:file-type-zig"
+  },
+  {
+    id: "sqlite",
+    langKey: "sqlite",
+    name: "SQLite 3 WASM DB Engine",
+    version: "v3.45.0",
+    size: "2.1 MB",
+    provider: "WAPM Registry",
+    providerIcon: "📦",
+    badgeColor: "#EDA200",
+    description: "SQLite 3 DB-Engine mit WASI VFS. Führe SQL-Abfragen & Schema-Migrationen lokal aus.",
+    tags: ["#sql", "#database", "#storage"],
+    sampleFile: "query.sql",
+    sampleCode: "CREATE TABLE users (id INT, name TEXT);\nINSERT INTO users VALUES (1, 'CipherNaut');\nSELECT * FROM users;",
+    icon: "vscode-icons:file-type-sqlite"
+  },
+  {
+    id: "lua",
+    langKey: "lua",
+    name: "Lua 5.4 WASM VM",
+    version: "v5.4.6",
+    size: "1.2 MB",
+    provider: "Zeno Community Index",
+    providerIcon: "⭐",
+    badgeColor: "#3574F0",
+    description: "Leichtgewichtiger Lua 5.4 Interpreter. Extrem schneller Startup und minimaler Speicherbedarf.",
+    tags: ["#lua", "#scripting", "#embed"],
+    sampleFile: "main.lua",
+    sampleCode: "print('Hello Zeno Lua 5.4 WASM!')",
+    icon: "vscode-icons:file-type-lua"
+  },
+  {
+    id: "python",
+    langKey: "python",
+    name: "Python Pyodide (Python WASM)",
+    version: "v0.26.2",
+    size: "12.8 MB",
+    provider: "Zeno Community Index",
+    providerIcon: "⭐",
+    badgeColor: "#3574F0",
+    description: "Vollständige Python 3.11 WASM-Umgebung mit NumPy & SciPy Unterstützung.",
+    tags: ["#python", "#datascience", "#wasi"],
+    sampleFile: "main.py",
+    sampleCode: "print('Hello Zeno Python WASM!')",
+    icon: "vscode-icons:file-type-python"
+  },
+  {
+    id: "rust",
+    langKey: "rust",
+    name: "Rust Compiler & Aegis Crypto",
+    version: "v1.78.0",
+    size: "4.5 MB",
+    provider: "Zeno Core",
+    providerIcon: "🛡️",
+    badgeColor: "#59A869",
+    description: "Rust-Laufzeitsimulation und lokale Aegis Kryptografie-Pakete.",
+    tags: ["#rust", "#crypto", "#zenocore"],
+    sampleFile: "main.rs",
+    sampleCode: "fn main() {\n    println!(\"Hello Zeno Rust WASM!\");\n}",
+    icon: "vscode-icons:file-type-rust"
+  },
+  {
+    id: "csharp",
+    langKey: "csharp",
+    name: ".NET CLR WASM Runtime (C#)",
+    version: "v8.0.4",
+    size: "8.2 MB",
+    provider: "Zeno Core",
+    providerIcon: "🛡️",
+    badgeColor: "#59A869",
+    description: ".NET CLR WASM Runtime zur lokalen Ausführung von C# Codeblöcken.",
+    tags: ["#csharp", "#dotnet", "#zenocore"],
+    sampleFile: "Program.cs",
+    sampleCode: "using System;\n\nclass Program {\n    static void Main() {\n        Console.WriteLine(\"Hello Zeno .NET WASM!\");\n    }\n}",
+    icon: "vscode-icons:file-type-csharp"
+  }
+];
+
 // --- WIDGET SYSTEM TYPES ---
 type WidgetType = "recent-files" | "git-status" | "weather" | "privacy-guard" | "custom";
 type WidgetColSpan = 1 | 2;
@@ -75,6 +292,242 @@ interface WidgetConfig {
   rowSpan: WidgetRowSpan;
   order: number;
   customCode: string;
+}
+
+// --- MULTI-LANGUAGE INTELLISENSE ENGINE FOR MONACO ---
+let isIntelliSenseRegistered = false;
+
+function setupZenoIntelliSense(monaco: any) {
+  if (isIntelliSenseRegistered || !monaco) return;
+  isIntelliSenseRegistered = true;
+
+  // Register Custom Zeno Themes
+  monaco.editor.defineTheme('zeno-dark-theme', {
+    base: 'vs-dark',
+    inherit: true,
+    rules: [
+      { token: 'comment', foreground: '5C6370', fontStyle: 'italic' },
+      { token: 'keyword', foreground: 'CF8E6D', fontStyle: 'bold' },
+      { token: 'string', foreground: '6A8759' },
+      { token: 'number', foreground: '6897BB' },
+      { token: 'regexp', foreground: '9A5334' },
+      { token: 'type', foreground: 'A9B7C6' },
+      { token: 'class', foreground: 'A9B7C6' },
+      { token: 'function', foreground: '57B6C2' },
+      { token: 'variable', foreground: 'A9B7C6' }
+    ],
+    colors: {
+      'editor.background': '#18191B',
+      'editor.foreground': '#E3E4E8',
+      'editor.lineHighlightBackground': '#26282E',
+      'editor.selectionBackground': '#214283',
+      'editorCursor.foreground': '#528BFF',
+      'editorWhitespace.foreground': '#3B4048',
+      'editorLineNumber.foreground': '#4B5263',
+      'editorLineNumber.activeForeground': '#E3E4E8'
+    }
+  });
+
+  monaco.editor.defineTheme('zeno-light-theme', {
+    base: 'vs',
+    inherit: true,
+    rules: [
+      { token: 'comment', foreground: '5C6370', fontStyle: 'italic' },
+      { token: 'keyword', foreground: '0033B3', fontStyle: 'bold' },
+      { token: 'string', foreground: '067D17' },
+      { token: 'number', foreground: '1750EB' },
+      { token: 'function', foreground: '00627A' }
+    ],
+    colors: {
+      'editor.background': '#E3E4E8',
+      'editor.foreground': '#060607',
+      'editor.lineHighlightBackground': '#DFE1E5',
+      'editor.selectionBackground': '#A6D2FF',
+      'editorCursor.foreground': '#0066CC',
+      'editorLineNumber.foreground': '#ADADAD',
+      'editorLineNumber.activeForeground': '#060607'
+    }
+  });
+
+  // TypeScript / JavaScript Diagnostics
+  if (monaco.languages.typescript) {
+    monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+      noSemanticValidation: false,
+      noSyntaxValidation: false
+    });
+    monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
+      noSemanticValidation: false,
+      noSyntaxValidation: false
+    });
+  }
+
+  // Define Language Rules, Keywords, Stdlib Functions & Snippets
+  const languageDefinitions: Record<string, { keywords: string[]; std: string[]; snippets: Array<{ label: string; insert: string; doc: string }> }> = {
+    rust: {
+      keywords: ["fn", "let", "mut", "pub", "struct", "impl", "enum", "match", "use", "mod", "trait", "where", "async", "await", "unsafe", "loop", "while", "for", "if", "else", "return", "type", "const", "static"],
+      std: ["println!", "eprintln!", "format!", "vec!", "panic!", "Option", "Result", "Some", "None", "Ok", "Err", "String", "Vec", "HashMap", "Box", "Arc", "Mutex"],
+      snippets: [
+        { label: "fn main", insert: "fn main() {\n    println!(\"${1:Hello World}\");\n}", doc: "Main funktion in Rust" },
+        { label: "struct", insert: "struct ${1:MyStruct} {\n    ${2:field}: ${3:String},\n}", doc: "Struct Definition" },
+        { label: "impl", insert: "impl ${1:MyStruct} {\n    pub fn new() -> Self {\n        Self {}\n    }\n}", doc: "Impl Block" }
+      ]
+    },
+    python: {
+      keywords: ["def", "class", "import", "from", "return", "if", "elif", "else", "try", "except", "finally", "with", "as", "for", "while", "async", "await", "lambda", "global", "nonlocal", "pass", "break", "continue"],
+      std: ["print", "len", "range", "list", "dict", "set", "str", "int", "float", "open", "enumerate", "zip", "isinstance", "type", "dir", "map", "filter", "sum", "max", "min"],
+      snippets: [
+        { label: "main guard", insert: "if __name__ == '__main__':\n    ${1:main()}", doc: "Python Main Guard" },
+        { label: "def function", insert: "def ${1:function_name}(${2:args}):\n    \"\"\"${3:Docstring}\"\"\"\n    ${4:pass}", doc: "Funktionsdefinition" },
+        { label: "class definition", insert: "class ${1:MyClass}:\n    def __init__(self, ${2:args}):\n        ${3:pass}", doc: "Klassendefinition" }
+      ]
+    },
+    golang: {
+      keywords: ["package", "import", "func", "var", "const", "type", "struct", "interface", "return", "if", "else", "for", "range", "switch", "case", "select", "go", "defer", "chan", "map"],
+      std: ["fmt.Println", "fmt.Printf", "fmt.Sprintf", "make", "append", "len", "panic", "recover", "copy"],
+      snippets: [
+        { label: "package main", insert: "package main\n\nimport \"fmt\"\n\nfunc main() {\n    fmt.Println(\"${1:Hello World}\")\n}", doc: "Go Main Package" },
+        { label: "if err != nil", insert: "if err != nil {\n    return ${1:err}\n}", doc: "Go Error Check" }
+      ]
+    },
+    csharp: {
+      keywords: ["using", "namespace", "class", "struct", "interface", "public", "private", "protected", "static", "void", "async", "Task", "string", "int", "bool", "var", "return", "if", "else", "foreach", "switch", "get", "set", "override"],
+      std: ["Console.WriteLine", "Console.Write", "Console.ReadLine", "Math.Abs", "List<T>", "Dictionary<K,V>", "Enumerable", "Console"],
+      snippets: [
+        { label: "static main", insert: "using System;\n\nclass Program {\n    static void Main(string[] args) {\n        Console.WriteLine(\"${1:Hello World}\");\n    }\n}", doc: "C# Main Method" },
+        { label: "prop auto", insert: "public ${1:string} ${2:MyProperty} { get; set; }", doc: "Auto-Property" }
+      ]
+    },
+    cpp: {
+      keywords: ["include", "namespace", "class", "struct", "public", "private", "auto", "const", "template", "typename", "virtual", "override", "return", "if", "else", "for", "while", "using", "typedef"],
+      std: ["std::cout", "std::cin", "std::endl", "std::vector", "std::string", "std::map", "std::shared_ptr", "std::unique_ptr", "std::make_shared"],
+      snippets: [
+        { label: "int main", insert: "#include <iostream>\n\nint main() {\n    std::cout << \"${1:Hello World}\" << std::endl;\n    return 0;\n}", doc: "C++ Main Function" }
+      ]
+    },
+    ruby: {
+      keywords: ["def", "end", "class", "module", "require", "include", "attr_accessor", "if", "elsif", "else", "unless", "do", "yield", "return", "begin", "rescue"],
+      std: ["puts", "print", "p", "raise", "each", "map", "select", "reject"],
+      snippets: [
+        { label: "def method", insert: "def ${1:method_name}(${2:args})\n  ${3:# code}\nend", doc: "Ruby Method" }
+      ]
+    },
+    perl: {
+      keywords: ["use", "strict", "warnings", "my", "our", "sub", "if", "elsif", "else", "unless", "foreach", "while", "return"],
+      std: ["print", "say", "die", "warn", "push", "pop", "shift", "split", "join"],
+      snippets: [
+        { label: "subroutine", insert: "sub ${1:name} {\n    my (${2:\\$args}) = @_;\n    ${3:# code}\n}", doc: "Perl Subroutine" }
+      ]
+    },
+    php: {
+      keywords: ["php", "namespace", "use", "class", "interface", "trait", "public", "private", "protected", "function", "return", "if", "else", "foreach", "match"],
+      std: ["echo", "print_r", "var_dump", "count", "array_map", "isset", "empty"],
+      snippets: [
+        { label: "<?php tag", insert: "<?php\n\n${1:echo 'Hello World';}\n", doc: "PHP Opening Tag" }
+      ]
+    },
+    zig: {
+      keywords: ["const", "var", "fn", "pub", "usingnamespace", "import", "struct", "enum", "union", "error", "try", "catch", "defer", "errdefer", "if", "else", "while", "for", "switch"],
+      std: ["std.debug.print", "std.log.info", "std.mem.allocator", "@import"],
+      snippets: [
+        { label: "pub fn main", insert: "const std = @import(\"std\");\n\npub fn main() !void {\n    std.debug.print(\"${1:Hello World}\\n\", .{});\n}", doc: "Zig Main Function" }
+      ]
+    },
+    lua: {
+      keywords: ["function", "end", "local", "if", "then", "elseif", "else", "for", "while", "do", "repeat", "until", "return", "require", "nil"],
+      std: ["print", "type", "tostring", "tonumber", "table.insert", "string.format"],
+      snippets: [
+        { label: "function", insert: "local function ${1:name}(${2:args})\n    ${3:-- code}\nend", doc: "Lua Function" }
+      ]
+    },
+    sql: {
+      keywords: ["SELECT", "FROM", "WHERE", "JOIN", "LEFT JOIN", "INNER JOIN", "GROUP BY", "ORDER BY", "HAVING", "LIMIT", "INSERT INTO", "UPDATE", "DELETE", "CREATE TABLE", "ALTER TABLE", "DROP TABLE"],
+      std: ["COUNT", "SUM", "AVG", "MAX", "MIN", "COALESCE", "NOW"],
+      snippets: [
+        { label: "SELECT FROM", insert: "SELECT ${1:*} FROM ${2:table_name} WHERE ${3:condition};", doc: "SQL Query" }
+      ]
+    }
+  };
+
+  // Register completion items & hovers for all languages
+  Object.keys(languageDefinitions).forEach((lang) => {
+    const def = languageDefinitions[lang];
+    
+    monaco.languages.registerCompletionItemProvider(lang, {
+      triggerCharacters: [".", ":", ">", "(", " ", "<", '"', "'"],
+      provideCompletionItems: (model: any, position: any) => {
+        const wordInfo = model.getWordUntilPosition(position);
+        const range = {
+          startLineNumber: position.lineNumber,
+          endLineNumber: position.lineNumber,
+          startColumn: wordInfo.startColumn,
+          endColumn: wordInfo.endColumn
+        };
+
+        const items: any[] = [];
+
+        // 1. Snippets
+        def.snippets.forEach((snip) => {
+          items.push({
+            label: snip.label,
+            kind: monaco.languages.CompletionItemKind.Snippet,
+            documentation: snip.doc,
+            insertText: snip.insert,
+            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+            range
+          });
+        });
+
+        // 2. Keywords
+        def.keywords.forEach((kw) => {
+          items.push({
+            label: kw,
+            kind: monaco.languages.CompletionItemKind.Keyword,
+            insertText: kw,
+            range
+          });
+        });
+
+        // 3. Std functions
+        def.std.forEach((st) => {
+          items.push({
+            label: st,
+            kind: monaco.languages.CompletionItemKind.Function,
+            documentation: `Zeno WASI Stdlib: ${st}`,
+            insertText: st,
+            range
+          });
+        });
+
+        return { suggestions: items };
+      }
+    });
+
+    // Hover Tooltip Provider
+    monaco.languages.registerHoverProvider(lang, {
+      provideHover: (model: any, position: any) => {
+        const word = model.getWordAtPosition(position);
+        if (!word) return null;
+
+        const w = word.word;
+        if (def.keywords.includes(w)) {
+          return {
+            contents: [
+              { value: `**${lang.toUpperCase()} Schlüsselwort**: \`${w}\`` },
+              { value: `Integraler Bestandteil der Sprach-Syntax von ${lang.toUpperCase()}.` }
+            ]
+          };
+        } else if (def.std.includes(w)) {
+          return {
+            contents: [
+              { value: `**${lang.toUpperCase()} Standard-Funktion**: \`${w}\`` },
+              { value: `Ausführbar in der Zeno WASI Sandbox-Laufzeitumgebung.` }
+            ]
+          };
+        }
+        return null;
+      }
+    });
+  });
 }
 
 // --- MOCK DATABASE ---
@@ -182,7 +635,8 @@ const initialMessages: Record<string, Message[]> = {
   allgemein: [
     { author: "MaxShield", text: "Hat jemand schon den neuen SFrame-Branch getestet? Die Latenz im Voice ist deutlich besser.", time: "10:14", color: "blue" },
     { author: "LenaCrypt", text: "Ja, funktioniert super! Hier ist mein Benchmark-Script:", time: "10:16", color: "green", code: "use zeno_core::crypto::sframe;\nuse std::time::Instant;\n\nfn main() {\n    let key = sframe::generate_key();\n    let payload = vec![0u8; 960];\n    let start = Instant::now();\n    for _ in 0..10_000 {\n        let _ = sframe::encrypt(&key, &payload);\n    }\n    println!(\"10k encryptions: {:?}\", start.elapsed());\n}" },
-    { author: "CipherNaut", text: "Nice! 🔥 Die Zahlen sehen vielversprechend aus. Ich merge den Branch heute Abend.", time: "10:18", color: "purple" }
+    { author: "CipherNaut", text: "Nice! 🔥 Die Zahlen sehen vielversprechend aus. Schaut euch auch die neue Tauri v2 Doku an: https://tauri.app/v2/guides/?utm_source=twitter&utm_medium=social&fbclid=IwAR982317983", time: "10:18", color: "purple" },
+    { author: "MaxShield", text: "Hier ist der Webrtc-RS Quellcode: https://github.com/webrtc-rs/webrtc?si=xyz123&utm_campaign=launch_announcement", time: "10:22", color: "blue" }
   ],
   "dev-talk": [
     { author: "CipherNaut", text: "Wir müssen die WASM-Sandbox-Performance im Auge behalten.", time: "09:12", color: "purple" },
@@ -399,6 +853,235 @@ export default function App() {
   const [isRenaming, setIsRenaming] = useState<boolean>(false);
   const [editorWorkflowStep, setEditorWorkflowStep] = useState<"select_action" | "input_filename" | "editor">("select_action");
   const [editorOutput, setEditorOutput] = useState<string>("");
+
+  // In-App Privacy Browser State
+  const [isPrivacyBrowserOpen, setIsPrivacyBrowserOpen] = useState<boolean>(false);
+  const [browserTabs, setBrowserTabs] = useState<BrowserTab[]>([
+    {
+      id: "tab-1",
+      title: "Zeno Privacy & SFrame Docs",
+      url: "https://zeno-chat.de/privacy?utm_source=twitter&fbclid=IwAR89712389",
+      activeUrl: "https://zeno-chat.de/privacy",
+      favicon: "🛡️",
+      blockedTrackers: 14,
+      httpsEnforced: true,
+      strippedParams: ["utm_source", "fbclid"]
+    },
+    {
+      id: "tab-2",
+      title: "Tauri v2 Architecture",
+      url: "https://tauri.app/v2/guides",
+      activeUrl: "https://tauri.app/v2/guides",
+      favicon: "⚡",
+      blockedTrackers: 6,
+      httpsEnforced: true,
+      strippedParams: []
+    }
+  ]);
+  const [activeTabId, setActiveTabId] = useState<string>("tab-1");
+  const [browserAddressInput, setBrowserAddressInput] = useState<string>("https://zeno-chat.de/privacy");
+  const [isShieldPanelOpen, setIsShieldPanelOpen] = useState<boolean>(false);
+  const [browserTrackerShieldEnabled, setBrowserTrackerShieldEnabled] = useState<boolean>(true);
+  const [browserViewMode, setBrowserViewMode] = useState<"live" | "audit">("live");
+
+  // Home Navigation & WASM Hub States
+  const [homeTab, setHomeTab] = useState<"dashboard" | "wasm_hub" | "ide">("dashboard");
+  const [wasmHubSearchQuery, setWasmHubSearchQuery] = useState<string>("");
+  const [wasmHubFilter, setWasmHubFilter] = useState<"all" | "community" | "wapm" | "installed">("all");
+  const [isCustomWasmModalOpen, setIsCustomWasmModalOpen] = useState<boolean>(false);
+  const [customWasmName, setCustomWasmName] = useState<string>("");
+  const [customWasmUrl, setCustomWasmUrl] = useState<string>("");
+
+  // Zeno Full-IDE Workspace States
+  const defaultWorkspace: IdeFile[] = [
+    { name: "Cargo.toml", path: "Cargo.toml", code: `[package]\nname = "zeno_sandbox"\nversion = "0.1.0"\nedition = "2021"\n\n[dependencies]\naegis = "0.2.0"\n`, language: "toml", isFolder: false },
+    { name: "src", path: "src", code: "", language: "", isFolder: true },
+    { name: "main.rs", path: "src/main.rs", code: `// Zeno Rust WASM Sandbox\nfn main() {\n    println!("Willkommen in der Zeno Full-IDE!");\n    println!("Dieses Projekt läuft in einer vollkommen isolierten WASM-Sandbox.");\n}\n`, language: "rust", isFolder: false }
+  ];
+
+  const [ideFiles, setIdeFiles] = useState<IdeFile[]>(defaultWorkspace);
+  const [ideOpenTabs, setIdeOpenTabs] = useState<string[]>(["src/main.rs", "Cargo.toml"]);
+  const [ideActiveFilePath, setIdeActiveFilePath] = useState<string>("src/main.rs");
+  const [ideConsoleOutput, setIdeConsoleOutput] = useState<string>("[zeno-ide] Workspace geladen. Klicke auf 'Run' in der Toolbar, um den Code auszuführen.\n");
+  const [isIdeConsoleExpanded, setIsIdeConsoleExpanded] = useState<boolean>(true);
+  const [isIdeProjectWizardOpen, setIsIdeProjectWizardOpen] = useState<boolean>(false);
+  const [isIdeNewItemModalOpen, setIsIdeNewItemModalOpen] = useState<boolean>(false);
+  const [ideNewItemType, setIdeNewItemType] = useState<"file" | "folder">("file");
+  const [ideNewItemParentPath, setIdeNewItemParentPath] = useState<string>("");
+  const [ideNewItemName, setIdeNewItemName] = useState<string>("");
+  const [ideExpandedFolders, setIdeExpandedFolders] = useState<Record<string, boolean>>({ "src": true });
+
+  // Zeno IDE Sidebar Panel States (VS Code replication)
+  const [ideSidebarTab, setIdeSidebarTab] = useState<"explorer" | "git" | "extensions" | "gitlens">("explorer");
+  const [ideGitMessage, setIdeGitMessage] = useState<string>("");
+  const [ideGitChanges, setIdeGitChanges] = useState<string[]>(["Cargo.toml", "src/main.rs"]);
+  const [ideExtensionsSearchQuery, setIdeExtensionsSearchQuery] = useState<string>("");
+  const [ideExtensions, setIdeExtensions] = useState<any[]>([
+    { id: "prettier", name: "Prettier - Code formatter", description: "Standardmäßiger Code-Formatter für Monaco-Dateien.", version: "v10.2.1", downloads: "45.1M", rating: "4.8", icon: "logos:prettier", author: "Esben Petersen", installed: false },
+    { id: "rust-analyzer", name: "rust-analyzer", description: "Bietet fortgeschrittene Auto-Vervollständigung und Diagnosen für Rust.", version: "v0.3.2064", downloads: "2.8M", rating: "4.9", icon: "vscode-icons:file-type-rust", author: "The rust-analyzer authors", installed: false },
+    { id: "python-intellisense", name: "Python Support", description: "Umfassende Syntax-Highlighting und Code-Analysen für Python.", version: "v2026.4.1", downloads: "112M", rating: "4.7", icon: "logos:python", author: "Microsoft", installed: false },
+    { id: "gitlens", name: "GitLens — Git supercharged", description: "Visualisiere Code-Autorenschaft und Git-Historie direkt in Zeno.", version: "v14.9.0", downloads: "29M", rating: "4.8", icon: "logos:git-icon", author: "GitKraken", installed: false },
+    { id: "eslint", name: "ESLint Checker", description: "Bietet Echtzeit-Syntax- und Formatierungs-Validierung in Zeno.", version: "v2.4.4", downloads: "48M", rating: "4.6", icon: "logos:eslint", author: "Microsoft", installed: false },
+    { id: "zeno-theme-changer", name: "Neon Glow Theme Pack", description: "Erweitert Zeno-Oberflächen um Cyberpunk Neon Glow Designs.", version: "v1.0.0", downloads: "15k", rating: "5.0", icon: "mage:lightning-bolt", author: "Zeno Community", installed: false }
+  ]);
+
+  const formatDownloads = (count: number) => {
+    if (!count) return "0";
+    if (count >= 1000000) return (count / 1000000).toFixed(1) + "M";
+    if (count >= 1000) return (count / 1000).toFixed(0) + "k";
+    return count.toString();
+  };
+
+  const fetchExtensionsFromMarketplace = async (query: string) => {
+    try {
+      let url = "https://open-vsx.org/api/-/search?size=15&sortBy=downloads";
+      if (query.trim()) {
+        url = `https://open-vsx.org/api/-/search?q=${encodeURIComponent(query)}&size=15`;
+      }
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("API Fehler");
+      const data = await response.json();
+      
+      if (data && data.extensions) {
+        const mapped = data.extensions.map((ext: any) => {
+          const isInstalled = ideExtensions.find(e => e.id === ext.uuid || e.id === `${ext.namespace}.${ext.name}`)?.installed || false;
+          return {
+            id: ext.uuid || `${ext.namespace}.${ext.name}`,
+            namespace: ext.namespace,
+            name: ext.displayName || ext.name,
+            description: ext.description || "Keine Beschreibung verfügbar.",
+            version: ext.version,
+            downloads: formatDownloads(ext.downloadCount),
+            rating: ext.averageRating ? ext.averageRating.toFixed(1) : "N/A",
+            icon: ext.files?.icon || "mage:box-3d",
+            author: ext.namespace,
+            installed: isInstalled
+          };
+        });
+        setIdeExtensions(mapped);
+      }
+    } catch (err) {
+      console.error("Fehler beim Laden von Open VSX:", err);
+    }
+  };
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      fetchExtensionsFromMarketplace(ideExtensionsSearchQuery);
+    }, 450);
+    return () => clearTimeout(delayDebounceFn);
+  }, [ideExtensionsSearchQuery]);
+
+  const handleExtensionInstall = (id: string) => {
+    setIdeExtensions((prev) =>
+      prev.map((ext) => {
+        if (ext.id === id) {
+          showToast(`Plugin "${ext.name}" wird installiert...`);
+          setTimeout(() => {
+            showToast(`Plugin "${ext.name}" erfolgreich installiert!`);
+            const extIdLower = ext.id.toLowerCase();
+            const extNameLower = ext.name.toLowerCase();
+            if (extIdLower.includes("gitlens") || extNameLower.includes("gitlens")) {
+              showToast("Info: GitLens wurde in die IDE-Aktivitätsleiste übersetzt!");
+            } else if (extIdLower.includes("theme") || extNameLower.includes("theme") || extIdLower.includes("glow")) {
+              setCanvasColor("#2e0854");
+              setGlowColor("#ff007f");
+              showToast("Neon Glow Theme aktiviert!");
+            }
+          }, 1200);
+          return { ...ext, installed: true };
+        }
+        return ext;
+      })
+    );
+  };
+
+  const handleExtensionUninstall = (id: string) => {
+    setIdeExtensions((prev) =>
+      prev.map((ext) => {
+        if (ext.id === id) {
+          showToast(`Plugin "${ext.name}" deinstalliert.`);
+          if (ext.id === "zeno-theme-changer") {
+            setCanvasColor(theme === "light" ? "#E3E4E8" : "#18191B");
+            setGlowColor("#3574F0");
+          }
+          return { ...ext, installed: false };
+        }
+        return ext;
+      })
+    );
+  };
+
+  const handleIdeGitCommit = () => {
+    if (!ideGitMessage.trim()) {
+      showToast("Bitte gib eine Commit-Nachricht ein.");
+      return;
+    }
+    showToast(`Git Commit "${ideGitMessage}" erfolgreich! Synchronisiere mit Remote...`);
+    setIdeConsoleOutput((prev) => prev + `[git] git commit -m "${ideGitMessage}"\n[git] 2 Dateien geändert.\n[git] git push origin main\n[git] Synchronisierung abgeschlossen.\n\n`);
+    setIdeGitMessage("");
+    setIdeGitChanges([]);
+  };
+
+  const activeBrowserTab = browserTabs.find((t) => t.id === activeTabId) || browserTabs[0];
+
+  const openInPrivacyBrowser = (targetUrl: string, title?: string) => {
+    const { cleanedUrl, strippedParams } = cleanUrl(targetUrl);
+    const existing = browserTabs.find((t) => t.activeUrl === cleanedUrl);
+    if (existing) {
+      setActiveTabId(existing.id);
+      setBrowserAddressInput(cleanedUrl);
+      setIsPrivacyBrowserOpen(true);
+      return;
+    }
+    const newTab: BrowserTab = {
+      id: "tab-" + Date.now(),
+      title: title || cleanedUrl.replace(/^https?:\/\//, "").split("/")[0] || "Neue Seite",
+      url: targetUrl,
+      activeUrl: cleanedUrl,
+      favicon: "🌐",
+      blockedTrackers: Math.floor(Math.random() * 10) + 5,
+      httpsEnforced: true,
+      strippedParams
+    };
+    setBrowserTabs((prev) => [...prev, newTab]);
+    setActiveTabId(newTab.id);
+    setBrowserAddressInput(cleanedUrl);
+    setIsPrivacyBrowserOpen(true);
+  };
+
+  const closeBrowserTab = (tabId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (browserTabs.length <= 1) {
+      setIsPrivacyBrowserOpen(false);
+      return;
+    }
+    const filtered = browserTabs.filter((t) => t.id !== tabId);
+    setBrowserTabs(filtered);
+    if (activeTabId === tabId) {
+      const nextTab = filtered[filtered.length - 1];
+      setActiveTabId(nextTab.id);
+      setBrowserAddressInput(nextTab.activeUrl);
+    }
+  };
+
+  const handleNavigateBrowser = (input: string) => {
+    const { cleanedUrl, strippedParams } = cleanUrl(input);
+    setBrowserTabs((prev) =>
+      prev.map((t) =>
+        t.id === activeTabId
+          ? {
+              ...t,
+              url: input,
+              activeUrl: cleanedUrl,
+              title: cleanedUrl.replace(/^https?:\/\//, "").split("/")[0] || "Webseite",
+              strippedParams: [...new Set([...t.strippedParams, ...strippedParams])]
+            }
+          : t
+      )
+    );
+    setBrowserAddressInput(cleanedUrl);
+  };
   const [editorRuntimes, setEditorRuntimes] = useState<Record<string, "installed" | "not_installed" | "installing">>({
     javascript: "installed",
     typescript: "installed",
@@ -675,6 +1358,8 @@ return \`
         setIsSettingsOpen(false);
         setSelectedUserProfile(null);
         setIsEditorOpen(false);
+        setIsIdeProjectWizardOpen(false);
+        setIsIdeNewItemModalOpen(false);
       }
       if ((e.ctrlKey || e.metaKey) && e.key === "k") {
         e.preventDefault();
@@ -994,6 +1679,362 @@ return \`
     showToast(`Anhang "${file.name}" bereit zum Senden`);
   };
 
+  // --- ZENO IDE HELPERS ---
+  const handleIdeFileSelect = (filePath: string) => {
+    if (!ideOpenTabs.includes(filePath)) {
+      setIdeOpenTabs((prev) => [...prev, filePath]);
+    }
+    setIdeActiveFilePath(filePath);
+  };
+
+  const handleIdeFileClose = (filePath: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const updated = ideOpenTabs.filter((t) => t !== filePath);
+    setIdeOpenTabs(updated);
+    if (ideActiveFilePath === filePath && updated.length > 0) {
+      setIdeActiveFilePath(updated[updated.length - 1]);
+    }
+  };
+
+  const handleIdeFileCreate = () => {
+    if (!ideNewItemName.trim()) return;
+    const cleanName = ideNewItemName.trim();
+    const newPath = ideNewItemParentPath ? `${ideNewItemParentPath}/${cleanName}` : cleanName;
+
+    // Check duplicate
+    if (ideFiles.some((f) => f.path === newPath)) {
+      showToast("Datei existiert bereits!");
+      return;
+    }
+
+    const lang = getLanguageFromExtension(cleanName);
+    const newFile: IdeFile = {
+      name: cleanName,
+      path: newPath,
+      code: `// ${cleanName} - Created in Zeno IDE\n`,
+      language: lang,
+      isFolder: false
+    };
+
+    setIdeFiles((prev) => [...prev, newFile]);
+    handleIdeFileSelect(newPath);
+    setIsIdeNewItemModalOpen(false);
+    setIdeNewItemName("");
+    showToast(`Datei "${cleanName}" erstellt.`);
+  };
+
+  const handleIdeFolderCreate = () => {
+    if (!ideNewItemName.trim()) return;
+    const cleanName = ideNewItemName.trim();
+    const newPath = ideNewItemParentPath ? `${ideNewItemParentPath}/${cleanName}` : cleanName;
+
+    // Check duplicate
+    if (ideFiles.some((f) => f.path === newPath)) {
+      showToast("Ordner existiert bereits!");
+      return;
+    }
+
+    const newFolder: IdeFile = {
+      name: cleanName,
+      path: newPath,
+      code: "",
+      language: "",
+      isFolder: true
+    };
+
+    setIdeFiles((prev) => [...prev, newFolder]);
+    if (ideNewItemParentPath) {
+      setIdeExpandedFolders((prev) => ({ ...prev, [ideNewItemParentPath]: true }));
+    }
+    setIsIdeNewItemModalOpen(false);
+    setIdeNewItemName("");
+    showToast(`Ordner "${cleanName}" erstellt.`);
+  };
+
+  const handleIdeItemDelete = (filePath: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (window.confirm(`Möchtest du "${filePath}" wirklich löschen?`)) {
+      setIdeFiles((prev) => prev.filter((f) => f.path !== filePath && !f.path.startsWith(filePath + "/")));
+      handleIdeFileClose(filePath);
+      showToast(`Element gelöscht.`);
+    }
+  };
+
+  const handleIdeGenerateProject = (type: string) => {
+    let files: IdeFile[] = [];
+    let open: string[] = [];
+    let active = "";
+
+    if (type === "rust") {
+      files = [
+        { name: "Cargo.toml", path: "Cargo.toml", code: `[package]\nname = "zeno_cargo_app"\nversion = "0.1.0"\nedition = "2021"\n\n[dependencies]\n`, language: "toml", isFolder: false },
+        { name: "src", path: "src", code: "", language: "", isFolder: true },
+        { name: "main.rs", path: "src/main.rs", code: `// Zeno Rust app template\nfn main() {\n    println!("Hello from Zeno Rust Cargo Template!");\n}\n`, language: "rust", isFolder: false }
+      ];
+      open = ["src/main.rs", "Cargo.toml"];
+      active = "src/main.rs";
+    } else if (type === "go") {
+      files = [
+        { name: "go.mod", path: "go.mod", code: `module zeno_go_app\n\ngo 1.22\n`, language: "toml", isFolder: false },
+        { name: "main.go", path: "main.go", code: `package main\n\nimport "fmt"\n\nfunc main() {\n    fmt.Println("Hello from Zeno Go Template!")\n}\n`, language: "golang", isFolder: false }
+      ];
+      open = ["main.go", "go.mod"];
+      active = "main.go";
+    } else if (type === "python") {
+      files = [
+        { name: "main.py", path: "main.py", code: `# Zeno Python app template\nimport sys\n\ndef main():\n    print("Hello from Zeno Python Template!")\n    print(f"Python version: {sys.version}")\n\nif __name__ == "__main__":\n    main()\n`, language: "python", isFolder: false },
+        { name: "requirements.txt", path: "requirements.txt", code: `numpy\nrequests\n`, language: "txt", isFolder: false }
+      ];
+      open = ["main.py", "requirements.txt"];
+      active = "main.py";
+    } else if (type === "web") {
+      files = [
+        { name: "index.html", path: "index.html", code: `<!DOCTYPE html>\n<html>\n<head>\n  <title>Zeno Web App</title>\n  <link rel="stylesheet" href="style.css">\n</head>\n<body>\n  <h1>Hello from Zeno Web Sandbox!</h1>\n  <button id="btn">Click me</button>\n  <script src="script.js"></script>\n</body>\n</html>\n`, language: "html", isFolder: false },
+        { name: "style.css", path: "style.css", code: `body {\n  font-family: sans-serif;\n  background: #18191B;\n  color: #E3E4E8;\n  text-align: center;\n  padding-top: 100px;\n}\nbutton {\n  background: #3574F0;\n  color: white;\n  border: none;\n  padding: 10px 20px;\n  border-radius: 6px;\n  cursor: pointer;\n}\n`, language: "css", isFolder: false },
+        { name: "script.js", path: "script.js", code: `// Zeno Web App script\ndocument.getElementById("btn").onclick = () => {\n  alert("Hello Web App!");\n};\n`, language: "javascript", isFolder: false }
+      ];
+      open = ["index.html", "script.js", "style.css"];
+      active = "index.html";
+    }
+
+    setIdeFiles(files);
+    setIdeOpenTabs(open);
+    setIdeActiveFilePath(active);
+    setIdeConsoleOutput(`[zeno-ide] Neues ${type.toUpperCase()}-Projekt generiert.\n`);
+    setIsIdeProjectWizardOpen(false);
+    showToast(`${type.toUpperCase()}-Projekt erfolgreich generiert!`);
+  };
+
+  const handleIdeRun = () => {
+    const activeFile = ideFiles.find((f) => f.path === ideActiveFilePath);
+    if (!activeFile || activeFile.isFolder) {
+      showToast("Bitte wähle eine gültige Datei zum Ausführen aus.");
+      return;
+    }
+
+    const codeToRun = activeFile.code;
+    const lang = activeFile.language.toLowerCase();
+    
+    setIdeConsoleOutput((prev) => prev + `\n[zeno-ide] Starte Ausführung für ${activeFile.name} (${lang.toUpperCase()})...\n`);
+
+    const runtimeStatus = editorRuntimes[lang] || "installed";
+    if (runtimeStatus === "not_installed") {
+      setIdeConsoleOutput((prev) => prev + `Fehler: Die Laufzeitumgebung für "${lang.toUpperCase()}" ist nicht installiert.\nBitte lade sie im WASM Runtime Hub herunter.\n`);
+      return;
+    }
+
+    if (lang === "javascript" || lang === "typescript") {
+      let cleanedCode = codeToRun;
+      if (lang === "typescript") {
+        cleanedCode = codeToRun
+          .replace(/:\s*(string|number|boolean|any|void|object|unknown|never)/g, "")
+          .replace(/as\s+(string|number|boolean|any|void|object|unknown|never)/g, "")
+          .replace(/interface\s+\w+\s*\{[^}]*\}/g, "")
+          .replace(/type\s+\w+\s*=\s*[^;]+;/g, "");
+      }
+
+      const workerCode = `
+        const outputs = [];
+        const customConsole = {
+          log: (...args) => {
+            outputs.push(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '));
+          },
+          error: (...args) => {
+            outputs.push("ERROR: " + args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '));
+          },
+          warn: (...args) => {
+            outputs.push("WARN: " + args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '));
+          }
+        };
+
+        self.onmessage = function(e) {
+          try {
+            const fn = new Function('console', e.data);
+            fn(customConsole);
+            self.postMessage({ success: true, output: outputs.join('\\n') || '✓ JS/TS Code ausgeführt (keine Ausgaben).' });
+          } catch (err) {
+            self.postMessage({ success: false, output: "Laufzeitfehler: " + err.message + "\\n" + outputs.join('\\n') });
+          }
+        };
+      `;
+
+      const blob = new Blob([workerCode], { type: "application/javascript" });
+      const workerUrl = URL.createObjectURL(blob);
+      const worker = new Worker(workerUrl);
+
+      worker.onmessage = (e) => {
+        setIdeConsoleOutput((prev) => prev + e.data.output + "\n");
+        worker.terminate();
+        URL.revokeObjectURL(workerUrl);
+      };
+
+      worker.onerror = (e) => {
+        setIdeConsoleOutput((prev) => prev + "Syntaxfehler oder Kompilierungsfehler: " + e.message + "\n");
+        worker.terminate();
+        URL.revokeObjectURL(workerUrl);
+      };
+
+      worker.postMessage(cleanedCode);
+    } else if (lang === "python") {
+      if (!(window as any).loadPyodide) {
+        setIdeConsoleOutput((prev) => prev + "Lade Python WASM-Sandbox von CDN...\n");
+        const script = document.createElement("script");
+        script.src = "https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js";
+        script.async = true;
+        script.onload = async () => {
+          try {
+            setIdeConsoleOutput((prev) => prev + "Initialisiere Python WASM-Laufzeitumgebung...\n");
+            const pyodideInstance = await (window as any).loadPyodide();
+            (window as any).pyodide = pyodideInstance;
+            runPythonInIde(pyodideInstance, codeToRun);
+          } catch (err: any) {
+            setIdeConsoleOutput((prev) => prev + "Initialisierungsfehler: " + err.message + "\n");
+          }
+        };
+        script.onerror = () => {
+          setIdeConsoleOutput((prev) => prev + "Fehler: Pyodide-Skript konnte nicht von CDN geladen werden.\n");
+        };
+        document.head.appendChild(script);
+      } else {
+        const run = async () => {
+          if (!(window as any).pyodide) {
+            setIdeConsoleOutput((prev) => prev + "Initialisiere Python WASM-Laufzeitumgebung...\n");
+            (window as any).pyodide = await (window as any).loadPyodide();
+          }
+          runPythonInIde((window as any).pyodide, codeToRun);
+        };
+        run();
+      }
+    } else {
+      // Simulate execution output for compilation languages based on simple patterns
+      setTimeout(() => {
+        let stdout = "";
+        if (lang === "rust") {
+          if (codeToRun.includes("println!(")) {
+            const matches = codeToRun.match(/println!\(\s*"([^"]+)"\s*(?:,\s*([^)]+))?\s*\)/g);
+            if (matches) {
+              stdout = matches.map(m => {
+                const content = m.match(/"([^"]+)"/);
+                return content ? content[1] : "";
+              }).join("\n");
+            }
+          }
+          setIdeConsoleOutput((prev) => prev + "[zeno-rust] Kompilierung erfolgreich.\nBuild abgeschlossen! Starte Programm...\n\n" + (stdout || "✓ Code ausgeführt (keine Ausgaben).") + "\n");
+        } else if (lang === "golang" || lang === "go") {
+          if (codeToRun.includes("Println(")) {
+            const matches = codeToRun.match(/Println\(\s*"([^"]+)"\s*\)/g);
+            if (matches) {
+              stdout = matches.map(m => {
+                const content = m.match(/"([^"]+)"/);
+                return content ? content[1] : "";
+              }).join("\n");
+            }
+          }
+          setIdeConsoleOutput((prev) => prev + "[zeno-go] Go WASM Engine gestartet...\n\n" + (stdout || "✓ Go-Programm beendet (0 Exit Code).") + "\n");
+        } else if (lang === "csharp") {
+          if (codeToRun.includes("Console.WriteLine(")) {
+            const matches = codeToRun.match(/WriteLine\(\s*"([^"]+)"\s*\)/g);
+            if (matches) {
+              stdout = matches.map(m => {
+                const content = m.match(/"([^"]+)"/);
+                return content ? content[1] : "";
+              }).join("\n");
+            }
+          }
+          setIdeConsoleOutput((prev) => prev + "[zeno-clr] Kompiliere .NET C# Code (WASM Runtime)...\nBuild erfolgreich!\n\n" + (stdout || "✓ C#-Programm beendet.") + "\n");
+        } else if (lang === "cpp") {
+          if (codeToRun.includes("std::cout <<")) {
+            const matches = codeToRun.match(/std::cout\s*<<\s*"([^"]+)"/g);
+            if (matches) {
+              stdout = matches.map(m => {
+                const content = m.match(/"([^"]+)"/);
+                return content ? content[1] : "";
+              }).join("\n");
+            }
+          }
+          setIdeConsoleOutput((prev) => prev + "[zeno-cpp] Kompilierung erfolgreich!\n\n" + (stdout || "✓ C++ Programm beendet.") + "\n");
+        } else if (lang === "ruby") {
+          if (codeToRun.includes("puts ")) {
+            const matches = codeToRun.match(/puts\s+["']([^"']+)["']/g);
+            if (matches) {
+              stdout = matches.map(m => {
+                const content = m.match(/["']([^"']+)["']/);
+                return content ? content[1] : "";
+              }).join("\n");
+            }
+          }
+          setIdeConsoleOutput((prev) => prev + "[zeno-ruby] Ruby 3.3.1 WASM VM ausgeführt.\n\n" + (stdout || "✓ Ruby Script beendet.") + "\n");
+        } else if (lang === "perl") {
+          if (codeToRun.includes("print ")) {
+            const matches = codeToRun.match(/print\s+["']([^"']+)["']/g);
+            if (matches) {
+              stdout = matches.map(m => {
+                const content = m.match(/["']([^"']+)["']/);
+                return content ? content[1] : "";
+              }).join("\n");
+            }
+          }
+          setIdeConsoleOutput((prev) => prev + "[zeno-perl] Perl 5.38 WASM Interpreter ausgeführt.\n\n" + (stdout || "✓ Perl Script beendet.") + "\n");
+        } else if (lang === "php") {
+          if (codeToRun.includes("echo ")) {
+            const matches = codeToRun.match(/echo\s+["']([^"']+)["']/g);
+            if (matches) {
+              stdout = matches.map(m => {
+                const content = m.match(/["']([^"']+)["']/);
+                return content ? content[1] : "";
+              }).join("\n");
+            }
+          }
+          setIdeConsoleOutput((prev) => prev + "[zeno-php] PHP 8.3.6 WASM Engine ausgeführt.\n\n" + (stdout || "✓ PHP Skript beendet.") + "\n");
+        } else if (lang === "zig") {
+          if (codeToRun.includes("print(")) {
+            const matches = codeToRun.match(/print\s*\(\s*"([^"]+)"/g);
+            if (matches) {
+              stdout = matches.map(m => {
+                const content = m.match(/"([^"]+)"/);
+                return content ? content[1] : "";
+              }).join("\n");
+            }
+          }
+          setIdeConsoleOutput((prev) => prev + "[zeno-zig] Zig Build ok. Führe WASI Binary aus...\n\n" + (stdout || "✓ Zig Code beendet.") + "\n");
+        } else if (lang === "lua") {
+          if (codeToRun.includes("print(")) {
+            const matches = codeToRun.match(/print\s*\(\s*["']([^"']+)["']\s*\)/g);
+            if (matches) {
+              stdout = matches.map(m => {
+                const content = m.match(/["']([^"']+)["']/);
+                return content ? content[1] : "";
+              }).join("\n");
+            }
+          }
+          setIdeConsoleOutput((prev) => prev + "[zeno-lua] Lua 5.4 VM ausgeführt.\n\n" + (stdout || "✓ Lua Script beendet.") + "\n");
+        } else if (lang === "sql" || lang === "sqlite") {
+          setIdeConsoleOutput((prev) => prev + "[zeno-sqlite] SQLite v3.45.0 WASM Ready.\n> CREATE TABLE users (id INT, name TEXT);\n> INSERT INTO users VALUES (1, 'CipherNaut');\n> SELECT * FROM users;\n\n1 | CipherNaut\n✓ Query in 0.4ms ausgeführt.\n");
+        } else {
+          setIdeConsoleOutput((prev) => prev + `[zeno-ide] Ausführung für Sprache ${lang.toUpperCase()} beendet.\n`);
+        }
+      }, 800);
+    }
+  };
+
+  const runPythonInIde = (pyodide: any, pyCode: string) => {
+    try {
+      pyodide.runPython(`
+import sys
+import io
+sys.stdout = io.StringIO()
+sys.stderr = io.StringIO()
+      `);
+      pyodide.runPython(pyCode);
+      const stdout = pyodide.runPython("sys.stdout.getvalue()");
+      const stderr = pyodide.runPython("sys.stderr.getvalue()");
+      const result = (stdout + "\n" + stderr).trim();
+      setIdeConsoleOutput((prev) => prev + (result || "✓ Python Code ausgeführt (keine Ausgaben).") + "\n");
+    } catch (err: any) {
+      setIdeConsoleOutput((prev) => prev + "Python Fehler: " + err.message + "\n");
+    }
+  };
+
   const handleThemeToggle = () => {
     const nextTheme = theme === "dark" ? "light" : "dark";
     setTheme(nextTheme);
@@ -1185,18 +2226,262 @@ sys.stderr = io.StringIO()
           setEditorOutput((prev) => prev + "Kompilierung erfolgreich!\n\n" + (stdout || "✓ C++ Programm beendet."));
         }
       }, 1200);
+    } else if (lang === "csharp") {
+      setEditorOutput(`[zeno-clr-sandbox] Kompiliere .NET C# Code (WASM Runtime)...\n`);
+      
+      setTimeout(() => {
+        if (!codeToRun.includes("Main") && !codeToRun.includes("Console.")) {
+          setEditorOutput((prev) => prev + "error CS5001: Program does not contain a static 'Main' method suitable for an entry point");
+          return;
+        }
+        
+        let stdout = "";
+        if (codeToRun.includes("Console.WriteLine(") || codeToRun.includes("Console.Write(")) {
+          const matches = codeToRun.match(/Console\.Write(?:Line)?\s*\(\s*"([^"]+)"\s*(?:,\s*([^)]+))?\s*\)/g);
+          if (matches) {
+            stdout = matches.map(m => {
+              const content = m.match(/"([^"]+)"/);
+              return content ? content[1] : "";
+            }).join("\n");
+          }
+        }
+        
+        setEditorOutput((prev) => prev + "Build erfolgreich (0 Fehler, .NET CLR WASM Ready)!\n\n" + (stdout || "✓ C#-Programm beendet."));
+      }, 1000);
+    } else if (lang === "golang" || lang === "go") {
+      setEditorOutput(`[zeno-wasm-wasi] Starte Golang WASM Runtime...\n`);
+      setTimeout(() => {
+        let stdout = "";
+        if (codeToRun.includes("fmt.Println(")) {
+          const matches = codeToRun.match(/fmt\.Println\s*\(\s*"([^"]+)"\s*\)/g);
+          if (matches) {
+            stdout = matches.map(m => {
+              const content = m.match(/"([^"]+)"/);
+              return content ? content[1] : "";
+            }).join("\n");
+          }
+        }
+        setEditorOutput((prev) => prev + "Go WASM Binary geladen (WASI Standalone Engine).\n\n" + (stdout || "✓ Go-Programm beendet (0 Exit Code)."));
+      }, 1000);
+    } else if (lang === "ruby") {
+      setEditorOutput(`[zeno-wasm-wasi] Starte CRuby WASM Interpreter (ruby.wasm)...\n`);
+      setTimeout(() => {
+        let stdout = "";
+        if (codeToRun.includes("puts ")) {
+          const matches = codeToRun.match(/puts\s+["']([^"']+)["']/g);
+          if (matches) {
+            stdout = matches.map(m => {
+              const content = m.match(/["']([^"']+)["']/);
+              return content ? content[1] : "";
+            }).join("\n");
+          }
+        }
+        setEditorOutput((prev) => prev + "Ruby 3.3.1 WASM VM ausgeführt.\n\n" + (stdout || "✓ Ruby Script beendet."));
+      }, 1000);
+    } else if (lang === "perl") {
+      setEditorOutput(`[zeno-wasm-wasi] Starte Perl 5 WASM Interpreter...\n`);
+      setTimeout(() => {
+        let stdout = "";
+        if (codeToRun.includes("print ")) {
+          const matches = codeToRun.match(/print\s+["']([^"']+)["']/g);
+          if (matches) {
+            stdout = matches.map(m => {
+              const content = m.match(/["']([^"']+)["']/);
+              return content ? content[1] : "";
+            }).join("\n");
+          }
+        }
+        setEditorOutput((prev) => prev + "Perl 5.38 WASM Interpreter ausgeführt.\n\n" + (stdout || "✓ Perl Script beendet."));
+      }, 1000);
+    } else if (lang === "php") {
+      setEditorOutput(`[zeno-wasm-wasi] Starte PHP 8.3 CLI (PHP-WASM)...\n`);
+      setTimeout(() => {
+        let stdout = "";
+        if (codeToRun.includes("echo ")) {
+          const matches = codeToRun.match(/echo\s+["']([^"']+)["']/g);
+          if (matches) {
+            stdout = matches.map(m => {
+              const content = m.match(/["']([^"']+)["']/);
+              return content ? content[1] : "";
+            }).join("\n");
+          }
+        }
+        setEditorOutput((prev) => prev + "PHP 8.3.6 WASM Engine ausgeführt.\n\n" + (stdout || "✓ PHP Skript beendet."));
+      }, 1000);
+    } else if (lang === "zig") {
+      setEditorOutput(`[zeno-wasm-wasi] Kompiliere Zig Code (WASI Target)...\n`);
+      setTimeout(() => {
+        let stdout = "";
+        if (codeToRun.includes("std.debug.print") || codeToRun.includes("std.log.info")) {
+          const matches = codeToRun.match(/print\s*\(\s*"([^"\\]*(?:\\.[^"\\]*)*)"/g);
+          if (matches) {
+            stdout = matches.map(m => {
+              const content = m.match(/"([^"]+)"/);
+              return content ? content[1] : "";
+            }).join("\n");
+          }
+        }
+        setEditorOutput((prev) => prev + "Zig Build ok. Führe WASI Binary aus...\n\n" + (stdout || "✓ Zig Code beendet."));
+      }, 1000);
+    } else if (lang === "lua") {
+      setEditorOutput(`[zeno-wasm-wasi] Starte Lua 5.4 WASM Interpreter...\n`);
+      setTimeout(() => {
+        let stdout = "";
+        if (codeToRun.includes("print(")) {
+          const matches = codeToRun.match(/print\s*\(\s*["']([^"']+)["']\s*\)/g);
+          if (matches) {
+            stdout = matches.map(m => {
+              const content = m.match(/["']([^"']+)["']/);
+              return content ? content[1] : "";
+            }).join("\n");
+          }
+        }
+        setEditorOutput((prev) => prev + "Lua 5.4 VM ausgeführt.\n\n" + (stdout || "✓ Lua Script beendet."));
+      }, 1000);
+    } else if (lang === "sql" || lang === "sqlite") {
+      setEditorOutput(`[zeno-wasm-wasi] Initialisiere SQLite WASM DB Engine (In-Memory VFS)...\n`);
+      setTimeout(() => {
+        setEditorOutput((prev) => prev + "SQLite v3.45.0 WASM Ready.\n> CREATE TABLE zeno_users (id INT, name TEXT);\n> INSERT INTO zeno_users VALUES (1, 'CipherNaut');\n> SELECT * FROM zeno_users;\n\n1 | CipherNaut\n✓ Query in 0.4ms ausgeführt.");
+      }, 800);
     } else {
-      setEditorOutput(`Kompilierung für ${lang.toUpperCase()} nicht unterstützt. Client-seitige Sandbox unterstützt JavaScript, TypeScript und Python.`);
+      setEditorOutput(`Kompilierung für ${lang.toUpperCase()} nicht unterstützt. Installiere diese Sprachumgebung im WASM Runtime Hub auf der Startseite.`);
     }
   };
 
+  const activeIdeFile = ideFiles.find((f) => f.path === ideActiveFilePath);
+
+  const handleIdeCodeChange = (newVal: string | undefined) => {
+    setIdeFiles((prev) =>
+      prev.map((f) => (f.path === ideActiveFilePath ? { ...f, code: newVal || "" } : f))
+    );
+  };
+
+  const renderIdeFileTree = () => {
+    const sorted = [...ideFiles].sort((a, b) => {
+      const aParts = a.path.split('/');
+      const bParts = b.path.split('/');
+      const len = Math.min(aParts.length, bParts.length);
+      for (let i = 0; i < len; i++) {
+        if (aParts[i] !== bParts[i]) {
+          const aIsFolder = i < aParts.length - 1 || a.isFolder;
+          const bIsFolder = i < bParts.length - 1 || b.isFolder;
+          if (aIsFolder !== bIsFolder) {
+            return aIsFolder ? -1 : 1;
+          }
+          return aParts[i].localeCompare(bParts[i]);
+        }
+      }
+      return aParts.length - bParts.length;
+    });
+
+    return sorted.map((file) => {
+      const parts = file.path.split('/');
+      const depth = parts.length - 1;
+      const parentPath = parts.slice(0, -1).join('/');
+
+      let isVisible = true;
+      let currentParent = parentPath;
+      while (currentParent) {
+        if (ideExpandedFolders[currentParent] === false) {
+          isVisible = false;
+          break;
+        }
+        const nextParts = currentParent.split('/');
+        nextParts.pop();
+        currentParent = nextParts.join('/');
+      }
+
+      if (!isVisible) return null;
+
+      const isFolder = file.isFolder;
+      const isExpanded = ideExpandedFolders[file.path] !== false;
+      const isActive = ideActiveFilePath === file.path;
+
+      return (
+        <div
+          key={file.path}
+          className={`ide-tree-item ${isActive ? "active" : ""}`}
+          style={{ paddingLeft: `${depth * 14 + 10}px` }}
+          onClick={() => {
+            if (isFolder) {
+              setIdeExpandedFolders((prev) => ({
+                ...prev,
+                [file.path]: !isExpanded
+              }));
+            } else {
+              handleIdeFileSelect(file.path);
+            }
+          }}
+        >
+          <span className="ide-tree-icon">
+            <Icon
+              icon={
+                isFolder
+                  ? (isExpanded ? "mage:chevron-down" : "mage:chevron-right")
+                  : (file.language === "rust" ? "vscode-icons:file-type-rust" :
+                     file.language === "python" ? "vscode-icons:file-type-python" :
+                     file.language === "golang" ? "vscode-icons:file-type-go" :
+                     file.language === "csharp" ? "vscode-icons:file-type-csharp" :
+                     file.language === "cpp" ? "vscode-icons:file-type-cpp" :
+                     file.language === "javascript" ? "vscode-icons:file-type-js" :
+                     file.language === "typescript" ? "vscode-icons:file-type-typescript" :
+                     file.language === "html" ? "vscode-icons:file-type-html" :
+                     file.language === "css" ? "vscode-icons:file-type-css" :
+                     file.language === "toml" ? "vscode-icons:file-type-toml" :
+                     "mage:file-records")
+              }
+              style={{
+                fontSize: "14px",
+                marginRight: "6px",
+                color: isFolder ? "var(--accent-color)" : "inherit"
+              }}
+            />
+          </span>
+          <span className="ide-tree-name">{file.name}</span>
+
+          <div className="ide-tree-actions" onClick={(e) => e.stopPropagation()}>
+            {isFolder && (
+              <>
+                <button
+                  onClick={() => {
+                    setIdeNewItemType("file");
+                    setIdeNewItemParentPath(file.path);
+                    setIsIdeNewItemModalOpen(true);
+                  }}
+                  title="Neue Datei"
+                >
+                  <Icon icon="mage:plus" />
+                </button>
+                <button
+                  onClick={() => {
+                    setIdeNewItemType("folder");
+                    setIdeNewItemParentPath(file.path);
+                    setIsIdeNewItemModalOpen(true);
+                  }}
+                  title="Neuer Ordner"
+                >
+                  <Icon icon="mage:folder-open" />
+                </button>
+              </>
+            )}
+            <button onClick={(e) => handleIdeItemDelete(file.path, e)} title="Löschen">
+              <Icon icon="mage:trash-3" />
+            </button>
+          </div>
+        </div>
+      );
+    });
+  };
+
+  const isIdeActive = activeServerId === "home" && homeTab === "ide";
+
   return (
-    <div className="app-layout">
+    <div className={`app-layout ${isIdeActive ? "in-ide" : ""}`}>
       {/* 1. SERVER SIDEBAR */}
       <aside className="server-sidebar">
         <button 
           className={`server-icon home-button ${activeServerId === "home" ? "active" : ""}`} 
-          onClick={() => setActiveServerId("home")} 
+          onClick={() => { setActiveServerId("home"); setHomeTab("dashboard"); }} 
           title="Zeno Home"
         >
           <img src="/zeno_logo.svg" alt="Zeno Logo" style={{ width: "30px", height: "30px", borderRadius: "6px" }} />
@@ -1227,7 +2512,8 @@ sys.stderr = io.StringIO()
       </aside>
 
       {/* 2. CHANNEL SIDEBAR */}
-      <aside className="channel-sidebar">
+      {!(activeServerId === "home" && homeTab === "ide") && (
+        <aside className="channel-sidebar">
         {activeServerId === "home" ? (
           <>
             <header className="server-header">
@@ -1241,9 +2527,30 @@ sys.stderr = io.StringIO()
                 </button>
                 <ul className="category-channels">
                   <li>
-                    <button className="channel-item active">
+                    <button 
+                      className={`channel-item ${homeTab === "dashboard" ? "active" : ""}`}
+                      onClick={() => setHomeTab("dashboard")}
+                    >
                       <span className="channel-icon"><Icon icon="mage:dashboard" /></span>
                       <span className="channel-name">Dashboard</span>
+                    </button>
+                  </li>
+                  <li>
+                    <button 
+                      className={`channel-item ${homeTab === "wasm_hub" ? "active" : ""}`}
+                      onClick={() => setHomeTab("wasm_hub")}
+                    >
+                      <span className="channel-icon"><Icon icon="mage:box-3d" style={{ color: "#3574F0" }} /></span>
+                      <span className="channel-name">⚡ WASM Runtime Hub</span>
+                    </button>
+                  </li>
+                  <li>
+                    <button 
+                      className={`channel-item ${homeTab === "ide" ? "active" : ""}`}
+                      onClick={() => setHomeTab("ide")}
+                    >
+                      <span className="channel-icon"><Icon icon="mage:code" style={{ color: "#59A869" }} /></span>
+                      <span className="channel-name">🛠️ Zeno Full-IDE</span>
                     </button>
                   </li>
                   <li>
@@ -1367,10 +2674,12 @@ sys.stderr = io.StringIO()
           </div>
         </footer>
       </aside>
+      )}
 
       {/* 3. CHAT MAIN AREA */}
       <main className="chat-area">
         {activeServerId === "home" ? (
+          homeTab === "dashboard" ? (
           <div className="zeno-dashboard" style={{ padding: "24px", overflowY: "auto", display: "flex", flexDirection: "column", height: "100%", boxSizing: "border-box" }}>
             <header className="dashboard-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-color)", paddingBottom: "16px", marginBottom: "8px" }}>
               <div className="dashboard-welcome">
@@ -1669,6 +2978,641 @@ sys.stderr = io.StringIO()
               })}
             </div>
           </div>
+          ) : homeTab === "wasm_hub" ? (
+            <div className="wasm-hub-view">
+              <header className="wasm-hub-header">
+                <div className="wasm-hub-title-area">
+                  <h2>
+                    <Icon icon="mage:box-3d" style={{ color: "var(--accent-color)" }} />
+                    ⚡ Zeno WASM Runtime Hub & Marketplace
+                  </h2>
+                  <p>Lade isolierte WebAssembly-Laufzeiten (WASI) von WAPM & dem Zeno Community Index herunter.</p>
+                </div>
+
+                <button
+                  className="settings-btn primary"
+                  onClick={() => setIsCustomWasmModalOpen(true)}
+                  style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", padding: "8px 14px" }}
+                >
+                  <Icon icon="mage:plus" /> Eigene WASM-URL Hinzufügen
+                </button>
+              </header>
+
+              {/* Toolbar / Search & Filter */}
+              <div className="wasm-hub-toolbar">
+                <div className="wasm-hub-search-wrapper">
+                  <Icon icon="mage:search" style={{ color: "var(--text-muted)", fontSize: "14px" }} />
+                  <input
+                    type="text"
+                    className="wasm-hub-search-input"
+                    placeholder="Laufzeit suchen (z.B. Go, Ruby, Perl, SQLite, #scripting)..."
+                    value={wasmHubSearchQuery}
+                    onChange={(e) => setWasmHubSearchQuery(e.target.value)}
+                  />
+                  {wasmHubSearchQuery && (
+                    <button
+                      onClick={() => setWasmHubSearchQuery("")}
+                      style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer" }}
+                    >
+                      <Icon icon="mage:multiply" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="wasm-hub-filter-tabs">
+                  <button
+                    className={`wasm-hub-filter-btn ${wasmHubFilter === "all" ? "active" : ""}`}
+                    onClick={() => setWasmHubFilter("all")}
+                  >
+                    Alle Runtimes ({HUB_RUNTIMES_CATALOG.length})
+                  </button>
+                  <button
+                    className={`wasm-hub-filter-btn ${wasmHubFilter === "community" ? "active" : ""}`}
+                    onClick={() => setWasmHubFilter("community")}
+                  >
+                    ⭐ Zeno Community Index
+                  </button>
+                  <button
+                    className={`wasm-hub-filter-btn ${wasmHubFilter === "wapm" ? "active" : ""}`}
+                    onClick={() => setWasmHubFilter("wapm")}
+                  >
+                    📦 WAPM Registry
+                  </button>
+                  <button
+                    className={`wasm-hub-filter-btn ${wasmHubFilter === "installed" ? "active" : ""}`}
+                    onClick={() => setWasmHubFilter("installed")}
+                  >
+                    ✅ Installiert
+                  </button>
+                </div>
+              </div>
+
+              {/* WASM Runtime Cards Grid */}
+              <div className="wasm-hub-grid">
+                {HUB_RUNTIMES_CATALOG.filter((item) => {
+                  // Filter by tab
+                  if (wasmHubFilter === "community" && item.provider !== "Zeno Community Index") return false;
+                  if (wasmHubFilter === "wapm" && item.provider !== "WAPM Registry") return false;
+                  if (wasmHubFilter === "installed" && editorRuntimes[item.langKey] !== "installed") return false;
+
+                  // Filter by search query
+                  if (wasmHubSearchQuery.trim()) {
+                    const q = wasmHubSearchQuery.toLowerCase();
+                    const matchesName = item.name.toLowerCase().includes(q);
+                    const matchesDesc = item.description.toLowerCase().includes(q);
+                    const matchesTags = item.tags.some((t) => t.toLowerCase().includes(q));
+                    const matchesProvider = item.provider.toLowerCase().includes(q);
+                    return matchesName || matchesDesc || matchesTags || matchesProvider;
+                  }
+
+                  return true;
+                }).map((item) => {
+                  const runtimeStatus = editorRuntimes[item.langKey] || "not_installed";
+
+                  return (
+                    <div key={item.id} className="wasm-hub-card">
+                      <div className="wasm-card-top">
+                        <div className="wasm-card-icon-title">
+                          <Icon icon={item.icon} className="wasm-card-icon" />
+                          <div>
+                            <h3 className="wasm-card-name">{item.name}</h3>
+                            <span className="wasm-card-version">{item.version} • {item.size}</span>
+                          </div>
+                        </div>
+                        <span
+                          className="wasm-card-provider-badge"
+                          style={{
+                            backgroundColor: `${item.badgeColor}18`,
+                            color: item.badgeColor,
+                            border: `1px solid ${item.badgeColor}33`
+                          }}
+                        >
+                          {item.providerIcon} {item.provider}
+                        </span>
+                      </div>
+
+                      <p className="wasm-card-desc">{item.description}</p>
+
+                      <div className="wasm-card-tags">
+                        {item.tags.map((t) => (
+                          <span key={t} className="wasm-tag">{t}</span>
+                        ))}
+                      </div>
+
+                      <div className="wasm-card-actions">
+                        {runtimeStatus === "installed" ? (
+                          <>
+                            <span style={{ fontSize: "11px", color: "#59A869", fontWeight: "600", display: "flex", alignItems: "center", gap: "4px" }}>
+                              <Icon icon="mage:check-circle" /> Bereit & Gecacht
+                            </span>
+                            <button
+                              className="settings-btn primary"
+                              onClick={() => {
+                                setEditorFilename(item.sampleFile);
+                                setEditorLanguage(item.langKey);
+                                setEditorCode(item.sampleCode);
+                                setEditorWorkflowStep("editor");
+                                setEditorOutput("");
+                                setIsEditorOpen(true);
+                                showToast(`Monaco-Editor für ${item.name} geöffnet!`);
+                              }}
+                              style={{ fontSize: "11px", padding: "4px 10px" }}
+                            >
+                              🚀 Ausprobieren
+                            </button>
+                          </>
+                        ) : runtimeStatus === "installing" ? (
+                          <span style={{ fontSize: "11px", color: "#FFC66D", fontWeight: "600", display: "flex", alignItems: "center", gap: "6px" }}>
+                            <Icon icon="mage:spinner-round" className="spin" /> WASM Download läuft...
+                          </span>
+                        ) : (
+                          <>
+                            <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                              🛡️ WASI Isolated
+                            </span>
+                            <button
+                              className="settings-btn"
+                              onClick={() => handleInstallRuntime(item.langKey)}
+                              style={{ fontSize: "11px", padding: "4px 10px", color: "var(--accent-color)" }}
+                            >
+                              <Icon icon="mage:download" style={{ marginRight: "4px" }} /> Download & Cachen
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="zeno-ide-workspace">
+              {/* VS Code styled Activity Bar (narrow sidebar menu) */}
+              <div className="ide-activity-bar">
+                <div className="ide-activity-top">
+                  <button 
+                    className={`ide-activity-btn ${ideSidebarTab === "explorer" ? "active" : ""}`}
+                    onClick={() => setIdeSidebarTab("explorer")}
+                    title="Explorer"
+                  >
+                    <Icon icon="mage:file-records" />
+                  </button>
+
+                  <button 
+                    className={`ide-activity-btn ${ideSidebarTab === "git" ? "active" : ""}`}
+                    onClick={() => setIdeSidebarTab("git")}
+                    title="Source Control (Git)"
+                  >
+                    <Icon icon="mage:git-branch" />
+                    {ideGitChanges.length > 0 && (
+                      <span className="ide-activity-badge">{ideGitChanges.length}</span>
+                    )}
+                  </button>
+
+                  <button 
+                    className={`ide-activity-btn ${ideSidebarTab === "extensions" ? "active" : ""}`}
+                    onClick={() => setIdeSidebarTab("extensions")}
+                    title="Plugins / Extensions"
+                  >
+                    <Icon icon="mage:box-3d" />
+                  </button>
+
+                  {/* GitLens Extension translated option! Rendered ONLY when GitLens is installed! */}
+                  {ideExtensions.find(ext => ext.id === "gitlens")?.installed && (
+                    <button 
+                      className={`ide-activity-btn gitlens-opt ${ideSidebarTab === "gitlens" ? "active" : ""}`}
+                      onClick={() => setIdeSidebarTab("gitlens")}
+                      title="GitLens History Map"
+                      style={{ color: "#E05555" }}
+                    >
+                      <Icon icon="octicon:history-16" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="ide-activity-bottom">
+                  <button className="ide-activity-btn" onClick={() => setIsSettingsOpen(true)} title="Einstellungen">
+                    <Icon icon="mage:settings" />
+                  </button>
+                </div>
+              </div>
+
+              {/* IDE Side Panel (width 260px) */}
+              <aside className="ide-sidebar">
+                {ideSidebarTab === "explorer" && (
+                  <>
+                    <div className="ide-sidebar-header">
+                      <span className="ide-project-title">
+                        Explorer
+                      </span>
+                      <div className="ide-sidebar-actions">
+                        <button 
+                          className="ide-sidebar-btn" 
+                          onClick={() => {
+                            setIdeNewItemType("file");
+                            setIdeNewItemParentPath("");
+                            setIsIdeNewItemModalOpen(true);
+                          }}
+                          title="Neue Datei erstellen"
+                        >
+                          <Icon icon="mage:plus" />
+                        </button>
+                        <button 
+                          className="ide-sidebar-btn" 
+                          onClick={() => {
+                            setIdeNewItemType("folder");
+                            setIdeNewItemParentPath("");
+                            setIsIdeNewItemModalOpen(true);
+                          }}
+                          title="Neuer Ordner erstellen"
+                        >
+                          <Icon icon="mage:folder-open" />
+                        </button>
+                        <button 
+                          className="ide-sidebar-btn" 
+                          onClick={() => setIsIdeProjectWizardOpen(true)}
+                          title="Projekt aus Vorlage generieren"
+                        >
+                          <Icon icon="mage:box-3d" style={{ color: "var(--accent-color)" }} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="ide-tree-container">
+                      <div className="ide-sidebar-section-title">ZENO-WORKSPACE</div>
+                      {renderIdeFileTree()}
+                      {ideFiles.length === 0 && (
+                        <p style={{ fontSize: "11px", color: "var(--text-muted)", padding: "16px", textAlign: "center" }}>
+                          Workspace leer. Generiere ein Projekt über das Würfel-Symbol.
+                        </p>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {ideSidebarTab === "git" && (
+                  <div className="ide-git-panel" style={{ display: "flex", flexDirection: "column", height: "100%", padding: "14px" }}>
+                    <div className="ide-sidebar-header" style={{ padding: "0 0 10px 0", borderBottom: "1px solid var(--border-color)", marginBottom: "14px" }}>
+                      <span className="ide-project-title">Source Control</span>
+                    </div>
+
+                    <div className="ide-git-input-wrapper" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                      <textarea
+                        className="settings-input"
+                        placeholder="Commit-Nachricht (Strg+Enter zum Committen)..."
+                        value={ideGitMessage}
+                        onChange={(e) => setIdeGitMessage(e.target.value)}
+                        style={{ width: "100%", height: "70px", resize: "none", fontSize: "11px", padding: "8px" }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                            handleIdeGitCommit();
+                          }
+                        }}
+                      />
+                      <button 
+                        className="settings-btn primary"
+                        onClick={handleIdeGitCommit}
+                        style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", fontSize: "11px", padding: "8px" }}
+                      >
+                        <Icon icon="mage:git-branch" /> Commit & Push
+                      </button>
+                    </div>
+
+                    <div className="ide-git-changes-section" style={{ marginTop: "20px", flex: 1, overflowY: "auto" }}>
+                      <div className="ide-sidebar-section-title" style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span>Änderungen</span>
+                        <span className="badge" style={{ backgroundColor: "var(--bg-tertiary)" }}>{ideGitChanges.length}</span>
+                      </div>
+                      
+                      {ideGitChanges.map((change) => (
+                        <div key={change} className="ide-git-change-item" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 8px", fontSize: "12px", borderRadius: "4px", cursor: "pointer", transition: "background 0.2s" }}>
+                          <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <Icon icon="mage:file-records" style={{ color: "var(--text-muted)", fontSize: "13px" }} />
+                            <span>{change}</span>
+                          </span>
+                          <span style={{ color: "#FFC66D", fontWeight: "bold", fontSize: "11px" }}>M</span>
+                        </div>
+                      ))}
+
+                      {ideGitChanges.length === 0 && (
+                        <p style={{ fontSize: "11px", color: "var(--text-muted)", textAlign: "center", marginTop: "24px" }}>
+                          Keine ungespeicherten Änderungen vorhanden.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {ideSidebarTab === "extensions" && (
+                  <div className="ide-extensions-panel" style={{ display: "flex", flexDirection: "column", height: "100%", padding: "14px" }}>
+                    <div className="ide-sidebar-header" style={{ padding: "0 0 10px 0", borderBottom: "1px solid var(--border-color)", marginBottom: "14px" }}>
+                      <span className="ide-project-title">Plugin-Installer</span>
+                    </div>
+
+                    {/* Search Field */}
+                    <div style={{ position: "relative", marginBottom: "14px" }}>
+                      <input
+                        type="text"
+                        className="settings-input"
+                        placeholder="Erweiterungen durchsuchen..."
+                        value={ideExtensionsSearchQuery}
+                        onChange={(e) => setIdeExtensionsSearchQuery(e.target.value)}
+                        style={{ width: "100%", paddingRight: "26px", fontSize: "11px", height: "30px" }}
+                      />
+                      <Icon icon="mage:search" style={{ position: "absolute", right: "8px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
+                    </div>
+
+                    {/* Extensions List */}
+                    <div className="extensions-list" style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "12px" }}>
+                      {ideExtensions
+                        .filter(ext => {
+                          if (!ideExtensionsSearchQuery.trim()) return true;
+                          const q = ideExtensionsSearchQuery.toLowerCase();
+                          return ext.name.toLowerCase().includes(q) || ext.description.toLowerCase().includes(q);
+                        })
+                        .map((ext) => (
+                          <div key={ext.id} className="extension-card" style={{ display: "flex", gap: "10px", padding: "10px", backgroundColor: "var(--bg-tertiary)", borderRadius: "6px", border: "1px solid var(--border-color)" }}>
+                            <div style={{ width: "32px", height: "32px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                              {ext.icon.startsWith("http") ? (
+                                <img src={ext.icon} alt={ext.name} style={{ width: "32px", height: "32px", borderRadius: "4px" }} />
+                              ) : (
+                                <Icon icon={ext.icon} style={{ fontSize: "28px" }} />
+                              )}
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <h4 style={{ fontSize: "12px", fontWeight: "600", color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", margin: 0 }}>
+                                {ext.name}
+                              </h4>
+                              <p style={{ fontSize: "10px", color: "var(--text-muted)", margin: "2px 0 6px 0", lineHeight: "1.3" }}>
+                                {ext.description}
+                              </p>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <span style={{ fontSize: "9px", color: "var(--text-muted)" }}>
+                                  {ext.downloads} downloads
+                                </span>
+                                {ext.installed ? (
+                                  <button
+                                    onClick={() => handleExtensionUninstall(ext.id)}
+                                    className="settings-btn"
+                                    style={{ fontSize: "9px", padding: "2px 6px", border: "1px solid var(--accent-danger)", color: "var(--accent-danger)" }}
+                                  >
+                                    Deinstallieren
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => handleExtensionInstall(ext.id)}
+                                    className="settings-btn primary"
+                                    style={{ fontSize: "9px", padding: "2px 8px" }}
+                                  >
+                                    Installieren
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* GitLens Extension Panel */}
+                {ideSidebarTab === "gitlens" && (
+                  <div className="ide-gitlens-panel" style={{ display: "flex", flexDirection: "column", height: "100%", padding: "14px" }}>
+                    <div className="ide-sidebar-header" style={{ padding: "0 0 10px 0", borderBottom: "1px solid var(--border-color)", marginBottom: "14px" }}>
+                      <span className="ide-project-title" style={{ color: "#E05555" }}>GitLens History Map</span>
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: "10px", flex: 1, overflowY: "auto" }}>
+                      <div className="gitlens-info" style={{ padding: "10px", backgroundColor: "rgba(224, 85, 85, 0.1)", borderRadius: "6px", border: "1px solid rgba(224, 85, 85, 0.2)" }}>
+                        <p style={{ fontSize: "11px", color: "var(--text-primary)", margin: 0 }}>
+                          GitLens hat das Platzierungsziel erfolgreich von der standardmäßigen VS-Code-Ansicht in das <strong>Zeno Aktivitäts-Menü</strong> übersetzt.
+                        </p>
+                      </div>
+
+                      <div className="gitlens-history-timeline" style={{ marginTop: "14px" }}>
+                        <div className="ide-sidebar-section-title">COMMITS VERLAUF</div>
+                        
+                        <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "10px" }}>
+                          {[
+                            { author: "CipherNaut", time: "Vor 10 Min.", msg: "feat: Add full-IDE layout Option B" },
+                            { author: "CipherNaut", time: "Vor 2 Std.", msg: "fix: Monaco Themes dynamic light/dark loading" },
+                            { author: "LenaCrypt", time: "Gestern", msg: "refactor: WASM isolates memory management" }
+                          ].map((commit, idx) => (
+                            <div key={idx} style={{ padding: "8px", borderLeft: "2px solid var(--border-color)", paddingLeft: "10px" }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: "var(--text-muted)" }}>
+                                <span>{commit.author}</span>
+                                <span>{commit.time}</span>
+                              </div>
+                              <div style={{ fontSize: "11px", color: "var(--text-primary)", fontWeight: "500", marginTop: "4px" }}>
+                                {commit.msg}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </aside>
+
+              {/* Main Editor & Console Container */}
+              <div className="ide-editor-container">
+                {/* Tabs Bar */}
+                <div className="ide-tabs-bar">
+                  {ideOpenTabs.map((tabPath) => {
+                    const isActive = tabPath === ideActiveFilePath;
+                    const fileName = tabPath.split("/").pop() || tabPath;
+                    const fileObj = ideFiles.find((f) => f.path === tabPath);
+                    const lang = fileObj?.language || "";
+
+                    return (
+                      <div
+                        key={tabPath}
+                        className={`ide-tab ${isActive ? "active" : ""}`}
+                        onClick={() => handleIdeFileSelect(tabPath)}
+                      >
+                        <Icon 
+                          icon={
+                            lang === "rust" ? "vscode-icons:file-type-rust" :
+                            lang === "python" ? "vscode-icons:file-type-python" :
+                            lang === "golang" ? "vscode-icons:file-type-go" :
+                            lang === "csharp" ? "vscode-icons:file-type-csharp" :
+                            lang === "cpp" ? "vscode-icons:file-type-cpp" :
+                            lang === "javascript" ? "vscode-icons:file-type-js" :
+                            lang === "typescript" ? "vscode-icons:file-type-typescript" :
+                            lang === "html" ? "vscode-icons:file-type-html" :
+                            lang === "css" ? "vscode-icons:file-type-css" :
+                            lang === "toml" ? "vscode-icons:file-type-toml" :
+                            "mage:file-records"
+                          } 
+                          style={{ fontSize: "13px" }}
+                        />
+                        <span>{fileName}</span>
+                        <button
+                          className="ide-tab-close"
+                          onClick={(e) => handleIdeFileClose(tabPath, e)}
+                        >
+                          <Icon icon="mage:multiply" style={{ fontSize: "10px" }} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Editor Area */}
+                <div className="ide-editor-wrapper">
+                  {activeIdeFile && !activeIdeFile.isFolder ? (
+                    <>
+                      {/* Editor Toolbar overlay */}
+                      <div style={{ position: "absolute", top: "10px", right: "20px", zIndex: 10, display: "flex", gap: "8px" }}>
+                        <button
+                          className="editor-toolbar-btn primary btn-run"
+                          onClick={handleIdeRun}
+                          style={{ fontSize: "11px", padding: "4px 10px", height: "26px" }}
+                          title="Code ausführen"
+                        >
+                          <Icon icon="mage:play" /> Run Sandbox
+                        </button>
+                        <button
+                          className="editor-toolbar-btn"
+                          onClick={() => {
+                            navigator.clipboard.writeText(activeIdeFile.code);
+                            showToast("Code kopiert!");
+                          }}
+                          style={{ fontSize: "11px", padding: "4px 8px", height: "26px" }}
+                          title="In Zwischenablage kopieren"
+                        >
+                          <Icon icon="mage:copy" /> Copy
+                        </button>
+                      </div>
+
+                      <Editor
+                        height="100%"
+                        language={activeIdeFile.language}
+                        theme={theme === "light" ? "zeno-light-theme" : "zeno-dark-theme"}
+                        value={activeIdeFile.code}
+                        onChange={handleIdeCodeChange}
+                        onMount={(_, monaco) => setupZenoIntelliSense(monaco)}
+                        options={{
+                          minimap: { enabled: false },
+                          fontSize: 13,
+                          fontFamily: "var(--font-mono)",
+                          automaticLayout: true,
+                          quickSuggestions: { other: true, comments: true, strings: true },
+                          suggestOnTriggerCharacters: true,
+                          acceptSuggestionOnEnter: "on",
+                          tabCompletion: "on",
+                          snippetSuggestions: "top",
+                          wordBasedSuggestions: "allDocuments",
+                          parameterHints: { enabled: true }
+                        }}
+                      />
+                    </>
+                  ) : (
+                    <div className="ide-no-editors-screen">
+                      <div className="ide-watermark-container">
+                        <img 
+                          src="/zeno_logo.svg" 
+                          alt="Zeno Logo" 
+                          className="ide-watermark-logo"
+                          style={{ width: "80px", height: "80px", opacity: 0.15, filter: "grayscale(30%)", marginBottom: "16px" }} 
+                        />
+                        <h3 style={{ fontSize: "16px", fontWeight: "600", color: "var(--text-primary)", opacity: 0.8, marginBottom: "24px" }}>
+                          Zeno Workspace Editor
+                        </h3>
+                      </div>
+
+                      <div className="ide-shortcut-list">
+                        <div className="ide-shortcut-item">
+                          <span className="ide-shortcut-action">Datei erstellen</span>
+                          <span className="ide-shortcut-keys">
+                            <kbd>Ctrl</kbd> + <kbd>N</kbd>
+                          </span>
+                        </div>
+                        <div className="ide-shortcut-item">
+                          <span className="ide-shortcut-action">Projekt-Template generieren</span>
+                          <span className="ide-shortcut-keys">
+                            <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>G</kbd>
+                          </span>
+                        </div>
+                        <div className="ide-shortcut-item">
+                          <span className="ide-shortcut-action">WASM Runtime Hub</span>
+                          <span className="ide-shortcut-keys">
+                            <kbd>Ctrl</kbd> + <kbd>H</kbd>
+                          </span>
+                        </div>
+                        <div className="ide-shortcut-item">
+                          <span className="ide-shortcut-action">Konsole ein-/ausblenden</span>
+                          <span className="ide-shortcut-keys">
+                            <kbd>Ctrl</kbd> + <kbd>`</kbd>
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="ide-quick-actions" style={{ display: "flex", gap: "10px", marginTop: "32px" }}>
+                        <button 
+                          className="settings-btn"
+                          onClick={() => {
+                            setIdeNewItemType("file");
+                            setIdeNewItemParentPath("");
+                            setIsIdeNewItemModalOpen(true);
+                          }}
+                          style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", padding: "8px 14px" }}
+                        >
+                          <Icon icon="mage:plus" /> Neue Datei
+                        </button>
+                        <button 
+                          className="settings-btn primary"
+                          onClick={() => setIsIdeProjectWizardOpen(true)}
+                          style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", padding: "8px 14px" }}
+                        >
+                          <Icon icon="mage:box-3d" /> Projekt generieren
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Collapsible Console Bottom Area */}
+                <div 
+                  className={`ide-console ${isIdeConsoleExpanded ? "" : "collapsed"}`}
+                  style={{ height: isIdeConsoleExpanded ? "220px" : "35px" }}
+                >
+                  <div 
+                    className="ide-console-header"
+                    onClick={() => setIsIdeConsoleExpanded(!isIdeConsoleExpanded)}
+                  >
+                    <span className="ide-console-title">
+                      <Icon icon="mage:dashboard" />
+                      WASM Sandbox-Ausgabe & Logs
+                    </span>
+                    <div className="ide-console-actions">
+                      <button
+                        className="ide-sidebar-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIdeConsoleOutput("");
+                          showToast("Konsole gelöscht.");
+                        }}
+                        title="Konsole leeren"
+                      >
+                        <Icon icon="mage:trash-3" style={{ fontSize: "12px" }} />
+                      </button>
+                      <Icon 
+                        icon={isIdeConsoleExpanded ? "mage:chevron-down" : "mage:chevron-up"} 
+                        style={{ fontSize: "14px", color: "var(--text-muted)" }} 
+                      />
+                    </div>
+                  </div>
+                  {isIdeConsoleExpanded && (
+                    <pre className="ide-console-output" style={{ flex: 1, margin: 0, overflowY: "auto" }}>
+                      <code>{ideConsoleOutput || "[zeno-console] Keine Ausgaben vorhanden."}</code>
+                    </pre>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
         ) : (
           <>
             <header className="chat-header">
@@ -1679,6 +3623,13 @@ sys.stderr = io.StringIO()
             <p className="chat-header-description">Kanal für {activeChannel.name} in {activeServer.name}</p>
           </div>
           <div className="chat-header-actions">
+            <button 
+              className="header-action-btn" 
+              onClick={() => openInPrivacyBrowser("https://github.com/tauri-apps/tauri?utm_source=twitter&fbclid=123", "GitHub Tauri Repo")} 
+              title="In-App Privacy Browser öffnen"
+            >
+              <Icon icon="mage:shield-check" />
+            </button>
             <button className="header-action-btn" onClick={() => showToast("Such-Layout ist im Prototyp deaktiviert")} title="Suche">
               <Icon icon="mage:search" />
             </button>
@@ -1698,25 +3649,85 @@ sys.stderr = io.StringIO()
             <span className="date-separator-text">— Heute —</span>
           </div>
 
-          {(chatMessages[activeChannel.id] || []).map((msg, i) => (
-            <article 
-              key={i} 
-              className="message message-animate"
-              style={{ "--idx": Math.min(i, 6) } as React.CSSProperties}
-            >
-              <div className={`message-avatar ${msg.color}`}>{msg.author[0]}</div>
-              <div className="message-body">
-                <header className="message-header">
-                  <span className={`message-author ${msg.color}`} onClick={() => setSelectedUserProfile(mockProfiles[msg.author] || null)} style={{ cursor: "pointer" }}>
-                    {msg.author}
-                  </span>
-                  {mockProfiles[msg.author]?.role === "Bot" && <span className="badge bot-badge">BOT</span>}
-                  <time className="message-timestamp">{msg.time}</time>
-                </header>
-                <div className="message-content">
-                  <p>{msg.text}</p>
-                  
-                  {/* Embedded Code Block */}
+          {(chatMessages[activeChannel.id] || []).map((msg, i) => {
+            const urlMatch = msg.text.match(/(https?:\/\/[^\s]+)/);
+            const foundUrl = urlMatch ? urlMatch[0] : null;
+            const urlDetails = foundUrl ? cleanUrl(foundUrl) : null;
+
+            return (
+              <article 
+                key={i} 
+                className="message message-animate"
+                style={{ "--idx": Math.min(i, 6) } as React.CSSProperties}
+              >
+                <div className={`message-avatar ${msg.color}`}>{msg.author[0]}</div>
+                <div className="message-body">
+                  <header className="message-header">
+                    <span className={`message-author ${msg.color}`} onClick={() => setSelectedUserProfile(mockProfiles[msg.author] || null)} style={{ cursor: "pointer" }}>
+                      {msg.author}
+                    </span>
+                    {mockProfiles[msg.author]?.role === "Bot" && <span className="badge bot-badge">BOT</span>}
+                    <time className="message-timestamp">{msg.time}</time>
+                  </header>
+                  <div className="message-content">
+                    <p>
+                      {foundUrl && urlDetails ? (
+                        <>
+                          {msg.text.split(foundUrl)[0]}
+                          <span 
+                            style={{ color: "var(--glow-color-1, #3574F0)", textDecoration: "underline", cursor: "pointer", fontWeight: "600" }} 
+                            onClick={() => openInPrivacyBrowser(foundUrl)}
+                          >
+                            {urlDetails.cleanedUrl}
+                          </span>
+                          {msg.text.split(foundUrl)[1]}
+                        </>
+                      ) : (
+                        msg.text
+                      )}
+                    </p>
+
+                    {/* Privacy Preserving Link Preview Card */}
+                    {foundUrl && urlDetails && (
+                      <div className="privacy-link-card">
+                        <div className="privacy-link-card-header">
+                          <span className="privacy-link-card-title">
+                            <Icon icon="mage:shield-check" style={{ color: "#59A869", fontSize: "16px" }} />
+                            Privacy Link Preview
+                          </span>
+                          <span className="badge" style={{ backgroundColor: "rgba(89, 168, 105, 0.15)", color: "#59A869", border: "1px solid rgba(89, 168, 105, 0.3)", fontSize: "9px", padding: "2px 6px" }}>
+                            🛡️ Proxy (IP geschützt)
+                          </span>
+                        </div>
+                        <div className="privacy-link-card-url">
+                          {urlDetails.cleanedUrl}
+                        </div>
+                        {urlDetails.strippedParams.length > 0 && (
+                          <div style={{ fontSize: "10px", color: "#FFC66D", display: "flex", alignItems: "center", gap: "4px" }}>
+                            <Icon icon="mage:information-circle" />
+                            {urlDetails.strippedParams.length} Tracking-Parameter automatisch entfernt ({urlDetails.strippedParams.join(", ")})
+                          </div>
+                        )}
+                        <div className="privacy-link-card-actions">
+                          <button 
+                            className="settings-btn primary" 
+                            onClick={() => openInPrivacyBrowser(foundUrl)} 
+                            style={{ fontSize: "11px", padding: "4px 10px", display: "flex", alignItems: "center", gap: "4px" }}
+                          >
+                            <Icon icon="mage:global" /> In Privacy Browser öffnen
+                          </button>
+                          <button 
+                            className="settings-btn" 
+                            onClick={() => { navigator.clipboard.writeText(urlDetails.cleanedUrl); showToast("Saubere URL kopiert!"); }} 
+                            style={{ fontSize: "11px", padding: "4px 10px", display: "flex", alignItems: "center", gap: "4px" }}
+                          >
+                            <Icon icon="mage:copy" /> Saubere URL kopieren
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Embedded Code Block */}
                   {msg.code && (
                     <div className="code-block-wrapper" data-language="rust">
                       <header className="code-block-header">
@@ -1773,7 +3784,8 @@ sys.stderr = io.StringIO()
                 </div>
               </div>
             </article>
-          ))}
+          );
+        })}
           <div ref={messagesEndRef} />
         </div>
 
@@ -2123,14 +4135,22 @@ sys.stderr = io.StringIO()
                 <Editor
                   height="100%"
                   language={editorLanguage}
-                  theme="vs-dark"
+                  theme={theme === "light" ? "zeno-light-theme" : "zeno-dark-theme"}
                   value={editorCode}
                   onChange={(val) => setEditorCode(val || "")}
+                  onMount={(_, monaco) => setupZenoIntelliSense(monaco)}
                   options={{
                     minimap: { enabled: false },
                     fontSize: 13,
                     fontFamily: "var(--font-mono)",
-                    automaticLayout: true
+                    automaticLayout: true,
+                    quickSuggestions: { other: true, comments: true, strings: true },
+                    suggestOnTriggerCharacters: true,
+                    acceptSuggestionOnEnter: "on",
+                    tabCompletion: "on",
+                    snippetSuggestions: "top",
+                    wordBasedSuggestions: "allDocuments",
+                    parameterHints: { enabled: true }
                   }}
                 />
               </div>
@@ -2478,6 +4498,448 @@ sys.stderr = io.StringIO()
             </div>
           </div>
         )}
+      </div>
+
+      {/* 8. IN-APP PRIVACY BROWSER MODAL */}
+      {isPrivacyBrowserOpen && (
+        <div className="privacy-browser-overlay">
+          <div className="privacy-browser-container">
+            {/* Window & Tab Bar */}
+            <div className="privacy-browser-header">
+              <div className="privacy-browser-tabs">
+                {browserTabs.map((t) => (
+                  <div
+                    key={t.id}
+                    className={`browser-tab ${activeTabId === t.id ? "active" : ""}`}
+                    onClick={() => {
+                      setActiveTabId(t.id);
+                      setBrowserAddressInput(t.activeUrl);
+                    }}
+                  >
+                    <span>{t.favicon}</span>
+                    <span className="browser-tab-title">{t.title}</span>
+                    <button className="browser-tab-close" onClick={(e) => closeBrowserTab(t.id, e)} title="Tab schließen">
+                      ×
+                    </button>
+                  </div>
+                ))}
+                <button
+                  className="browser-tab-add"
+                  onClick={() => openInPrivacyBrowser("https://docs.rs/webrtc", "WebRTC Rust Docs")}
+                  title="Neuer Privacy Tab"
+                >
+                  +
+                </button>
+              </div>
+
+              {/* Navigation & Address Bar */}
+              <div className="privacy-browser-toolbar">
+                <button className="browser-nav-btn" onClick={() => showToast("Zurück")} title="Zurück">
+                  <Icon icon="mage:arrow-left" />
+                </button>
+                <button className="browser-nav-btn" onClick={() => showToast("Vorwärts")} title="Vorwärts">
+                  <Icon icon="mage:arrow-right" />
+                </button>
+                <button className="browser-nav-btn" onClick={() => showToast("Seite neu geladen")} title="Neu laden">
+                  <Icon icon="mage:reload" />
+                </button>
+
+                {/* URL Bar & Shield Badge */}
+                <div className="browser-url-bar-wrapper">
+                  <div
+                    className="browser-shield-badge"
+                    onClick={() => setIsShieldPanelOpen(!isShieldPanelOpen)}
+                    title="Brave-Style Tracker Shield Details"
+                  >
+                    <Icon icon="mage:shield-check" />
+                    <span>{activeBrowserTab.blockedTrackers} Blockiert</span>
+                  </div>
+
+                  <input
+                    type="text"
+                    className="browser-url-input"
+                    value={browserAddressInput}
+                    onChange={(e) => setBrowserAddressInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleNavigateBrowser(browserAddressInput);
+                    }}
+                  />
+
+                  {activeBrowserTab.strippedParams.length > 0 && (
+                    <div className="browser-clean-indicator" title="Gereinigte Parameter: utm_*, fbclid, etc.">
+                      <Icon icon="mage:lightning-bolt" />
+                      <span>{activeBrowserTab.strippedParams.length} Params entfernt</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <button
+                  className="browser-nav-btn"
+                  onClick={() => {
+                    navigator.clipboard.writeText(activeBrowserTab.activeUrl);
+                    showToast("Saubere URL kopiert!");
+                  }}
+                  title="Saubere URL kopieren"
+                >
+                  <Icon icon="mage:copy" />
+                </button>
+                <button
+                  className="browser-nav-btn"
+                  onClick={() => {
+                    window.open(activeBrowserTab.activeUrl, "_blank");
+                    showToast("Im Systembrowser geöffnet");
+                  }}
+                  title="In externem Browser öffnen"
+                >
+                  <Icon icon="mage:external-link" />
+                </button>
+                <button
+                  className="browser-nav-btn"
+                  onClick={() => setIsPrivacyBrowserOpen(false)}
+                  title="Privacy Browser schließen"
+                >
+                  <Icon icon="mage:multiply" />
+                </button>
+              </div>
+
+              {/* Shield Status Panel */}
+              {isShieldPanelOpen && (
+                <div className="privacy-shield-panel">
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <span style={{ fontWeight: "700", color: "#59A869", display: "flex", alignItems: "center", gap: "4px" }}>
+                      <Icon icon="mage:shield-check" /> Zeno Shield A+ Status
+                    </span>
+                    <span style={{ color: "var(--text-muted)" }}>|</span>
+                    <span>HTTPS Enforced: <strong>Aktiv</strong></span>
+                    <span style={{ color: "var(--text-muted)" }}>|</span>
+                    <span>Fingerprint Protection: <strong>Strict (WASM Isolierung)</strong></span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    {activeBrowserTab.strippedParams.length > 0 && (
+                      <span style={{ color: "#FFC66D", fontSize: "10px" }}>
+                        Entfernt: {activeBrowserTab.strippedParams.join(", ")}
+                      </span>
+                    )}
+                    <button
+                      className="settings-btn"
+                      onClick={() => {
+                        setBrowserTrackerShieldEnabled(!browserTrackerShieldEnabled);
+                        showToast(`Shield ${!browserTrackerShieldEnabled ? "aktiviert" : "deaktiviert"}`);
+                      }}
+                      style={{ fontSize: "10px", padding: "2px 8px" }}
+                    >
+                      {browserTrackerShieldEnabled ? "Shield Aktiviert (Brave Level)" : "Shield Deaktiviert"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Browser Content Webview Canvas */}
+            <div style={{ flex: 1, backgroundColor: "var(--bg-primary)", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+              <div style={{ padding: "8px 16px", backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)", display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "11px" }}>
+                <span style={{ color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <Icon icon="mage:lock" style={{ color: "#59A869" }} />
+                  Proxy Sandbox Connection: IP-Adresse geschützt via Zeno Relay (Brave Shield Engine)
+                </span>
+                
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <button
+                    className={`settings-btn ${browserViewMode === "live" ? "primary" : ""}`}
+                    onClick={() => setBrowserViewMode("live")}
+                    style={{ fontSize: "10px", padding: "2px 8px" }}
+                  >
+                    🌐 Live Website View
+                  </button>
+                  <button
+                    className={`settings-btn ${browserViewMode === "audit" ? "primary" : ""}`}
+                    onClick={() => setBrowserViewMode("audit")}
+                    style={{ fontSize: "10px", padding: "2px 8px" }}
+                  >
+                    🛡️ Privacy Audit Report
+                  </button>
+                </div>
+              </div>
+
+              {/* View Mode: Live WebView vs Privacy Audit Report */}
+              {browserViewMode === "live" ? (
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%", width: "100%", position: "relative" }}>
+                  <iframe
+                    src={activeBrowserTab.activeUrl}
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                    style={{ width: "100%", height: "100%", border: "none", background: "#FFFFFF" }}
+                    title="Live Webview"
+                  />
+                  <div style={{ padding: "6px 14px", backgroundColor: "rgba(43,45,48,0.95)", borderTop: "1px solid var(--border-color)", display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "10px", color: "var(--text-muted)" }}>
+                    <span>💡 <strong>Hinweis:</strong> Manche Webseiten (z. B. Google, YouTube) blockieren `iframe`-Einbettung über `X-Frame-Options`.</span>
+                    <button
+                      className="settings-btn"
+                      onClick={() => {
+                        window.open(activeBrowserTab.activeUrl, "_blank");
+                        showToast("Im Nativen Tauri WebView2 Fenster geöffnet!");
+                      }}
+                      style={{ fontSize: "10px", padding: "2px 8px", color: "var(--accent-color)" }}
+                    >
+                      🚀 In Nativer Tauri WebView2 öffnen
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <iframe
+                  srcDoc={`<!DOCTYPE html>
+                  <html>
+                  <head>
+                    <style>
+                      body {
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                        background: #18191B;
+                        color: #E3E4E8;
+                        margin: 0;
+                        padding: 40px;
+                        line-height: 1.6;
+                      }
+                      .hero {
+                        max-width: 800px;
+                        margin: 0 auto;
+                        background: #2B2D30;
+                        border: 1px solid #3f4248;
+                        border-radius: 12px;
+                        padding: 30px;
+                        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+                      }
+                      h1 { color: #FFFFFF; font-size: 24px; margin-top: 0; display: flex; align-items: center; gap: 10px; }
+                      .badge { display: inline-block; background: rgba(89, 168, 105, 0.2); color: #59A869; border: 1px solid #59A869; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+                      .url-box { background: #1A1B1D; border: 1px solid #3f4248; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 12px; color: #3574F0; margin: 15px 0; word-break: break-all; }
+                      .tracker-list { background: rgba(255, 198, 109, 0.1); border-left: 3px solid #FFC66D; padding: 12px 16px; margin: 20px 0; border-radius: 0 6px 6px 0; }
+                      ul { padding-left: 20px; margin: 8px 0; }
+                      li { margin-bottom: 4px; font-size: 13px; }
+                    </style>
+                  </head>
+                  <body>
+                    <div class="hero">
+                      <span class="badge">🛡️ PRIVACY SHIELD PROTECTED (BRAVE RUST ENGINE)</span>
+                      <h1>${activeBrowserTab.title}</h1>
+                      <p>Datenschutz-Analyse des <strong>Zeno Privacy Browsers</strong> mit integriertem Brave-Shielding.</p>
+                      
+                      <div class="url-box">
+                        <strong>Aktive gereinigte URL:</strong><br/>
+                        ${activeBrowserTab.activeUrl}
+                      </div>
+
+                      ${
+                        activeBrowserTab.strippedParams.length > 0
+                          ? `<div class="tracker-list">
+                              <strong>⚡ Entfernte Tracking-Token:</strong>
+                              <ul>
+                                ${activeBrowserTab.strippedParams.map((p) => `<li><code>${p}</code> (Cross-Site Tracker gedämpft)</li>`).join("")}
+                              </ul>
+                            </div>`
+                          : `<p style="color:#59A869; font-size: 13px;">✅ Keine Tracking-Parameter in dieser URL gefunden.</p>`
+                      }
+
+                      <p style="font-size: 12px; color: #949BA4; margin-top: 25px;">
+                        🔒 <strong>Security Audit:</strong> Skripte von Drittanbieter-Netzwerken wurden über die originale Brave Rust <code>adblock</code> Engine gefiltert.
+                      </p>
+                    </div>
+                  </body>
+                  </html>`}
+                  sandbox="allow-scripts"
+                  style={{ width: "100%", height: "100%", border: "none" }}
+                  title="Privacy Audit Report"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 7. CUSTOM WASM RUNTIME MODAL */}
+      <div className={`modal-overlay ${isCustomWasmModalOpen ? "open" : ""}`}>
+        <div className="settings-modal" style={{ width: "500px", height: "auto", minHeight: "340px", borderRadius: "12px", padding: "24px", position: "relative" }}>
+          <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-color)", paddingBottom: "12px", marginBottom: "16px" }}>
+            <h3 style={{ fontSize: "16px", fontWeight: "700", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "8px" }}>
+              <Icon icon="mage:box-3d" style={{ color: "var(--accent-color)" }} />
+              Eigene WASM-Laufzeit einbinden
+            </h3>
+            <button className="editor-close-btn modal-close" onClick={() => setIsCustomWasmModalOpen(false)}>
+              <Icon icon="mage:multiply" />
+            </button>
+          </header>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+            <p className="settings-help-text">
+              Binde ein benutzerdefiniertes `.wasm` Paket von deiner eigenen URL oder der WAPM-Registry ein. Die Laufzeit wird isoliert in der WASI-Sandbox ausgeführt.
+            </p>
+
+            <div>
+              <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
+                SPRACH-NAME / TITEL
+              </label>
+              <input
+                type="text"
+                className="settings-input"
+                placeholder="z. B. Elixir Engine (WASI)"
+                value={customWasmName}
+                onChange={(e) => setCustomWasmName(e.target.value)}
+                style={{ width: "100%", maxWidth: "none" }}
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
+                WASM-BINARY URL (.wasm)
+              </label>
+              <input
+                type="text"
+                className="settings-input"
+                placeholder="https://wapm.io/download/elixir/elixir.wasm"
+                value={customWasmUrl}
+                onChange={(e) => setCustomWasmUrl(e.target.value)}
+                style={{ width: "100%", maxWidth: "none" }}
+              />
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "12px" }}>
+              <button className="settings-btn" onClick={() => setIsCustomWasmModalOpen(false)}>
+                Abbrechen
+              </button>
+              <button
+                className="settings-btn primary"
+                onClick={() => {
+                  if (!customWasmName.trim() || !customWasmUrl.trim()) {
+                    showToast("Bitte Titel und URL eingeben.");
+                    return;
+                  }
+                  showToast(`Benutzerdefinierte WASM-Laufzeit "${customWasmName}" erfolgreich eingebunden!`);
+                  setIsCustomWasmModalOpen(false);
+                  setCustomWasmName("");
+                  setCustomWasmUrl("");
+                }}
+              >
+                Laufzeit Registrieren
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 8. IDE PROJECT WIZARD MODAL */}
+      <div className={`modal-overlay ${isIdeProjectWizardOpen ? "open" : ""}`}>
+        <div className="settings-modal" style={{ width: "600px", height: "auto", borderRadius: "12px", padding: "24px", position: "relative" }}>
+          <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-color)", paddingBottom: "12px", marginBottom: "16px" }}>
+            <h3 style={{ fontSize: "16px", fontWeight: "700", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "8px" }}>
+              <Icon icon="mage:box-3d" style={{ color: "var(--accent-color)" }} />
+              Neues Projekt generieren
+            </h3>
+            <button className="editor-close-btn modal-close" onClick={() => setIsIdeProjectWizardOpen(false)}>
+              <Icon icon="mage:multiply" />
+            </button>
+          </header>
+
+          <p className="settings-help-text" style={{ marginBottom: "14px" }}>
+            Wähle eine Projektvorlage. Alle Dateien werden in deinem virtuellen Zeno-Workspace generiert und können direkt ausgeführt werden.
+          </p>
+
+          <div className="ide-wizard-grid">
+            <div className="ide-wizard-card" onClick={() => handleIdeGenerateProject("rust")}>
+              <Icon icon="vscode-icons:file-type-rust" className="ide-wizard-card-icon" />
+              <div className="ide-wizard-card-details">
+                <h4>Rust Cargo App</h4>
+                <p>Erstellt Cargo.toml und src/main.rs mit Print-Ausgaben.</p>
+              </div>
+            </div>
+
+            <div className="ide-wizard-card" onClick={() => handleIdeGenerateProject("go")}>
+              <Icon icon="vscode-icons:file-type-go" className="ide-wizard-card-icon" />
+              <div className="ide-wizard-card-details">
+                <h4>Go Module App</h4>
+                <p>Erstellt go.mod und main.go mit fmt-Paket.</p>
+              </div>
+            </div>
+
+            <div className="ide-wizard-card" onClick={() => handleIdeGenerateProject("python")}>
+              <Icon icon="vscode-icons:file-type-python" className="ide-wizard-card-icon" />
+              <div className="ide-wizard-card-details">
+                <h4>Python App</h4>
+                <p>Erstellt main.py und requirements.txt.</p>
+              </div>
+            </div>
+
+            <div className="ide-wizard-card" onClick={() => handleIdeGenerateProject("web")}>
+              <Icon icon="vscode-icons:file-type-html" className="ide-wizard-card-icon" />
+              <div className="ide-wizard-card-details">
+                <h4>Static Web App</h4>
+                <p>Template mit index.html, style.css und script.js.</p>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "20px" }}>
+            <button className="settings-btn" onClick={() => setIsIdeProjectWizardOpen(false)}>
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 9. IDE CREATE ITEM MODAL */}
+      <div className={`modal-overlay ${isIdeNewItemModalOpen ? "open" : ""}`}>
+        <div className="settings-modal" style={{ width: "400px", height: "auto", borderRadius: "12px", padding: "20px", position: "relative" }}>
+          <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-color)", paddingBottom: "10px", marginBottom: "14px" }}>
+            <h3 style={{ fontSize: "14px", fontWeight: "700", color: "var(--text-primary)" }}>
+              {ideNewItemType === "file" ? "Neue Datei erstellen" : "Neuer Ordner erstellen"}
+            </h3>
+            <button className="editor-close-btn modal-close" onClick={() => setIsIdeNewItemModalOpen(false)}>
+              <Icon icon="mage:multiply" />
+            </button>
+          </header>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            {ideNewItemParentPath && (
+              <div style={{ fontSize: "11px", color: "var(--text-muted)", display: "flex", gap: "4px" }}>
+                <span>Speicherort:</span>
+                <code style={{ color: "var(--accent-color)" }}>/{ideNewItemParentPath}</code>
+              </div>
+            )}
+
+            <div>
+              <label style={{ fontSize: "10px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
+                NAME
+              </label>
+              <input
+                type="text"
+                className="settings-input"
+                placeholder={ideNewItemType === "file" ? "z. B. main.rs oder index.js" : "z. B. src oder assets"}
+                value={ideNewItemName}
+                onChange={(e) => setIdeNewItemName(e.target.value)}
+                style={{ width: "100%", maxWidth: "none" }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    if (ideNewItemType === "file") handleIdeFileCreate();
+                    else handleIdeFolderCreate();
+                  }
+                }}
+                autoFocus
+              />
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "8px" }}>
+              <button className="settings-btn" onClick={() => setIsIdeNewItemModalOpen(false)}>
+                Abbrechen
+              </button>
+              <button
+                className="settings-btn primary"
+                onClick={() => {
+                  if (ideNewItemType === "file") handleIdeFileCreate();
+                  else handleIdeFolderCreate();
+                }}
+              >
+                Erstellen
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* TOAST CONTAINER */}
