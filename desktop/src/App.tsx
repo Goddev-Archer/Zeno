@@ -1049,16 +1049,27 @@ export default function App() {
     setIdeGitChanges([]);
   };
 
-  const activeBrowserTab = browserTabs.find((t) => t.id === activeTabId) || browserTabs[0];
+  const activeBrowserTab = browserTabs.find((t) => t.id === activeTabId) || browserTabs[0] || {
+    id: "empty",
+    title: "Neue Seite",
+    url: "about:blank",
+    activeUrl: "about:blank",
+    favicon: "🌐",
+    blockedTrackers: 0,
+    httpsEnforced: true,
+    strippedParams: []
+  };
 
-  const openInPrivacyBrowser = (targetUrl: string, title?: string) => {
+  const openInPrivacyBrowser = (targetUrl: string, title?: string, forceNew = false) => {
     const { cleanedUrl, strippedParams } = cleanUrl(targetUrl);
-    const existing = browserTabs.find((t) => t.activeUrl === cleanedUrl);
-    if (existing) {
-      setActiveTabId(existing.id);
-      setBrowserAddressInput(cleanedUrl);
-      setIsPrivacyBrowserOpen(true);
-      return;
+    if (!forceNew) {
+      const existing = browserTabs.find((t) => t.activeUrl === cleanedUrl);
+      if (existing) {
+        setActiveTabId(existing.id);
+        setBrowserAddressInput(cleanedUrl);
+        setIsPrivacyBrowserOpen(true);
+        return;
+      }
     }
     const newTab: BrowserTab = {
       id: "tab-" + Date.now(),
@@ -5206,7 +5217,7 @@ sys.stderr = io.StringIO()
                 ))}
                 <button
                   className="browser-tab-add"
-                  onClick={() => openInPrivacyBrowser("https://docs.rs/webrtc", "WebRTC Rust Docs")}
+                  onClick={() => openInPrivacyBrowser("https://docs.rs/webrtc", "WebRTC Rust Docs", true)}
                   title="Neuer Privacy Tab"
                 >
                   +
