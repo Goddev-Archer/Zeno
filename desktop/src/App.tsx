@@ -963,12 +963,12 @@ export default function App() {
 
   const fetchExtensionsFromMarketplace = async (query: string) => {
     try {
-      let url = "https://open-vsx.org/api/-/search?size=15&sortBy=downloads";
+      let url = "https://open-vsx.org/api/-/search?q=*&size=15";
       if (query.trim()) {
         url = `https://open-vsx.org/api/-/search?q=${encodeURIComponent(query)}&size=15`;
       }
       const response = await fetch(url);
-      if (!response.ok) throw new Error("API Fehler");
+      if (!response.ok) return;
       const data = await response.json();
       
       if (data && data.extensions) {
@@ -5448,7 +5448,7 @@ sys.stderr = io.StringIO()
                       <Icon icon="eos-icons:loading" style={{ fontSize: "36px", color: "var(--accent-color)", marginBottom: "20px" }} />
                       <div style={{ width: "100%", maxWidth: "600px", background: "#1A1B1D", border: "1px solid var(--border-color)", borderRadius: "8px", padding: "20px", maxHeight: "300px", overflowY: "auto", fontSize: "11px", display: "flex", flexDirection: "column", gap: "6px" }}>
                         {streamLoadingLogs.map((log, index) => (
-                          <div key={index} style={{ color: log.includes("STREAM") ? "#00E676" : log.includes("BRAVE") ? "#FF9800" : "#E3E4E8" }}>{log}</div>
+                          <div key={index} style={{ color: log?.includes("STREAM") ? "#00E676" : log?.includes("BRAVE") ? "#FF9800" : "#E3E4E8" }}>{log}</div>
                         ))}
                       </div>
                     </div>
