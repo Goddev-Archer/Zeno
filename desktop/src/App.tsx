@@ -5455,13 +5455,12 @@ sys.stderr = io.StringIO()
                       backgroundImage: "linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%)",
                       backgroundSize: "100% 4px",
                     }}>
-                      {/* ZENO LOCAL PRIVACY PROXY ENGINE (60 FPS HARDWARE ACCELERATED STREAM) */}
+                      {/* ZENO DIRECT BROWSER VIEWPORT (NATIVE ORIGIN) */}
                       <div style={{ flex: 1, display: "flex", flexDirection: "column", width: "100%", height: "100%", position: "relative", minHeight: "500px" }}>
                         <iframe
-                          src={`http://127.0.0.1:14211/proxy?url=${encodeURIComponent(activeBrowserTab?.activeUrl || "https://zeno-chat.de/privacy")}`}
+                          src={activeBrowserTab?.activeUrl || "https://zeno-chat.de/privacy"}
                           style={{ width: "100%", height: "100%", flex: 1, border: "none", borderRadius: "8px", background: "#FFFFFF" }}
-                          title="Zeno Privacy Proxy Viewport"
-                          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+                          title="Zeno Privacy Viewport"
                         />
                       </div>
                     </div>
