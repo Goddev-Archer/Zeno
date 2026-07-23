@@ -2337,9 +2337,10 @@ input:checked + .slider:before {
 }
 
 .privacy-browser-container {
-  width: 100%;
-  max-width: 1100px;
-  height: 88vh;
+  width: calc(100vw - 32px);
+  max-width: none;
+  height: calc(100vh - 32px);
+  margin: 0 auto;
   background-color: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
