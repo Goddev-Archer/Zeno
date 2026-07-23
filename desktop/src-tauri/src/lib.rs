@@ -312,7 +312,12 @@ fn load_settings(app: tauri::AppHandle) -> Result<String, String> {
 
 #[tauri::command]
 fn open_native_webview(app: tauri::AppHandle, url: String, title: String) -> Result<(), String> {
-    let parsed_url = url.parse().map_err(|e| format!("Ungültige URL: {}", e))?;
+    let clean_url_str = if !url.starts_with("http://") && !url.starts_with("https://") {
+        format!("https://{}", url)
+    } else {
+        url
+    };
+    let parsed_url = clean_url_str.parse().map_err(|e| format!("Ungültige URL: {}", e))?;
     
     if let Some(window) = app.get_webview_window("browser_win") {
         let _ = window.navigate(parsed_url);
@@ -325,7 +330,7 @@ fn open_native_webview(app: tauri::AppHandle, url: String, title: String) -> Res
             tauri::WebviewUrl::External(parsed_url)
         )
         .title(title)
-        .inner_size(1000.0, 700.0)
+        .inner_size(1100.0, 750.0)
         .build()
         .map_err(|e| format!("Fehler beim Erstellen des Fensters: {}", e))?;
     }
