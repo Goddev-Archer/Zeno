@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Icon } from "@iconify/react";
-import Editor from "@monaco-editor/react";
+import Editor, { loader } from "@monaco-editor/react";
+import * as monaco from "monaco-editor";
 import "./App.css";
+
+// Configure Monaco Editor to use local bundled package instead of third-party CDN
+loader.config({ monaco });
 
 // --- TYPES & INTERFACES ---
 interface Channel {
