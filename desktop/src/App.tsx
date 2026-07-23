@@ -4326,7 +4326,7 @@ sys.stderr = io.StringIO()
           </div>
 
           {(chatMessages[activeChannel.id] || []).map((msg, i) => {
-            const urlMatch = msg.text.match(/(https?:\/\/[^\s]+)/);
+            const urlMatch = msg.text ? msg.text.match(/(https?:\/\/[^\s]+)/) : null;
             const foundUrl = urlMatch ? urlMatch[0] : null;
             const urlDetails = foundUrl ? cleanUrl(foundUrl) : null;
 
