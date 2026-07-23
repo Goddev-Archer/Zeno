@@ -89,6 +89,9 @@ const KNOWN_TRACKING_PARAMS = [
 ];
 
 function cleanUrl(rawUrl: string): { cleanedUrl: string; strippedParams: string[] } {
+  if (!rawUrl || typeof rawUrl !== "string") {
+    return { cleanedUrl: "", strippedParams: [] };
+  }
   try {
     const validUrl = rawUrl.startsWith("http://") || rawUrl.startsWith("https://") ? rawUrl : `https://${rawUrl}`;
     const parsed = new URL(validUrl);
@@ -1061,7 +1064,9 @@ export default function App() {
   };
 
   const openInPrivacyBrowser = (targetUrl: string, title?: string, forceNew = false) => {
+    if (!targetUrl || typeof targetUrl !== "string") return;
     const { cleanedUrl, strippedParams } = cleanUrl(targetUrl);
+    if (!cleanedUrl) return;
     if (!forceNew) {
       const existing = browserTabs.find((t) => t.activeUrl === cleanedUrl);
       if (existing) {
@@ -5461,7 +5466,7 @@ sys.stderr = io.StringIO()
                       backgroundSize: "100% 4px",
                     }}>
                       {/* Webpage Content Simulation */}
-                      {activeBrowserTab.activeUrl.includes("tauri.app") ? (
+                      {activeBrowserTab?.activeUrl?.includes("tauri.app") ? (
                         /* Mock Tauri Page */
                         <div style={{ maxWidth: "800px", margin: "0 auto", width: "100%" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: "12px", borderBottom: "1px solid var(--border-color)", paddingBottom: "16px", marginBottom: "20px" }}>
@@ -5513,7 +5518,7 @@ sys.stderr = io.StringIO()
                             </div>
                           </div>
                         </div>
-                      ) : activeBrowserTab.activeUrl.includes("zeno-chat.de/privacy") ? (
+                      ) : activeBrowserTab?.activeUrl?.includes("zeno-chat.de/privacy") ? (
                         /* Mock Zeno Privacy Page */
                         <div style={{ maxWidth: "700px", margin: "0 auto", width: "100%", fontFamily: "sans-serif" }}>
                           <h1 style={{ fontSize: "24px", color: "#FFFFFF", borderBottom: "1px solid var(--border-color)", paddingBottom: "12px", marginBottom: "20px" }}>
@@ -5540,7 +5545,7 @@ sys.stderr = io.StringIO()
                             The URL you requested is being rendered inside an isolated background sandbox. All scripts, DOM structures, and local cookies are isolated.
                           </p>
                           <div style={{ display: "inline-block", background: "rgba(255,255,255,0.03)", border: "1px solid var(--border-color)", borderRadius: "8px", padding: "14px 24px", fontFamily: "monospace", fontSize: "12px", color: "#FFC66D", wordBreak: "break-all" }}>
-                            {activeBrowserTab.activeUrl}
+                            {activeBrowserTab?.activeUrl || ""}
                           </div>
                           
                           <div style={{ display: "flex", justifyContent: "center", gap: "10px", marginTop: "30px" }}>
