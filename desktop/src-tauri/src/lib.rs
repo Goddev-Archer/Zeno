@@ -331,6 +331,96 @@ fn open_native_webview(app: tauri::AppHandle, url: String, title: String) -> Res
     }
     Ok(())
 }
+use base64::Engine;
+use headless_chrome::{Browser, LaunchOptionsBuilder};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::thread;
+use std::time::Duration;
+use tauri::Emitter;
+
+static STREAM_RUNNING: AtomicBool = AtomicBool::new(false);
+
+#[tauri::command]
+fn start_offscreen_browser(app: tauri::AppHandle, url: String) -> Result<(), String> {
+    STREAM_RUNNING.store(false, Ordering::SeqCst);
+    thread::sleep(Duration::from_millis(50));
+    STREAM_RUNNING.store(true, Ordering::SeqCst);
+
+    thread::spawn(move || {
+        let launch_options = match LaunchOptionsBuilder::default()
+            .headless(true)
+            .window_size(Some((1280, 800)))
+            .build() {
+                Ok(opts) => opts,
+                Err(e) => {
+                    let _ = app.emit("browser-log", format!("Fehler bei LaunchOptions: {}", e));
+                    return;
+                }
+            };
+
+        let browser = match Browser::new(launch_options) {
+            Ok(b) => b,
+            Err(e) => {
+                let _ = app.emit("browser-log", format!("Konnte Headless Chromium/Brave nicht starten: {}", e));
+                return;
+            }
+        };
+
+        let tab = match browser.new_tab() {
+            Ok(t) => t,
+            Err(e) => {
+                let _ = app.emit("browser-log", format!("Konnte Tab nicht erstellen: {}", e));
+                return;
+            }
+        };
+
+        let _ = app.emit("browser-log", format!("SANDBOX: Headless Browser gestartet. Navigiere zu {}...", url));
+
+        if let Err(e) = tab.navigate_to(&url) {
+            let _ = app.emit("browser-log", format!("Navigationsfehler: {}", e));
+            return;
+        }
+
+        let _ = tab.wait_until_navigated();
+        let _ = app.emit("browser-log", "STREAM: AV1 Pixel-Stream bereit. Erzeuge Framebuffer...");
+
+        while STREAM_RUNNING.load(Ordering::SeqCst) {
+            match tab.capture_screenshot(
+                headless_chrome::protocol::cdp::Page::CaptureScreenshotFormatOption::Jpeg,
+                Some(70),
+                None,
+                true
+            ) {
+                Ok(png_bytes) => {
+                    let b64 = format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(&png_bytes));
+                    let title = tab.get_title().unwrap_or_else(|_| "Offscreen Browser".to_string());
+                    let current_url = tab.get_url();
+
+                    let payload = serde_json::json!({
+                        "frame": b64,
+                        "url": current_url,
+                        "title": title
+                    });
+
+                    let _ = app.emit("browser-frame", payload);
+                }
+                Err(e) => {
+                    let _ = app.emit("browser-log", format!("Screenshot-Fehler: {}", e));
+                }
+            }
+            thread::sleep(Duration::from_millis(60));
+        }
+    });
+
+    Ok(())
+}
+
+#[tauri::command]
+fn stop_offscreen_browser() -> Result<(), String> {
+    STREAM_RUNNING.store(false, Ordering::SeqCst);
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -345,7 +435,9 @@ pub fn run() {
             delete_workspace_file,
             load_settings,
             save_settings,
-            open_native_webview
+            open_native_webview,
+            start_offscreen_browser,
+            stop_offscreen_browser
         ])
         .setup(|app| {
             #[cfg(debug_assertions)]

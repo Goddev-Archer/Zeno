@@ -1132,6 +1132,7 @@ export default function App() {
   const [isStreamLoading, setIsStreamLoading] = useState(false);
   const [streamLoadingLogs, setStreamLoadingLogs] = useState<string[]>([]);
   const [streamStats, setStreamStats] = useState({ latency: 14, fps: 60.0, bitrate: 3.8 });
+  const [liveFrame, setLiveFrame] = useState<string | null>(null);
 
   // Fluctuate stream stats to make HUD feel alive
   useEffect(() => {
@@ -1145,37 +1146,48 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
-  // Simulate remote connection logs whenever activeUrl changes
+  // Real Offscreen Chromium Streaming Engine Connection
   useEffect(() => {
-    if (!isPrivacyBrowserOpen || browserViewMode !== "live") return;
-    
+    if (!isPrivacyBrowserOpen || browserViewMode !== "live") {
+      safeInvoke("stop_offscreen_browser").catch(() => {});
+      return;
+    }
+
     setIsStreamLoading(true);
     setStreamLoadingLogs([]);
-    
-    const logs = [
-      `[${new Date().toLocaleTimeString()}] SECURE: Initiating WireGuard tunnel to isolated node...`,
-      `[${new Date().toLocaleTimeString()}] SANDBOX: Allocating ephemeral Docker container (CPU: 2, RAM: 2GB)...`,
-      `[${new Date().toLocaleTimeString()}] NET: Allocating anonymous proxy IP (Frankfurt Node)...`,
-      `[${new Date().toLocaleTimeString()}] BRAVE: Initializing Brave Shield Engines (Adblock, Tracker-Block)...`,
-      `[${new Date().toLocaleTimeString()}] BROWSER: Spawning headless Chromium instance (PID: ${Math.floor(1000 + Math.random() * 9000)})...`,
-      `[${new Date().toLocaleTimeString()}] BROWSER: Navigating to ${activeBrowserTab.activeUrl}...`,
-      `[${new Date().toLocaleTimeString()}] STREAM: Encoders active. Capturing offscreen buffer...`,
-      `[${new Date().toLocaleTimeString()}] STREAM: AV1 Pixel-Stream connection established successfully.`
-    ];
+    setLiveFrame(null);
 
-    let currentLogIndex = 0;
-    const logInterval = setInterval(() => {
-      if (currentLogIndex < logs.length) {
-        setStreamLoadingLogs((prev) => [...prev, logs[currentLogIndex]]);
-        currentLogIndex++;
-      } else {
-        clearInterval(logInterval);
-        setIsStreamLoading(false);
+    let unlistenFrame: (() => void) | undefined;
+    let unlistenLog: (() => void) | undefined;
+
+    const setupStream = async () => {
+      try {
+        const { listen } = await import("@tauri-apps/api/event");
+        unlistenFrame = await listen<{ frame: string; url: string; title: string }>("browser-frame", (event) => {
+          if (event.payload && event.payload.frame) {
+            setLiveFrame(event.payload.frame);
+            setIsStreamLoading(false);
+          }
+        });
+        unlistenLog = await listen<string>("browser-log", (event) => {
+          if (event.payload) {
+            setStreamLoadingLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${event.payload}`]);
+          }
+        });
+
+        // Trigger real Rust headless browser session
+        await safeInvoke("start_offscreen_browser", { url: activeBrowserTab.activeUrl });
+      } catch (err) {
+        console.warn("Offscreen streaming fallback mode:", err);
       }
-    }, 150);
+    };
+
+    setupStream();
 
     return () => {
-      clearInterval(logInterval);
+      if (unlistenFrame) unlistenFrame();
+      if (unlistenLog) unlistenLog();
+      safeInvoke("stop_offscreen_browser").catch(() => {});
     };
   }, [activeBrowserTab.activeUrl, isPrivacyBrowserOpen, browserViewMode]);
   const [editorRuntimes, setEditorRuntimes] = useState<Record<string, "installed" | "not_installed" | "installing">>({
@@ -5469,8 +5481,17 @@ sys.stderr = io.StringIO()
                       backgroundImage: "linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%)",
                       backgroundSize: "100% 4px",
                     }}>
-                      {/* Webpage Content Simulation */}
-                      {activeBrowserTab?.activeUrl?.includes("youtube.com") || activeBrowserTab?.activeUrl?.includes("youtu.be") ? (
+                      {/* Webpage Content Simulation & Real Offscreen Browser Frame */}
+                      {liveFrame ? (
+                        /* REAL OFFSCREEN CHROMIUM AV1 PIXEL STREAM FRAME */
+                        <div style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center", width: "100%", height: "100%" }}>
+                          <img
+                            src={liveFrame}
+                            style={{ maxWidth: "100%", maxHeight: "100%", borderRadius: "8px", boxShadow: "0 10px 30px rgba(0,0,0,0.8)", border: "1px solid var(--border-color)", objectFit: "contain" }}
+                            alt="Offscreen Live Stream"
+                          />
+                        </div>
+                      ) : activeBrowserTab?.activeUrl?.includes("youtube.com") || activeBrowserTab?.activeUrl?.includes("youtu.be") ? (
                         /* Mock YouTube Stream View */
                         <div style={{ maxWidth: "900px", margin: "0 auto", width: "100%", display: "flex", flexDirection: "column", gap: "20px" }}>
                           {/* YouTube Header */}
