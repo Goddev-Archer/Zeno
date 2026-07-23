@@ -5466,7 +5466,151 @@ sys.stderr = io.StringIO()
                       backgroundSize: "100% 4px",
                     }}>
                       {/* Webpage Content Simulation */}
-                      {activeBrowserTab?.activeUrl?.includes("tauri.app") ? (
+                      {activeBrowserTab?.activeUrl?.includes("youtube.com") || activeBrowserTab?.activeUrl?.includes("youtu.be") ? (
+                        /* Mock YouTube Stream View */
+                        <div style={{ maxWidth: "900px", margin: "0 auto", width: "100%", display: "flex", flexDirection: "column", gap: "20px" }}>
+                          {/* YouTube Header */}
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid var(--border-color)", paddingBottom: "12px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                              <Icon icon="logos:youtube-icon" style={{ fontSize: "28px" }} />
+                              <span style={{ fontSize: "18px", fontWeight: "bold", color: "#FFFFFF", letterSpacing: "-0.5px" }}>YouTube</span>
+                              <span style={{ fontSize: "10px", background: "rgba(255,0,0,0.15)", color: "#FF4E4E", border: "1px solid rgba(255,0,0,0.3)", padding: "1px 6px", borderRadius: "4px" }}>SANDBOX STREAM</span>
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                              <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>Search:</span>
+                              <div style={{ background: "#222", border: "1px solid var(--border-color)", padding: "4px 12px", borderRadius: "20px", fontSize: "11px", color: "#FFF", width: "220px" }}>
+                                zeno privacy protocol
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* YouTube Main Content */}
+                          <div style={{ display: "flex", gap: "20px" }}>
+                            {/* Video Player Box */}
+                            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "14px" }}>
+                              <div style={{
+                                width: "100%",
+                                aspectRatio: "16/9",
+                                background: "radial-gradient(circle, #2a2d34 0%, #111215 100%)",
+                                border: "1px solid var(--border-color)",
+                                borderRadius: "10px",
+                                display: "flex",
+                                flexDirection: "column",
+                                justifyContent: "space-between",
+                                padding: "16px",
+                                position: "relative",
+                                overflow: "hidden",
+                                boxShadow: "0 8px 24px rgba(0,0,0,0.6)"
+                              }}>
+                                {/* Animated Stream Overlay Tag */}
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 2 }}>
+                                  <span style={{ background: "rgba(0,0,0,0.7)", color: "#00E676", border: "1px solid #00E676", padding: "2px 8px", borderRadius: "4px", fontSize: "10px", fontFamily: "monospace" }}>
+                                    ● LIVE STREAM 1080p60
+                                  </span>
+                                  <span style={{ background: "rgba(0,0,0,0.7)", color: "#FFF", padding: "2px 8px", borderRadius: "4px", fontSize: "10px" }}>
+                                    HD AV1
+                                  </span>
+                                </div>
+
+                                {/* Center Play Button */}
+                                <div style={{ alignSelf: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", zIndex: 2 }}>
+                                  <div style={{ width: "64px", height: "64px", background: "rgba(255, 0, 0, 0.9)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 20px rgba(255,0,0,0.5)", cursor: "pointer" }}>
+                                    <Icon icon="mdi:play" style={{ fontSize: "36px", color: "#FFF", marginLeft: "4px" }} />
+                                  </div>
+                                  <span style={{ fontSize: "13px", fontWeight: "600", color: "#FFF", textShadow: "0 2px 4px rgba(0,0,0,0.8)" }}>Zeno SFrame & Privacy Architecture Demo</span>
+                                </div>
+
+                                {/* Video Control Bar */}
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(0,0,0,0.6)", backdropFilter: "blur(6px)", padding: "8px 12px", borderRadius: "6px", zIndex: 2 }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: "12px", fontSize: "14px", color: "#FFF" }}>
+                                    <Icon icon="mdi:play" style={{ cursor: "pointer" }} />
+                                    <Icon icon="mdi:volume-high" style={{ cursor: "pointer" }} />
+                                    <span style={{ fontSize: "11px", color: "#aaa", fontFamily: "monospace" }}>04:12 / 12:45</span>
+                                  </div>
+                                  <div style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "14px", color: "#FFF" }}>
+                                    <Icon icon="mdi:cog" style={{ cursor: "pointer" }} />
+                                    <Icon icon="mdi:fullscreen" style={{ cursor: "pointer" }} />
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Title & Channel Details */}
+                              <div>
+                                <h2 style={{ fontSize: "16px", color: "#FFF", margin: "0 0 8px 0" }}>Zeno SFrame End-to-End Encryption & Offscreen Sandbox Demo</h2>
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid var(--border-color)", paddingBottom: "12px" }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                    <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "var(--accent-color)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", color: "#FFF" }}>Z</div>
+                                    <div>
+                                      <div style={{ fontSize: "13px", fontWeight: "bold", color: "#FFF", display: "flex", alignItems: "center", gap: "4px" }}>
+                                        Zeno Core Team <Icon icon="mdi:check-decagram" style={{ color: "#3574F0", fontSize: "14px" }} />
+                                      </div>
+                                      <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>142k subscribers</div>
+                                    </div>
+                                    <button className="settings-btn primary" style={{ marginLeft: "10px", padding: "4px 12px", fontSize: "11px", borderRadius: "18px" }}>Subscribe</button>
+                                  </div>
+                                  <div style={{ display: "flex", gap: "8px" }}>
+                                    <button className="settings-btn" style={{ fontSize: "11px", padding: "4px 10px", borderRadius: "18px" }}>👍 14.2k</button>
+                                    <button className="settings-btn" style={{ fontSize: "11px", padding: "4px 10px", borderRadius: "18px" }}>🔗 Share</button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* YouTube Recommendations Sidebar */}
+                            <div style={{ width: "240px", display: "flex", flexDirection: "column", gap: "12px" }}>
+                              <h4 style={{ margin: 0, fontSize: "12px", color: "var(--text-muted)" }}>Up Next</h4>
+                              {[
+                                { title: "Tauri v2 Cross-Platform Architecture", channel: "Tauri Official", views: "88k views" },
+                                { title: "Building Zero-Knowledge Chat Apps in Rust", channel: "Rust Core", views: "45k views" },
+                                { title: "WebRTC vs WebSockets in 2026", channel: "DevTalk", views: "112k views" }
+                              ].map((rec, i) => (
+                                <div key={i} style={{ display: "flex", gap: "10px", background: "rgba(255,255,255,0.02)", padding: "8px", borderRadius: "6px", border: "1px solid var(--border-color)", cursor: "pointer" }}>
+                                  <div style={{ width: "80px", height: "48px", background: "#333", borderRadius: "4px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", color: "#aaa" }}>▶ 1080p</div>
+                                  <div style={{ flex: 1 }}>
+                                    <div style={{ fontSize: "11px", fontWeight: "600", color: "#FFF", lineHeight: "1.3" }}>{rec.title}</div>
+                                    <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "2px" }}>{rec.channel}</div>
+                                    <div style={{ fontSize: "9px", color: "#888" }}>{rec.views}</div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      ) : activeBrowserTab?.activeUrl?.includes("github.com") ? (
+                        /* Mock GitHub Page */
+                        <div style={{ maxWidth: "850px", margin: "0 auto", width: "100%", display: "flex", flexDirection: "column", gap: "16px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px", borderBottom: "1px solid var(--border-color)", paddingBottom: "12px" }}>
+                            <Icon icon="logos:github-icon" style={{ fontSize: "32px", filter: "invert(1)" }} />
+                            <div>
+                              <div style={{ fontSize: "16px", fontWeight: "bold", color: "#3574F0", display: "flex", alignItems: "center", gap: "6px" }}>
+                                Goddev-Archer / Zeno <span style={{ fontSize: "10px", border: "1px solid var(--border-color)", color: "#aaa", padding: "1px 6px", borderRadius: "10px" }}>Public</span>
+                              </div>
+                              <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>A secure, end-to-end encrypted developer communication platform.</span>
+                            </div>
+                          </div>
+
+                          <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--border-color)", borderRadius: "8px", overflow: "hidden" }}>
+                            <div style={{ background: "rgba(255,255,255,0.04)", padding: "10px 14px", borderBottom: "1px solid var(--border-color)", display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#AAA" }}>
+                              <span>📂 Repository Files</span>
+                              <span>Latest commit: <code style={{ color: "#00E676" }}>5ef9c42</code></span>
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column" }}>
+                              {[
+                                { name: "desktop/src-tauri", desc: "Rust Tauri backend handlers", time: "2 hours ago" },
+                                { name: "desktop/src", desc: "React frontend design system & components", time: "1 hour ago" },
+                                { name: "Cargo.toml", desc: "Add unstable feature flag for multi-webview", time: "3 hours ago" },
+                                { name: "README.md", desc: "Update security documentation", time: "1 day ago" }
+                              ].map((f, i) => (
+                                <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "10px 14px", borderBottom: "1px solid rgba(255,255,255,0.05)", fontSize: "12px" }}>
+                                  <span style={{ color: "#3574F0" }}>📁 {f.name}</span>
+                                  <span style={{ color: "#aaa" }}>{f.desc}</span>
+                                  <span style={{ color: "#666" }}>{f.time}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      ) : activeBrowserTab?.activeUrl?.includes("tauri.app") ? (
                         /* Mock Tauri Page */
                         <div style={{ maxWidth: "800px", margin: "0 auto", width: "100%" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: "12px", borderBottom: "1px solid var(--border-color)", paddingBottom: "16px", marginBottom: "20px" }}>
@@ -5588,68 +5732,109 @@ sys.stderr = io.StringIO()
                   </div>
                 </div>
               ) : (
-                <iframe
-                  srcDoc={`<!DOCTYPE html>
-                  <html>
-                  <head>
-                    <style>
-                      body {
-                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-                        background: #18191B;
-                        color: #E3E4E8;
-                        margin: 0;
-                        padding: 40px;
-                        line-height: 1.6;
-                      }
-                      .hero {
-                        max-width: 800px;
-                        margin: 0 auto;
-                        background: #2B2D30;
-                        border: 1px solid #3f4248;
-                        border-radius: 12px;
-                        padding: 30px;
-                        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-                      }
-                      h1 { color: #FFFFFF; font-size: 24px; margin-top: 0; display: flex; align-items: center; gap: 10px; }
-                      .badge { display: inline-block; background: rgba(89, 168, 105, 0.2); color: #59A869; border: 1px solid #59A869; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; }
-                      .url-box { background: #1A1B1D; border: 1px solid #3f4248; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 12px; color: #3574F0; margin: 15px 0; word-break: break-all; }
-                      .tracker-list { background: rgba(255, 198, 109, 0.1); border-left: 3px solid #FFC66D; padding: 12px 16px; margin: 20px 0; border-radius: 0 6px 6px 0; }
-                      ul { padding-left: 20px; margin: 8px 0; }
-                      li { margin-bottom: 4px; font-size: 13px; }
-                    </style>
-                  </head>
-                  <body>
-                    <div class="hero">
-                      <span class="badge">🛡️ PRIVACY SHIELD PROTECTED (BRAVE RUST ENGINE)</span>
-                      <h1>${activeBrowserTab.title}</h1>
-                      <p>Datenschutz-Analyse des <strong>Zeno Privacy Browsers</strong> mit integriertem Brave-Shielding.</p>
-                      
-                      <div class="url-box">
-                        <strong>Aktive gereinigte URL:</strong><br/>
-                        ${activeBrowserTab.activeUrl}
+                /* Native Privacy Audit Report View (matching Zeno Sandbox design system) */
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "30px", overflowY: "auto", background: "linear-gradient(135deg, #18191b 0%, #111214 100%)" }}>
+                  <div style={{ maxWidth: "680px", margin: "0 auto", width: "100%", textAlign: "center" }}>
+                    <Icon icon="clarity:shield-line" style={{ fontSize: "64px", color: "#59A869", marginBottom: "12px" }} />
+                    <h2 style={{ color: "#FFFFFF", margin: "0 0 6px 0", fontSize: "22px" }}>Zeno Privacy Audit & Security Report</h2>
+                    <p style={{ fontSize: "13px", color: "#ccc", margin: "0 0 20px 0" }}>
+                      Echtzeit-Sicherheitsüberprüfung und Tracker-Analyse für die aktive Webseite.
+                    </p>
+
+                    {/* Active URL Card */}
+                    <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--border-color)", borderRadius: "8px", padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "24px" }}>
+                      <div style={{ textAlign: "left" }}>
+                        <div style={{ fontSize: "10px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Gereinigte Ziel-URL</div>
+                        <div style={{ fontFamily: "monospace", fontSize: "12px", color: "#3574F0", wordBreak: "break-all", marginTop: "2px" }}>
+                          {activeBrowserTab?.activeUrl || ""}
+                        </div>
+                      </div>
+                      <span style={{ background: "rgba(89, 168, 105, 0.15)", color: "#59A869", border: "1px solid rgba(89, 168, 105, 0.3)", padding: "4px 10px", borderRadius: "12px", fontSize: "11px", fontWeight: "bold", whiteSpace: "nowrap" }}>
+                        🛡️ Geschützt
+                      </span>
+                    </div>
+
+                    {/* Security Metrics Grid */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px", textAlign: "left" }}>
+                      <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--border-color)", borderRadius: "8px", padding: "16px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#59A869", fontWeight: "bold", fontSize: "13px", marginBottom: "6px" }}>
+                          <Icon icon="mage:shield-check" /> Brave Shield Engine
+                        </div>
+                        <div style={{ fontSize: "18px", fontWeight: "bold", color: "#FFF" }}>100% Aktiviert</div>
+                        <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>Automatische Filterlisten (v3.0.4) geladen</div>
                       </div>
 
-                      ${
-                        activeBrowserTab.strippedParams.length > 0
-                          ? `<div class="tracker-list">
-                              <strong>⚡ Entfernte Tracking-Token:</strong>
-                              <ul>
-                                ${activeBrowserTab.strippedParams.map((p) => `<li><code>${p}</code> (Cross-Site Tracker gedämpft)</li>`).join("")}
-                              </ul>
-                            </div>`
-                          : `<p style="color:#59A869; font-size: 13px;">✅ Keine Tracking-Parameter in dieser URL gefunden.</p>`
-                      }
+                      <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--border-color)", borderRadius: "8px", padding: "16px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#FF9800", fontWeight: "bold", fontSize: "13px", marginBottom: "6px" }}>
+                          <Icon icon="mage:lightning-bolt" /> Token-Entfernung
+                        </div>
+                        <div style={{ fontSize: "18px", fontWeight: "bold", color: "#FFF" }}>
+                          {activeBrowserTab?.strippedParams?.length || 0} Params gereinigt
+                        </div>
+                        <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>utm_*, fbclid, gclid automatisch gestrippt</div>
+                      </div>
 
-                      <p style="font-size: 12px; color: #949BA4; margin-top: 25px;">
-                        🔒 <strong>Security Audit:</strong> Skripte von Drittanbieter-Netzwerken wurden über die originale Brave Rust <code>adblock</code> Engine gefiltert.
-                      </p>
+                      <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--border-color)", borderRadius: "8px", padding: "16px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#3574F0", fontWeight: "bold", fontSize: "13px", marginBottom: "6px" }}>
+                          <Icon icon="mage:lock" /> IP-Verschleierung
+                        </div>
+                        <div style={{ fontSize: "18px", fontWeight: "bold", color: "#FFF" }}>Zeno WireGuard Relay</div>
+                        <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>Tunnel-Knoten DE-FRA-01 (Frankfurt)</div>
+                      </div>
+
+                      <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--border-color)", borderRadius: "8px", padding: "16px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#00E676", fontWeight: "bold", fontSize: "13px", marginBottom: "6px" }}>
+                          <Icon icon="mage:box-3d" /> Tracker-Sperre
+                        </div>
+                        <div style={{ fontSize: "18px", fontWeight: "bold", color: "#FFF" }}>
+                          {activeBrowserTab?.blockedTrackers || 0} Skripte gestoppt
+                        </div>
+                        <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>Fingerprinting & Analytics isoliert</div>
+                      </div>
                     </div>
-                  </body>
-                  </html>`}
-                  sandbox="allow-scripts"
-                  style={{ width: "100%", height: "100%", border: "none" }}
-                  title="Privacy Audit Report"
-                />
+
+                    {/* Stripped Parameters Details */}
+                    {activeBrowserTab?.strippedParams && activeBrowserTab.strippedParams.length > 0 && (
+                      <div style={{ background: "rgba(255, 198, 109, 0.08)", border: "1px solid rgba(255, 198, 109, 0.25)", borderRadius: "8px", padding: "14px 18px", textAlign: "left", marginBottom: "24px" }}>
+                        <div style={{ color: "#FFC66D", fontWeight: "bold", fontSize: "12px", marginBottom: "6px", display: "flex", alignItems: "center", gap: "6px" }}>
+                          <Icon icon="mage:information-circle" /> Entfernte Tracking-Token:
+                        </div>
+                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                          {activeBrowserTab.strippedParams.map((p, idx) => (
+                            <span key={idx} style={{ background: "rgba(0,0,0,0.3)", color: "#FFC66D", border: "1px solid rgba(255,198,109,0.3)", padding: "2px 8px", borderRadius: "4px", fontFamily: "monospace", fontSize: "11px" }}>
+                              {p} (Cross-Site Tracker gedämpft)
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Actions */}
+                    <div style={{ display: "flex", justifyContent: "center", gap: "12px", marginTop: "10px" }}>
+                      <button
+                        className="settings-btn primary"
+                        onClick={() => {
+                          navigator.clipboard.writeText(activeBrowserTab?.activeUrl || "");
+                          showToast("Saubere URL kopiert!");
+                        }}
+                        style={{ padding: "8px 16px", fontSize: "12px" }}
+                      >
+                        📋 Saubere URL kopieren
+                      </button>
+                      <button
+                        className="settings-btn"
+                        onClick={() => {
+                          safeInvoke("open_native_webview", { url: activeBrowserTab.activeUrl, title: activeBrowserTab.title })
+                            .then(() => showToast("In separatem Fenster geöffnet!"))
+                            .catch(() => window.open(activeBrowserTab.activeUrl, "_blank"));
+                        }}
+                        style={{ padding: "8px 16px", fontSize: "12px" }}
+                      >
+                        🚀 In separatem Fenster öffnen
+                      </button>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
           </div>
