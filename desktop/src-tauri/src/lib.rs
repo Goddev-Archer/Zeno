@@ -421,6 +421,120 @@ fn stop_offscreen_browser() -> Result<(), String> {
     Ok(())
 }
 
+fn urlencoding_decode(s: &str) -> String {
+    let mut result = String::new();
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '%' {
+            let hex: String = chars.by_ref().take(2).collect();
+            if hex.len() == 2 {
+                if let Ok(byte) = u8::from_str_radix(&hex, 16) {
+                    result.push(byte as char);
+                    continue;
+                }
+            }
+            result.push('%');
+            result.push_str(&hex);
+        } else if c == '+' {
+            result.push(' ');
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
+fn spawn_privacy_proxy_server() {
+    thread::spawn(|| {
+        let server = match tiny_http::Server::http("127.0.0.1:14211") {
+            Ok(s) => s,
+            Err(_) => return,
+        };
+
+        let client = reqwest::blocking::Client::builder()
+            .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 ZenoPrivacy/1.0")
+            .build()
+            .unwrap_or_default();
+
+        for request in server.incoming_requests() {
+            let url_raw = request.url();
+            let target_url = if let Some(idx) = url_raw.find("url=") {
+                let encoded = &url_raw[idx + 4..];
+                urlencoding_decode(encoded)
+            } else {
+                "".to_string()
+            };
+
+            if target_url.is_empty() {
+                let response = tiny_http::Response::from_string("Zeno Privacy Proxy Active")
+                    .with_status_code(200);
+                let _ = request.respond(response);
+                continue;
+            }
+
+            match client.get(&target_url).send() {
+                Ok(resp) => {
+                    let status = resp.status().as_u16();
+                    let content_type = resp
+                        .headers()
+                        .get("content-type")
+                        .and_then(|v| v.to_str().ok())
+                        .unwrap_or("text/html")
+                        .to_string();
+
+                    let is_html = content_type.contains("text/html");
+
+                    if is_html {
+                        let text = resp.text().unwrap_or_default();
+                        
+                        let base_href = if let Ok(parsed) = url::Url::parse(&target_url) {
+                            format!("{}://{}/", parsed.scheme(), parsed.host_str().unwrap_or(""))
+                        } else {
+                            target_url.clone()
+                        };
+
+                        let modified_html = format!(
+                            "<!DOCTYPE html><html><head><base href=\"{}\" /><meta charset=\"utf-8\"></head><body>{}</body></html>",
+                            base_href,
+                            text.replace("<head>", &format!("<head><base href=\"{}\" />", base_href))
+                        );
+
+                        let mut headers = vec![
+                            tiny_http::Header::from_bytes(&b"Content-Type"[..], content_type.as_bytes()).unwrap(),
+                            tiny_http::Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]).unwrap(),
+                        ];
+
+                        let response = tiny_http::Response::from_string(modified_html)
+                            .with_status_code(status);
+
+                        let mut final_resp = response;
+                        for h in headers.drain(..) {
+                            final_resp = final_resp.with_header(h);
+                        }
+                        let _ = request.respond(final_resp);
+                    } else {
+                        let bytes = resp.bytes().unwrap_or_default();
+                        let header_ct = tiny_http::Header::from_bytes(&b"Content-Type"[..], content_type.as_bytes()).unwrap();
+                        let header_cors = tiny_http::Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]).unwrap();
+                        
+                        let response = tiny_http::Response::from_data(bytes.to_vec())
+                            .with_status_code(status)
+                            .with_header(header_ct)
+                            .with_header(header_cors);
+
+                        let _ = request.respond(response);
+                    }
+                }
+                Err(e) => {
+                    let err_msg = format!("Proxy Fehler beim Abrufen der URL: {}", e);
+                    let response = tiny_http::Response::from_string(err_msg).with_status_code(500);
+                    let _ = request.respond(response);
+                }
+            }
+        }
+    });
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -440,6 +554,7 @@ pub fn run() {
             stop_offscreen_browser
         ])
         .setup(|app| {
+            spawn_privacy_proxy_server();
             #[cfg(debug_assertions)]
             if let Some(window) = app.get_webview_window("main") {
                 window.open_devtools();

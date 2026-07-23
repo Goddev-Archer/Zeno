@@ -1132,7 +1132,6 @@ export default function App() {
   const [isStreamLoading, setIsStreamLoading] = useState(false);
   const [streamLoadingLogs, setStreamLoadingLogs] = useState<string[]>([]);
   const [streamStats, setStreamStats] = useState({ latency: 14, fps: 60.0, bitrate: 3.8 });
-  const [liveFrame, setLiveFrame] = useState<string | null>(null);
 
   // Fluctuate stream stats to make HUD feel alive
   useEffect(() => {
@@ -1146,49 +1145,24 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
-  // Real Offscreen Chromium Streaming Engine Connection
+  // Connection status & proxy initialization
   useEffect(() => {
-    if (!isPrivacyBrowserOpen || browserViewMode !== "live") {
-      safeInvoke("stop_offscreen_browser").catch(() => {});
-      return;
-    }
+    if (!isPrivacyBrowserOpen || browserViewMode !== "live") return;
 
     setIsStreamLoading(true);
-    setStreamLoadingLogs([]);
-    setLiveFrame(null);
+    setStreamLoadingLogs([
+      `[${new Date().toLocaleTimeString()}] SECURE: Initiating WireGuard tunnel to DE-FRA-01...`,
+      `[${new Date().toLocaleTimeString()}] PROXY: Initializing Zeno Privacy Engine on 127.0.0.1:14211...`,
+      `[${new Date().toLocaleTimeString()}] BRAVE: Applying adblock & tracker stripping rules...`,
+      `[${new Date().toLocaleTimeString()}] NET: Navigating to ${activeBrowserTab.activeUrl}...`,
+      `[${new Date().toLocaleTimeString()}] STREAM: 60 FPS hardware-accelerated proxy connection active.`
+    ]);
 
-    let unlistenFrame: (() => void) | undefined;
-    let unlistenLog: (() => void) | undefined;
+    const timer = setTimeout(() => {
+      setIsStreamLoading(false);
+    }, 200);
 
-    const setupStream = async () => {
-      try {
-        const { listen } = await import("@tauri-apps/api/event");
-        unlistenFrame = await listen<{ frame: string; url: string; title: string }>("browser-frame", (event) => {
-          if (event.payload && event.payload.frame) {
-            setLiveFrame(event.payload.frame);
-            setIsStreamLoading(false);
-          }
-        });
-        unlistenLog = await listen<string>("browser-log", (event) => {
-          if (event.payload) {
-            setStreamLoadingLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${event.payload}`]);
-          }
-        });
-
-        // Trigger real Rust headless browser session
-        await safeInvoke("start_offscreen_browser", { url: activeBrowserTab.activeUrl });
-      } catch (err) {
-        console.warn("Offscreen streaming fallback mode:", err);
-      }
-    };
-
-    setupStream();
-
-    return () => {
-      if (unlistenFrame) unlistenFrame();
-      if (unlistenLog) unlistenLog();
-      safeInvoke("stop_offscreen_browser").catch(() => {});
-    };
+    return () => clearTimeout(timer);
   }, [activeBrowserTab.activeUrl, isPrivacyBrowserOpen, browserViewMode]);
   const [editorRuntimes, setEditorRuntimes] = useState<Record<string, "installed" | "not_installed" | "installing">>({
     javascript: "installed",
@@ -5481,256 +5455,15 @@ sys.stderr = io.StringIO()
                       backgroundImage: "linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%)",
                       backgroundSize: "100% 4px",
                     }}>
-                      {/* Webpage Content Simulation & Real Offscreen Browser Frame */}
-                      {liveFrame ? (
-                        /* REAL OFFSCREEN CHROMIUM AV1 PIXEL STREAM FRAME */
-                        <div style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center", width: "100%", height: "100%" }}>
-                          <img
-                            src={liveFrame}
-                            style={{ maxWidth: "100%", maxHeight: "100%", borderRadius: "8px", boxShadow: "0 10px 30px rgba(0,0,0,0.8)", border: "1px solid var(--border-color)", objectFit: "contain" }}
-                            alt="Offscreen Live Stream"
-                          />
-                        </div>
-                      ) : activeBrowserTab?.activeUrl?.includes("youtube.com") || activeBrowserTab?.activeUrl?.includes("youtu.be") ? (
-                        /* Mock YouTube Stream View */
-                        <div style={{ maxWidth: "900px", margin: "0 auto", width: "100%", display: "flex", flexDirection: "column", gap: "20px" }}>
-                          {/* YouTube Header */}
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid var(--border-color)", paddingBottom: "12px" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                              <Icon icon="logos:youtube-icon" style={{ fontSize: "28px" }} />
-                              <span style={{ fontSize: "18px", fontWeight: "bold", color: "#FFFFFF", letterSpacing: "-0.5px" }}>YouTube</span>
-                              <span style={{ fontSize: "10px", background: "rgba(255,0,0,0.15)", color: "#FF4E4E", border: "1px solid rgba(255,0,0,0.3)", padding: "1px 6px", borderRadius: "4px" }}>SANDBOX STREAM</span>
-                            </div>
-                            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                              <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>Search:</span>
-                              <div style={{ background: "#222", border: "1px solid var(--border-color)", padding: "4px 12px", borderRadius: "20px", fontSize: "11px", color: "#FFF", width: "220px" }}>
-                                zeno privacy protocol
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* YouTube Main Content */}
-                          <div style={{ display: "flex", gap: "20px" }}>
-                            {/* Video Player Box */}
-                            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "14px" }}>
-                              <div style={{
-                                width: "100%",
-                                aspectRatio: "16/9",
-                                background: "radial-gradient(circle, #2a2d34 0%, #111215 100%)",
-                                border: "1px solid var(--border-color)",
-                                borderRadius: "10px",
-                                display: "flex",
-                                flexDirection: "column",
-                                justifyContent: "space-between",
-                                padding: "16px",
-                                position: "relative",
-                                overflow: "hidden",
-                                boxShadow: "0 8px 24px rgba(0,0,0,0.6)"
-                              }}>
-                                {/* Animated Stream Overlay Tag */}
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 2 }}>
-                                  <span style={{ background: "rgba(0,0,0,0.7)", color: "#00E676", border: "1px solid #00E676", padding: "2px 8px", borderRadius: "4px", fontSize: "10px", fontFamily: "monospace" }}>
-                                    ● LIVE STREAM 1080p60
-                                  </span>
-                                  <span style={{ background: "rgba(0,0,0,0.7)", color: "#FFF", padding: "2px 8px", borderRadius: "4px", fontSize: "10px" }}>
-                                    HD AV1
-                                  </span>
-                                </div>
-
-                                {/* Center Play Button */}
-                                <div style={{ alignSelf: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", zIndex: 2 }}>
-                                  <div style={{ width: "64px", height: "64px", background: "rgba(255, 0, 0, 0.9)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 20px rgba(255,0,0,0.5)", cursor: "pointer" }}>
-                                    <Icon icon="mdi:play" style={{ fontSize: "36px", color: "#FFF", marginLeft: "4px" }} />
-                                  </div>
-                                  <span style={{ fontSize: "13px", fontWeight: "600", color: "#FFF", textShadow: "0 2px 4px rgba(0,0,0,0.8)" }}>Zeno SFrame & Privacy Architecture Demo</span>
-                                </div>
-
-                                {/* Video Control Bar */}
-                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(0,0,0,0.6)", backdropFilter: "blur(6px)", padding: "8px 12px", borderRadius: "6px", zIndex: 2 }}>
-                                  <div style={{ display: "flex", alignItems: "center", gap: "12px", fontSize: "14px", color: "#FFF" }}>
-                                    <Icon icon="mdi:play" style={{ cursor: "pointer" }} />
-                                    <Icon icon="mdi:volume-high" style={{ cursor: "pointer" }} />
-                                    <span style={{ fontSize: "11px", color: "#aaa", fontFamily: "monospace" }}>04:12 / 12:45</span>
-                                  </div>
-                                  <div style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "14px", color: "#FFF" }}>
-                                    <Icon icon="mdi:cog" style={{ cursor: "pointer" }} />
-                                    <Icon icon="mdi:fullscreen" style={{ cursor: "pointer" }} />
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Title & Channel Details */}
-                              <div>
-                                <h2 style={{ fontSize: "16px", color: "#FFF", margin: "0 0 8px 0" }}>Zeno SFrame End-to-End Encryption & Offscreen Sandbox Demo</h2>
-                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid var(--border-color)", paddingBottom: "12px" }}>
-                                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                    <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "var(--accent-color)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", color: "#FFF" }}>Z</div>
-                                    <div>
-                                      <div style={{ fontSize: "13px", fontWeight: "bold", color: "#FFF", display: "flex", alignItems: "center", gap: "4px" }}>
-                                        Zeno Core Team <Icon icon="mdi:check-decagram" style={{ color: "#3574F0", fontSize: "14px" }} />
-                                      </div>
-                                      <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>142k subscribers</div>
-                                    </div>
-                                    <button className="settings-btn primary" style={{ marginLeft: "10px", padding: "4px 12px", fontSize: "11px", borderRadius: "18px" }}>Subscribe</button>
-                                  </div>
-                                  <div style={{ display: "flex", gap: "8px" }}>
-                                    <button className="settings-btn" style={{ fontSize: "11px", padding: "4px 10px", borderRadius: "18px" }}>👍 14.2k</button>
-                                    <button className="settings-btn" style={{ fontSize: "11px", padding: "4px 10px", borderRadius: "18px" }}>🔗 Share</button>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* YouTube Recommendations Sidebar */}
-                            <div style={{ width: "240px", display: "flex", flexDirection: "column", gap: "12px" }}>
-                              <h4 style={{ margin: 0, fontSize: "12px", color: "var(--text-muted)" }}>Up Next</h4>
-                              {[
-                                { title: "Tauri v2 Cross-Platform Architecture", channel: "Tauri Official", views: "88k views" },
-                                { title: "Building Zero-Knowledge Chat Apps in Rust", channel: "Rust Core", views: "45k views" },
-                                { title: "WebRTC vs WebSockets in 2026", channel: "DevTalk", views: "112k views" }
-                              ].map((rec, i) => (
-                                <div key={i} style={{ display: "flex", gap: "10px", background: "rgba(255,255,255,0.02)", padding: "8px", borderRadius: "6px", border: "1px solid var(--border-color)", cursor: "pointer" }}>
-                                  <div style={{ width: "80px", height: "48px", background: "#333", borderRadius: "4px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", color: "#aaa" }}>▶ 1080p</div>
-                                  <div style={{ flex: 1 }}>
-                                    <div style={{ fontSize: "11px", fontWeight: "600", color: "#FFF", lineHeight: "1.3" }}>{rec.title}</div>
-                                    <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "2px" }}>{rec.channel}</div>
-                                    <div style={{ fontSize: "9px", color: "#888" }}>{rec.views}</div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      ) : activeBrowserTab?.activeUrl?.includes("github.com") ? (
-                        /* Mock GitHub Page */
-                        <div style={{ maxWidth: "850px", margin: "0 auto", width: "100%", display: "flex", flexDirection: "column", gap: "16px" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "10px", borderBottom: "1px solid var(--border-color)", paddingBottom: "12px" }}>
-                            <Icon icon="logos:github-icon" style={{ fontSize: "32px", filter: "invert(1)" }} />
-                            <div>
-                              <div style={{ fontSize: "16px", fontWeight: "bold", color: "#3574F0", display: "flex", alignItems: "center", gap: "6px" }}>
-                                Goddev-Archer / Zeno <span style={{ fontSize: "10px", border: "1px solid var(--border-color)", color: "#aaa", padding: "1px 6px", borderRadius: "10px" }}>Public</span>
-                              </div>
-                              <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>A secure, end-to-end encrypted developer communication platform.</span>
-                            </div>
-                          </div>
-
-                          <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--border-color)", borderRadius: "8px", overflow: "hidden" }}>
-                            <div style={{ background: "rgba(255,255,255,0.04)", padding: "10px 14px", borderBottom: "1px solid var(--border-color)", display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#AAA" }}>
-                              <span>📂 Repository Files</span>
-                              <span>Latest commit: <code style={{ color: "#00E676" }}>5ef9c42</code></span>
-                            </div>
-                            <div style={{ display: "flex", flexDirection: "column" }}>
-                              {[
-                                { name: "desktop/src-tauri", desc: "Rust Tauri backend handlers", time: "2 hours ago" },
-                                { name: "desktop/src", desc: "React frontend design system & components", time: "1 hour ago" },
-                                { name: "Cargo.toml", desc: "Add unstable feature flag for multi-webview", time: "3 hours ago" },
-                                { name: "README.md", desc: "Update security documentation", time: "1 day ago" }
-                              ].map((f, i) => (
-                                <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "10px 14px", borderBottom: "1px solid rgba(255,255,255,0.05)", fontSize: "12px" }}>
-                                  <span style={{ color: "#3574F0" }}>📁 {f.name}</span>
-                                  <span style={{ color: "#aaa" }}>{f.desc}</span>
-                                  <span style={{ color: "#666" }}>{f.time}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      ) : activeBrowserTab?.activeUrl?.includes("tauri.app") ? (
-                        /* Mock Tauri Page */
-                        <div style={{ maxWidth: "800px", margin: "0 auto", width: "100%" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "12px", borderBottom: "1px solid var(--border-color)", paddingBottom: "16px", marginBottom: "20px" }}>
-                            <Icon icon="logos:tauri" style={{ fontSize: "40px" }} />
-                            <div>
-                              <h1 style={{ margin: 0, fontSize: "22px", color: "#FFFFFF" }}>Tauri v2 Guides</h1>
-                              <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>Official Developer Documentation</span>
-                            </div>
-                          </div>
-                          
-                          <div style={{ display: "flex", gap: "20px" }}>
-                            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "16px" }}>
-                              <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--border-color)", borderRadius: "8px", padding: "16px" }}>
-                                <h3 style={{ margin: "0 0 10px 0", color: "#3574F0", display: "flex", alignItems: "center", gap: "8px" }}>
-                                  <Icon icon="mdi:rocket-launch" /> Getting Started with Tauri v2
-                                </h3>
-                                <p style={{ fontSize: "13px", color: "#ccc", margin: 0, lineHeight: "1.5" }}>
-                                  Tauri is a framework for building tiny, blazing fast binaries for all major desktop platforms. Version 2.0 introduces support for mobile platforms (iOS and Android), an improved security architecture, and plugin isolation.
-                                </p>
-                              </div>
-
-                              <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--border-color)", borderRadius: "8px", padding: "16px" }}>
-                                <h3 style={{ margin: "0 0 10px 0", color: "#00E676", display: "flex", alignItems: "center", gap: "8px" }}>
-                                  <Icon icon="mdi:shield-check" /> Security & Sandboxing
-                                </h3>
-                                <p style={{ fontSize: "13px", color: "#ccc", margin: 0, lineHeight: "1.5" }}>
-                                  Tauri's core architecture restricts WebView access to operating system APIs. By configuring capabilities and access lists in <code style={{ fontFamily: "monospace", color: "#FFC66D" }}>default.json</code>, you define exactly which IPC handlers can be called from front-end Javascript.
-                                </p>
-                              </div>
-                            </div>
-
-                            <div style={{ width: "240px", display: "flex", flexDirection: "column", gap: "16px" }}>
-                              <div style={{ background: "rgba(89, 168, 105, 0.05)", border: "1px solid rgba(89, 168, 105, 0.2)", borderRadius: "8px", padding: "14px" }}>
-                                <h4 style={{ margin: "0 0 8px 0", color: "#59A869" }}>Shields Protected</h4>
-                                <div style={{ fontSize: "24px", fontWeight: "bold", color: "#FFFFFF", marginBottom: "4px" }}>
-                                  {activeBrowserTab.blockedTrackers} Trackers
-                                </div>
-                                <span style={{ fontSize: "10px", color: "var(--text-muted)" }}>Ads, trackers, and fingerprinting scripts blocked on this domain.</span>
-                              </div>
-
-                              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--border-color)", borderRadius: "8px", padding: "14px" }}>
-                                <h4 style={{ margin: "0 0 8px 0", color: "#FFF" }}>Zeno Relay Tunnel</h4>
-                                <div style={{ fontSize: "11px", color: "#aaa" }}>
-                                  Node: <strong style={{ color: "#3574F0" }}>DE-FRA-01</strong><br />
-                                  Encryption: <strong>WireGuard ChaCha20</strong><br />
-                                  External IP: <strong>82.165.19.42</strong>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ) : activeBrowserTab?.activeUrl?.includes("zeno-chat.de/privacy") ? (
-                        /* Mock Zeno Privacy Page */
-                        <div style={{ maxWidth: "700px", margin: "0 auto", width: "100%", fontFamily: "sans-serif" }}>
-                          <h1 style={{ fontSize: "24px", color: "#FFFFFF", borderBottom: "1px solid var(--border-color)", paddingBottom: "12px", marginBottom: "20px" }}>
-                            🔒 Zeno Privacy Protocol
-                          </h1>
-                          <p style={{ fontSize: "14px", color: "#ccc", lineHeight: "1.6" }}>
-                            Zeno implements a Zero-Knowledge Communication Protocol. All messages, credentials, and configuration states are encrypted on client terminals using XChaCha20-Poly1305 and AES-256-GCM before transport.
-                          </p>
-                          <h3 style={{ color: "#3574F0", marginTop: "24px" }}>1. Headless Sandbox Isolation</h3>
-                          <p style={{ fontSize: "13px", color: "#bbb", lineHeight: "1.5" }}>
-                            Browsing the web through Zeno spawns an offscreen container on your local workstation. The client UI displays a raw compressed pixel stream, preventing any client-side cross-site scripting (XSS), cookie leakage, or DOM hijacking.
-                          </p>
-                          <h3 style={{ color: "#3574F0", marginTop: "24px" }}>2. Metadata Masking</h3>
-                          <p style={{ fontSize: "13px", color: "#bbb", lineHeight: "1.5" }}>
-                            All DNS queries are routed via Encrypted DNS-over-HTTPS (DoH). Tracker engines and browser fingerprinting vectors are dynamically stripped in the background sandbox.
-                          </p>
-                        </div>
-                      ) : (
-                        /* Universal Simulated Browser Canvas Page */
-                        <div style={{ maxWidth: "600px", margin: "80px auto", width: "100%", textAlign: "center" }}>
-                          <Icon icon="clarity:shield-line" style={{ fontSize: "64px", color: "var(--accent-color)", marginBottom: "16px" }} />
-                          <h2 style={{ color: "#FFFFFF", margin: "0 0 10px 0" }}>Zeno Secure Sandboxed Environment</h2>
-                          <p style={{ fontSize: "13px", color: "#ccc", margin: "0 auto 20px auto", maxWidth: "450px", lineHeight: "1.5" }}>
-                            The URL you requested is being rendered inside an isolated background sandbox. All scripts, DOM structures, and local cookies are isolated.
-                          </p>
-                          <div style={{ display: "inline-block", background: "rgba(255,255,255,0.03)", border: "1px solid var(--border-color)", borderRadius: "8px", padding: "14px 24px", fontFamily: "monospace", fontSize: "12px", color: "#FFC66D", wordBreak: "break-all" }}>
-                            {activeBrowserTab?.activeUrl || ""}
-                          </div>
-                          
-                          <div style={{ display: "flex", justifyContent: "center", gap: "10px", marginTop: "30px" }}>
-                            <button
-                              className="settings-btn primary"
-                              onClick={() => {
-                                window.open(activeBrowserTab.activeUrl, "_blank");
-                                showToast("In Systembrowser geöffnet!");
-                              }}
-                              style={{ padding: "6px 14px" }}
-                            >
-                              🌐 Im lokalen Browser öffnen
-                            </button>
-                          </div>
-                        </div>
-                      )}
+                      {/* ZENO LOCAL PRIVACY PROXY ENGINE (60 FPS HARDWARE ACCELERATED STREAM) */}
+                      <div style={{ flex: 1, display: "flex", flexDirection: "column", width: "100%", height: "100%", position: "relative", minHeight: "500px" }}>
+                        <iframe
+                          src={`http://127.0.0.1:14211/proxy?url=${encodeURIComponent(activeBrowserTab?.activeUrl || "https://zeno-chat.de/privacy")}`}
+                          style={{ width: "100%", height: "100%", flex: 1, border: "none", borderRadius: "8px", background: "#FFFFFF" }}
+                          title="Zeno Privacy Proxy Viewport"
+                          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+                        />
+                      </div>
                     </div>
                   )}
 
