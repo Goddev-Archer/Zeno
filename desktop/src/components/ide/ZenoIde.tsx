@@ -35,6 +35,7 @@ interface ZenoIdeProps {
   setupZenoIntelliSense: (monaco: any) => void;
   setIsIdeConsoleExpanded: (expanded: boolean) => void;
   setIdeConsoleOutput: (out: string) => void;
+  onReturnToDashboard?: () => void;
   showToast: (msg: string) => void;
 }
 
@@ -70,13 +71,54 @@ export const ZenoIde: React.FC<ZenoIdeProps> = ({
   setupZenoIntelliSense,
   setIsIdeConsoleExpanded,
   setIdeConsoleOutput,
+  onReturnToDashboard,
   showToast
 }) => {
+  const handleEditorBeforeMount = (monaco: any) => {
+    monaco.editor.defineTheme("zeno-dark-theme", {
+      base: "vs-dark",
+      inherit: true,
+      rules: [
+        { token: "comment", foreground: "6A9955" },
+        { token: "keyword", foreground: "569CD6" },
+        { token: "string", foreground: "CE9178" }
+      ],
+      colors: {
+        "editor.background": "#111214",
+        "editor.foreground": "#CCCCCC",
+        "editorGutter.background": "#111214",
+        "editor.lineHighlightBackground": "#1E1F22",
+        "editor.lineHighlightBorder": "#2A2D32",
+        "editorCursor.foreground": "#00FF87"
+      }
+    });
+
+    monaco.editor.defineTheme("zeno-light-theme", {
+      base: "vs",
+      inherit: true,
+      rules: [],
+      colors: {
+        "editor.background": "#FFFFFF",
+        "editor.foreground": "#1C1C1E"
+      }
+    });
+  };
+
   return (
     <div className="zeno-ide-workspace">
       {/* VS Code styled Activity Bar (narrow sidebar menu) */}
       <div className="ide-activity-bar">
         <div className="ide-activity-top">
+          {onReturnToDashboard && (
+            <button 
+              className="ide-activity-btn back-to-dashboard"
+              onClick={onReturnToDashboard}
+              title="IDE verlassen & zum Dashboard zurückkehren"
+              style={{ color: "#00FF87", borderBottom: "1px solid var(--border-color)", marginBottom: "8px" }}
+            >
+              <Icon icon="mage:arrow-left" />
+            </button>
+          )}
           <button 
             className={`ide-activity-btn ${ideSidebarTab === "explorer" ? "active" : ""}`}
             onClick={() => setIdeSidebarTab("explorer")}
@@ -410,6 +452,7 @@ export const ZenoIde: React.FC<ZenoIdeProps> = ({
                 height="100%"
                 language={activeIdeFile.language}
                 theme={theme === "light" ? "zeno-light-theme" : "zeno-dark-theme"}
+                beforeMount={handleEditorBeforeMount}
                 value={activeIdeFile.code}
                 onChange={handleIdeCodeChange}
                 onMount={(_, monaco) => setupZenoIntelliSense(monaco)}

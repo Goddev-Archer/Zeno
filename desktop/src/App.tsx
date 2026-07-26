@@ -1260,6 +1260,7 @@ function ZenoMainApp() {
             setupZenoIntelliSense={setupZenoIntelliSense}
             setIsIdeConsoleExpanded={setIsIdeConsoleExpanded}
             setIdeConsoleOutput={setIdeConsoleOutput}
+            onReturnToDashboard={() => setHomeTab("dashboard")}
             showToast={showToast}
           />
         )
