@@ -1826,18 +1826,22 @@ input:checked + .slider:before {
 .settings-input,
 .settings-select {
   width: 100%;
-  max-width: 400px;
+  box-sizing: border-box;
   background-color: var(--bg-tertiary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  padding: 6px 10px;
+  padding: 8px 12px;
+  height: 36px;
   font-size: 12px;
   color: var(--text-primary);
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .settings-input:focus,
 .settings-select:focus {
   border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px rgba(53, 116, 240, 0.2);
 }
 
 /* ============================================================

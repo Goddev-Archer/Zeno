@@ -198,12 +198,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 {/* Custom Profile CSS & Template Customizer Section */}
-                <div className="settings-form-group" style={{ marginTop: "24px", paddingTop: "20px", borderTop: "1px solid var(--border-color)" }}>
+                <div className="settings-form-group" style={{ marginTop: "20px", paddingTop: "16px", borderTop: "1px solid var(--border-color)" }}>
                   <h4 style={{ fontSize: "14px", fontWeight: "700", color: "var(--text-primary)", marginBottom: "4px", display: "flex", alignItems: "center", gap: "8px" }}>
                     <Icon icon="mage:palette" style={{ color: "var(--accent-color)" }} />
                     Zeno Profil-Studio & Design-Baukasten
                   </h4>
-                  <p className="settings-help-text" style={{ marginBottom: "16px" }}>
+                  <p className="settings-help-text" style={{ marginBottom: "18px" }}>
                     Gestalte deine Profil-Karte frei mit Animationen, Avatar-Dekorationen, Hover-Designs und benutzerdefinierten Farbverläufen. Keine malicious JS-Scripts erlaubt!
                   </p>
 
@@ -226,37 +226,42 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     }}
                   />
 
-                  {/* 1. Profilbild, Hover-Effekt & Dekorations-Rahmen */}
-                  <div style={{ marginBottom: "20px", padding: "14px", background: "var(--bg-secondary)", borderRadius: "8px", border: "1px solid var(--border-color)" }}>
-                    <label style={{ fontSize: "12px", fontWeight: "700", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px" }}>
-                      <Icon icon="mage:user" /> Profilbild & Hover-Effekt
-                    </label>
-                    <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "12px" }}>
-                      <div className={`profile-card-avatar purple ${userAvatarHoverEffect !== "none" ? `avatar-hover-${userAvatarHoverEffect}` : ""} ${userAvatarEffectFrame !== "none" ? `avatar-frame-${userAvatarEffectFrame}` : ""}`} style={{ width: "54px", height: "54px", fontSize: "22px", flexShrink: 0 }}>
+                  {/* BLOCK 1: Profilbild & Avatar-Optionen */}
+                  <div style={{ marginBottom: "16px", padding: "16px", background: "var(--bg-secondary)", borderRadius: "10px", border: "1px solid var(--border-color)" }}>
+                    <div style={{ fontSize: "12px", fontWeight: "700", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "6px", marginBottom: "14px" }}>
+                      <Icon icon="mage:user" style={{ color: "var(--accent-color)" }} />
+                      Profilbild & Avatar-Optionen
+                    </div>
+                    
+                    <div style={{ display: "flex", gap: "16px", alignItems: "center", marginBottom: "16px", paddingBottom: "14px", borderBottom: "1px solid var(--border-color)" }}>
+                      <div className={`profile-card-avatar purple ${userAvatarHoverEffect !== "none" ? `avatar-hover-${userAvatarHoverEffect}` : ""} ${userAvatarEffectFrame !== "none" ? `avatar-frame-${userAvatarEffectFrame}` : ""}`} style={{ width: "56px", height: "56px", fontSize: "22px", flexShrink: 0 }}>
                         {userAvatarImage ? (
                           <img src={userAvatarImage} alt="Avatar" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }} />
                         ) : (
                           "C"
                         )}
                       </div>
-                      <div style={{ display: "flex", gap: "8px" }}>
-                        <button className="settings-btn primary" onClick={() => avatarFileInputRef.current?.click()} style={{ fontSize: "11px", padding: "6px 12px" }}>
-                          📷 Bild hochladen
-                        </button>
-                        {userAvatarImage && (
-                          <button className="settings-btn" onClick={() => { setUserAvatarImage(""); showToast("Profilbild zurückgesetzt."); }} style={{ fontSize: "11px", padding: "6px 12px" }}>
-                            ❌ Entfernen
+                      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                        <div style={{ display: "flex", gap: "8px" }}>
+                          <button className="settings-btn primary" onClick={() => avatarFileInputRef.current?.click()} style={{ fontSize: "11px", padding: "7px 14px" }}>
+                            📷 Bild hochladen
                           </button>
-                        )}
+                          {userAvatarImage && (
+                            <button className="settings-btn" onClick={() => { setUserAvatarImage(""); showToast("Profilbild zurückgesetzt."); }} style={{ fontSize: "11px", padding: "7px 14px" }}>
+                              ❌ Entfernen
+                            </button>
+                          )}
+                        </div>
+                        <span style={{ fontSize: "10px", color: "var(--text-muted)" }}>Empfohlen: Quadratische Bilddateien (PNG, JPG, WebP)</span>
                       </div>
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
                       <div>
-                        <label style={{ fontSize: "10px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
+                        <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "6px" }}>
                           Avatar Hover-Animation
                         </label>
-                        <select className="settings-select" value={userAvatarHoverEffect} onChange={(e) => setUserAvatarHoverEffect(e.target.value as any)} style={{ width: "100%", fontSize: "11px" }}>
+                        <select className="settings-select" value={userAvatarHoverEffect} onChange={(e) => setUserAvatarHoverEffect(e.target.value as any)}>
                           <option value="none">Keine Animation</option>
                           <option value="float">🎈 Schweben (Float)</option>
                           <option value="spin">🔄 Drehen (360° Spin)</option>
@@ -266,10 +271,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         </select>
                       </div>
                       <div>
-                        <label style={{ fontSize: "10px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
+                        <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "6px" }}>
                           Avatar Dekorations-Rahmen (Discord Style)
                         </label>
-                        <select className="settings-select" value={userAvatarEffectFrame} onChange={(e) => setUserAvatarEffectFrame(e.target.value as any)} style={{ width: "100%", fontSize: "11px" }}>
+                        <select className="settings-select" value={userAvatarEffectFrame} onChange={(e) => setUserAvatarEffectFrame(e.target.value as any)}>
                           <option value="none">Kein Rahmen</option>
                           <option value="cyber_ring">⚙️ Cyber Ring (Dashed Teal)</option>
                           <option value="neon_pulse">💗 Neon Pulse (Pink Glow)</option>
@@ -281,183 +286,194 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
                   </div>
 
-                  {/* 2. Theme Presets Grid */}
-                  <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "6px" }}>
-                    Schnell-Presets
-                  </label>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "10px", marginBottom: "20px" }}>
-                    {[
-                      { id: "cyberpunk", label: "⚡ Cyberpunk", gradient: "linear-gradient(135deg, #7928CA 0%, #FF0080 100%)", badge: "⚡ VIP CYBERNAUT" },
-                      { id: "glassmorphism", label: "❄️ Glassmorphism", gradient: "linear-gradient(135deg, #00C6FF 0%, #0072FF 100%)", badge: "❄️ FROSTED GLASS" },
-                      { id: "synthwave", label: "🌅 Synthwave 80s", gradient: "linear-gradient(135deg, #f857a6 0%, #ff5858 100%)", badge: "🌅 RETRO WAVE" },
-                      { id: "matrix", label: "🟩 Matrix Hacker", gradient: "linear-gradient(135deg, #00FF87 0%, #60EFFF 100%)", badge: "🟩 MATRIX CORE" },
-                      { id: "default", label: "🎨 Standard", gradient: "linear-gradient(135deg, #3574F0 0%, #1A44A5 100%)", badge: "⭐ VERIFIZIERT" }
-                    ].map((preset) => (
-                      <button
-                        key={preset.id}
-                        className={`settings-btn ${userProfilePreset === preset.id ? "primary" : ""}`}
-                        onClick={() => {
-                          setUserProfilePreset(preset.id as any);
-                          setUserBannerGradient(preset.gradient);
-                          setUserBadge(preset.badge);
-                          showToast(`Profil-Theme "${preset.label}" angewendet!`);
-                        }}
-                        style={{ padding: "8px 6px", fontSize: "11px", borderRadius: "8px", textAlign: "center" }}
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
+                  {/* BLOCK 2: Schnell-Presets & Texte */}
+                  <div style={{ marginBottom: "16px", padding: "16px", background: "var(--bg-secondary)", borderRadius: "10px", border: "1px solid var(--border-color)" }}>
+                    <div style={{ fontSize: "12px", fontWeight: "700", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "6px", marginBottom: "14px" }}>
+                      <Icon icon="mage:sparkles" style={{ color: "var(--accent-color)" }} />
+                      Presets & Profil-Texte
+                    </div>
+
+                    <div style={{ marginBottom: "16px" }}>
+                      <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "8px" }}>
+                        Schnell-Presets
+                      </label>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "8px" }}>
+                        {[
+                          { id: "cyberpunk", label: "⚡ Cyberpunk", gradient: "linear-gradient(135deg, #7928CA 0%, #FF0080 100%)", badge: "⚡ VIP CYBERNAUT" },
+                          { id: "glassmorphism", label: "❄️ Glassmorphism", gradient: "linear-gradient(135deg, #00C6FF 0%, #0072FF 100%)", badge: "❄️ FROSTED GLASS" },
+                          { id: "synthwave", label: "🌅 Synthwave 80s", gradient: "linear-gradient(135deg, #f857a6 0%, #ff5858 100%)", badge: "🌅 RETRO WAVE" },
+                          { id: "matrix", label: "🟩 Matrix Hacker", gradient: "linear-gradient(135deg, #00FF87 0%, #60EFFF 100%)", badge: "🟩 MATRIX CORE" },
+                          { id: "default", label: "🎨 Standard", gradient: "linear-gradient(135deg, #3574F0 0%, #1A44A5 100%)", badge: "⭐ VERIFIZIERT" }
+                        ].map((preset) => (
+                          <button
+                            key={preset.id}
+                            className={`settings-btn ${userProfilePreset === preset.id ? "primary" : ""}`}
+                            onClick={() => {
+                              setUserProfilePreset(preset.id as any);
+                              setUserBannerGradient(preset.gradient);
+                              setUserBadge(preset.badge);
+                              showToast(`Profil-Theme "${preset.label}" angewendet!`);
+                            }}
+                            style={{ padding: "8px 4px", fontSize: "11px", borderRadius: "6px", textAlign: "center" }}
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                      <div>
+                        <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "6px" }}>
+                          Status-Spruch
+                        </label>
+                        <input
+                          type="text"
+                          className="settings-input"
+                          value={userStatusQuote}
+                          onChange={(e) => setUserStatusQuote(e.target.value)}
+                          placeholder="Zeno verschlüsselt meine Daten."
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "6px" }}>
+                          Profil Badge / Badge-Text
+                        </label>
+                        <input
+                          type="text"
+                          className="settings-input"
+                          value={userBadge}
+                          onChange={(e) => setUserBadge(e.target.value)}
+                          placeholder="⚡ VIP CYBERNAUT"
+                        />
+                      </div>
+                    </div>
                   </div>
 
-                  {/* 3. Inputs & Alignment Grid */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
-                    <div>
-                      <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
-                        Status-Spruch
+                  {/* BLOCK 3: Farben, Designs & Baukasten */}
+                  <div style={{ marginBottom: "16px", padding: "16px", background: "var(--bg-secondary)", borderRadius: "10px", border: "1px solid var(--border-color)" }}>
+                    <div style={{ fontSize: "12px", fontWeight: "700", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "6px", marginBottom: "14px" }}>
+                      <Icon icon="mage:paint-brush" style={{ color: "var(--accent-color)" }} />
+                      Farbanpassungen & Effekte
+                    </div>
+
+                    {/* 3-Spalten Farben-Grid */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px", marginBottom: "16px" }}>
+                      <div>
+                        <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "6px" }}>
+                          Badge-Hintergrund (CSS)
+                        </label>
+                        <input 
+                          type="text" 
+                          className="settings-input" 
+                          value={userBadgeBgColor} 
+                          onChange={(e) => setUserBadgeBgColor(e.target.value)} 
+                          placeholder="#111214 oder linear-gradient(...)" 
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "6px" }}>
+                          Badge-Textfarbe
+                        </label>
+                        <input 
+                          type="text" 
+                          className="settings-input" 
+                          value={userBadgeTextColor} 
+                          onChange={(e) => setUserBadgeTextColor(e.target.value)} 
+                          placeholder="#00DFD8 oder #FFFFFF" 
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "6px" }}>
+                          Karten-Body Hintergrund
+                        </label>
+                        <input 
+                          type="text" 
+                          className="settings-input" 
+                          value={userCardBgColor} 
+                          onChange={(e) => setUserCardBgColor(e.target.value)} 
+                          placeholder="#0d0b14 oder linear-gradient(...)" 
+                        />
+                      </div>
+                    </div>
+
+                    {/* Banner Input */}
+                    <div style={{ marginBottom: "16px" }}>
+                      <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "6px" }}>
+                        Banner CSS Gradient / Hintergrund
                       </label>
                       <input
                         type="text"
                         className="settings-input"
-                        value={userStatusQuote}
-                        onChange={(e) => setUserStatusQuote(e.target.value)}
-                        placeholder="Zeno verschlüsselt meine Daten."
-                        style={{ width: "100%", padding: "8px 12px", background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "6px", color: "var(--text-primary)", fontSize: "12px" }}
+                        value={userBannerGradient}
+                        onChange={(e) => setUserBannerGradient(e.target.value)}
+                        placeholder="linear-gradient(135deg, #7928CA 0%, #FF0080 100%)"
+                        style={{ fontFamily: "monospace" }}
                       />
                     </div>
 
-                    <div>
-                      <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
-                        Profil Badge / Badge-Text
-                      </label>
-                      <input
-                        type="text"
-                        className="settings-input"
-                        value={userBadge}
-                        onChange={(e) => setUserBadge(e.target.value)}
-                        placeholder="⚡ VIP CYBERNAUT"
-                        style={{ width: "100%", padding: "8px 12px", background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "6px", color: "var(--text-primary)", fontSize: "12px" }}
-                      />
+                    {/* 3-Spalten Hover, Animation Builder & Layout */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px", marginBottom: "16px" }}>
+                      <div>
+                        <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "6px" }}>
+                          Karten-Hover Design (Shop Style)
+                        </label>
+                        <select className="settings-select" value={userCardHoverEffect} onChange={(e) => setUserCardHoverEffect(e.target.value as any)}>
+                          <option value="none">Kein Hover-Effekt</option>
+                          <option value="rainbow_border">🌈 Rainbow Border</option>
+                          <option value="holographic_shimmer">✨ Holographic Shimmer</option>
+                          <option value="cosmic_glow">🌌 Cosmic Glow</option>
+                          <option value="neon_border">🟩 Neon Border Glow</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "6px" }}>
+                          Animation Baukasten (Sicher)
+                        </label>
+                        <select className="settings-select" value={userAnimationPreset} onChange={(e) => setUserAnimationPreset(e.target.value as any)}>
+                          <option value="none">Statisch (Keine Animation)</option>
+                          <option value="subtle_pulse">💓 Sanfter Puls (Subtle Pulse)</option>
+                          <option value="floating_card">🎈 Schwebende Karte (Floating)</option>
+                          <option value="neon_flicker">⚡ Neon Flackern (Flicker)</option>
+                          <option value="particle_shimmer">🌈 Prismatisches Shimmern</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "6px" }}>
+                          Element-Platzierung (Layout)
+                        </label>
+                        <select className="settings-select" value={userLayoutOrder} onChange={(e) => setUserLayoutOrder(e.target.value as any)}>
+                          <option value="standard">Standard (Klassisch Zentriert)</option>
+                          <option value="avatar_left">◀️ Avatar Links bündig</option>
+                          <option value="compact">📱 Kompakter Banner-Header</option>
+                          <option value="banner_overlay">🔮 Glassmorphism Overlay</option>
+                        </select>
+                      </div>
                     </div>
-                  </div>
 
-                  {/* 4. Badge- & Card-Farben Customizer */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "16px" }}>
+                    {/* Badge Position Row */}
                     <div>
-                      <label style={{ fontSize: "10px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
-                        Badge-Hintergrund (CSS)
+                      <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "6px" }}>
+                        Badge-Ausrichtung
                       </label>
-                      <input 
-                        type="text" 
-                        className="settings-input" 
-                        value={userBadgeBgColor} 
-                        onChange={(e) => setUserBadgeBgColor(e.target.value)} 
-                        placeholder="#111214 oder linear-gradient(...)" 
-                        style={{ width: "100%", fontSize: "11px" }} 
-                      />
+                      <div style={{ display: "flex", gap: "10px" }}>
+                        {[
+                          { id: "badge-center", label: "🎯 Zentriert (Standard)" },
+                          { id: "badge-right", label: "↗️ Rechts unten" },
+                          { id: "badge-left", label: "↖️ Links unten" }
+                        ].map((pos) => (
+                          <button
+                            key={pos.id}
+                            className={`settings-btn ${userBadgePosition === pos.id ? "primary" : ""}`}
+                            onClick={() => setUserBadgePosition(pos.id as any)}
+                            style={{ flex: 1, padding: "8px", fontSize: "11px", borderRadius: "6px", textAlign: "center" }}
+                          >
+                            {pos.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    <div>
-                      <label style={{ fontSize: "10px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
-                        Badge-Textfarbe
-                      </label>
-                      <input 
-                        type="text" 
-                        className="settings-input" 
-                        value={userBadgeTextColor} 
-                        onChange={(e) => setUserBadgeTextColor(e.target.value)} 
-                        placeholder="#00DFD8 oder #FFFFFF" 
-                        style={{ width: "100%", fontSize: "11px" }} 
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: "10px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
-                        Karten-Body Hintergrund
-                      </label>
-                      <input 
-                        type="text" 
-                        className="settings-input" 
-                        value={userCardBgColor} 
-                        onChange={(e) => setUserCardBgColor(e.target.value)} 
-                        placeholder="#0d0b14 oder linear-gradient(...)" 
-                        style={{ width: "100%", fontSize: "11px" }} 
-                      />
-                    </div>
-                  </div>
-
-                  {/* 5. Card Hover, Animation Builder & Layout Placement */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "16px" }}>
-                    <div>
-                      <label style={{ fontSize: "10px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
-                        Karten-Hover Design (Shop Style)
-                      </label>
-                      <select className="settings-select" value={userCardHoverEffect} onChange={(e) => setUserCardHoverEffect(e.target.value as any)} style={{ width: "100%", fontSize: "11px" }}>
-                        <option value="none">Kein Hover-Effekt</option>
-                        <option value="rainbow_border">🌈 Rainbow Border</option>
-                        <option value="holographic_shimmer">✨ Holographic Shimmer</option>
-                        <option value="cosmic_glow">🌌 Cosmic Glow</option>
-                        <option value="neon_border">🟩 Neon Border Glow</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label style={{ fontSize: "10px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
-                        Animation Baukasten (Sicher ohne JS)
-                      </label>
-                      <select className="settings-select" value={userAnimationPreset} onChange={(e) => setUserAnimationPreset(e.target.value as any)} style={{ width: "100%", fontSize: "11px" }}>
-                        <option value="none">Statisch (Keine Animation)</option>
-                        <option value="subtle_pulse">💓 Sanfter Puls (Subtle Pulse)</option>
-                        <option value="floating_card">🎈 Schwebende Karte (Floating)</option>
-                        <option value="neon_flicker">⚡ Neon Flackern (Flicker)</option>
-                        <option value="particle_shimmer">🌈 Prismatisches Shimmern</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label style={{ fontSize: "10px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
-                        Element-Platzierung (Layout)
-                      </label>
-                      <select className="settings-select" value={userLayoutOrder} onChange={(e) => setUserLayoutOrder(e.target.value as any)} style={{ width: "100%", fontSize: "11px" }}>
-                        <option value="standard">Standard (Klassisch Zentriert)</option>
-                        <option value="avatar_left">◀️ Avatar Links bündig</option>
-                        <option value="compact">📱 Kompakter Banner-Header</option>
-                        <option value="banner_overlay">🔮 Glassmorphism Card Overlay</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* 6. Badge Position Grid */}
-                  <div style={{ marginBottom: "16px" }}>
-                    <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
-                      Badge-Ausrichtung (Standard: Zentriert)
-                    </label>
-                    <div style={{ display: "flex", gap: "10px" }}>
-                      {[
-                        { id: "badge-center", label: "🎯 Zentriert (Standard)" },
-                        { id: "badge-right", label: "↗️ Rechts unten" },
-                        { id: "badge-left", label: "↖️ Links unten" }
-                      ].map((pos) => (
-                        <button
-                          key={pos.id}
-                          className={`settings-btn ${userBadgePosition === pos.id ? "primary" : ""}`}
-                          onClick={() => setUserBadgePosition(pos.id as any)}
-                          style={{ flex: 1, padding: "8px", fontSize: "11px", borderRadius: "6px", textAlign: "center" }}
-                        >
-                          {pos.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* 7. Banner Gradient Input */}
-                  <div style={{ marginBottom: "16px" }}>
-                    <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
-                      Banner CSS Gradient / Hintergrund
-                    </label>
-                    <input
-                      type="text"
-                      className="settings-input"
-                      value={userBannerGradient}
-                      onChange={(e) => setUserBannerGradient(e.target.value)}
-                      placeholder="linear-gradient(135deg, #7928CA 0%, #FF0080 100%)"
-                      style={{ width: "100%", padding: "8px 12px", background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "6px", color: "var(--text-primary)", fontSize: "12px", fontFamily: "monospace" }}
-                    />
                   </div>
 
                   {/* 8. Custom CSS Editor Box */}
