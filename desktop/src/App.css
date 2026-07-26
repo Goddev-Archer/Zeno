@@ -1858,22 +1858,49 @@ input:checked + .slider:before {
 .profile-avatar-wrapper {
   position: relative;
   margin-top: -42px;
-  margin-bottom: 8px;
+  margin-bottom: 14px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
+/* Profile Badge (Centered by default) */
 .profile-badge {
   position: absolute;
-  bottom: -4px;
-  right: -10px;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
   background: var(--bg-tertiary);
   border: 1px solid var(--border-color);
-  font-size: 9px;
+  font-size: 9.5px;
   font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 10px;
+  padding: 3px 10px;
+  border-radius: 12px;
   color: var(--text-primary);
-  box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
   white-space: nowrap;
+  letter-spacing: 0.5px;
+  z-index: 2;
+  transition: all 180ms ease;
+}
+
+/* Badge Alignment Modifier Classes */
+.profile-badge.badge-center {
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+}
+
+.profile-badge.badge-right {
+  left: auto;
+  right: -10px;
+  transform: none;
+}
+
+.profile-badge.badge-left {
+  right: auto;
+  left: -10px;
+  transform: none;
 }
 
 /* Custom Profile Theme Presets */

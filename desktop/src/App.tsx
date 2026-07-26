@@ -68,6 +68,7 @@ interface Profile {
   fingerprint: string;
   bannerGradient?: string;
   badge?: string;
+  badgePosition?: "badge-center" | "badge-right" | "badge-left";
   themePreset?: "default" | "cyberpunk" | "glassmorphism" | "synthwave" | "matrix" | "custom";
   customCss?: string;
 }
@@ -943,6 +944,7 @@ function ZenoMainApp() {
 }`
   );
   const [userBadge, setUserBadge] = useState<string>("⚡ VIP CYBERNAUT");
+  const [userBadgePosition, setUserBadgePosition] = useState<"badge-center" | "badge-right" | "badge-left">("badge-center");
   const [userStatusQuote, setUserStatusQuote] = useState<string>("Zeno verschlüsselt meine Daten.");
   const [userBannerGradient, setUserBannerGradient] = useState<string>("linear-gradient(135deg, #7928CA 0%, #FF0080 100%)");
 
@@ -952,10 +954,11 @@ function ZenoMainApp() {
       mockProfiles.CipherNaut.themePreset = userProfilePreset;
       mockProfiles.CipherNaut.customCss = userCustomCss;
       mockProfiles.CipherNaut.badge = userBadge;
+      mockProfiles.CipherNaut.badgePosition = userBadgePosition;
       mockProfiles.CipherNaut.status = `"${userStatusQuote}"`;
       mockProfiles.CipherNaut.bannerGradient = userBannerGradient;
     }
-  }, [userProfilePreset, userCustomCss, userBadge, userStatusQuote, userBannerGradient]);
+  }, [userProfilePreset, userCustomCss, userBadge, userBadgePosition, userStatusQuote, userBannerGradient]);
 
 
 
@@ -4933,7 +4936,9 @@ sys.stderr = io.StringIO()
                       ))}
                     </div>
 
-                    {/* Inputs Grid */}
+
+
+                    {/* Inputs & Alignment Grid */}
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
                       <div>
                         <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
@@ -4961,6 +4966,29 @@ sys.stderr = io.StringIO()
                           placeholder="⚡ VIP CYBERNAUT"
                           style={{ width: "100%", padding: "8px 12px", background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "6px", color: "#FFF", fontSize: "12px" }}
                         />
+                      </div>
+                    </div>
+
+                    {/* Badge Position Grid */}
+                    <div style={{ marginBottom: "16px" }}>
+                      <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
+                        Badge-Ausrichtung (Standard: Zentriert)
+                      </label>
+                      <div style={{ display: "flex", gap: "10px" }}>
+                        {[
+                          { id: "badge-center", label: "🎯 Zentriert (Standard)" },
+                          { id: "badge-right", label: "↗️ Rechts unten" },
+                          { id: "badge-left", label: "↖️ Links unten" }
+                        ].map((pos) => (
+                          <button
+                            key={pos.id}
+                            className={`settings-btn ${userBadgePosition === pos.id ? "primary" : ""}`}
+                            onClick={() => setUserBadgePosition(pos.id as any)}
+                            style={{ flex: 1, padding: "8px", fontSize: "11px", borderRadius: "6px", textAlign: "center" }}
+                          >
+                            {pos.label}
+                          </button>
+                        ))}
                       </div>
                     </div>
 
@@ -5029,7 +5057,7 @@ sys.stderr = io.StringIO()
                           <div className="profile-card-body" style={{ padding: "14px" }}>
                             <div className="profile-avatar-wrapper">
                               <div className="profile-card-avatar purple" style={{ width: "54px", height: "54px", fontSize: "22px" }}>C</div>
-                              {userBadge && <span className="profile-badge">{userBadge}</span>}
+                              {userBadge && <span className={`profile-badge ${userBadgePosition}`}>{userBadge}</span>}
                             </div>
                             <h3 className="profile-card-name" style={{ fontSize: "14px" }}>CipherNaut</h3>
                             <span className="profile-card-role" style={{ fontSize: "8px" }}>UNTERSTÜTZER</span>
@@ -5322,7 +5350,7 @@ sys.stderr = io.StringIO()
                   {selectedUserProfile.avatar}
                 </div>
                 {selectedUserProfile.badge && (
-                  <span className="profile-badge">{selectedUserProfile.badge}</span>
+                  <span className={`profile-badge ${selectedUserProfile.badgePosition || "badge-center"}`}>{selectedUserProfile.badge}</span>
                 )}
               </div>
 
