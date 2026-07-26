@@ -532,6 +532,14 @@ function ZenoMainApp() {
   };
 
   // Theme toggle
+  useEffect(() => {
+    if (theme === "light") {
+      document.body.classList.add("light-mode");
+    } else {
+      document.body.classList.remove("light-mode");
+    }
+  }, [theme]);
+
   const handleThemeToggle = () => {
     const nextTheme = theme === "dark" ? "light" : "dark";
     setTheme(nextTheme);
@@ -939,7 +947,7 @@ function ZenoMainApp() {
 
   return (
     <div
-      className={`app-layout ${activeServerId === "home" && homeTab === "ide" ? "in-ide" : ""} ${theme} ${glassmorphism ? "glassmorphism" : ""}`}
+      className={`app-layout ${activeServerId === "home" && homeTab === "ide" ? "in-ide" : ""} ${theme === "light" ? "light light-mode theme-light" : "dark"} ${glassmorphism ? "glassmorphism" : ""}`}
       style={{
         "--canvas-bg": canvasColor,
         "--glow-color": glowColor

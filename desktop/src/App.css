@@ -1288,7 +1288,8 @@ pre.editor-code {
 /* ============================================================
    LIGHT MODE OVERRIDES
    ============================================================ */
-body.light-mode {
+body.light-mode,
+.app-layout.light-mode {
   /* Backgrounds */
   --bg-primary:   #FFFFFF; /* Pure white chat area */
   --bg-secondary: #F2F3F5; /* Light grey sidebars */
@@ -1313,23 +1314,28 @@ body.light-mode {
 }
 
 /* Light mode adjustments for components */
-body.light-mode .user-panel {
+body.light-mode .user-panel,
+.app-layout.light-mode .user-panel {
   background-color: rgba(0, 0, 0, 0.03);
 }
 
-body.light-mode .date-separator-text {
+body.light-mode .date-separator-text,
+.app-layout.light-mode .date-separator-text {
   background-color: var(--bg-primary);
 }
 
-body.light-mode .code-block-header {
+body.light-mode .code-block-header,
+.app-layout.light-mode .code-block-header {
   background-color: rgba(0, 0, 0, 0.05);
 }
 
-body.light-mode pre.code-block {
+body.light-mode pre.code-block,
+.app-layout.light-mode pre.code-block {
   background-color: var(--bg-tertiary);
 }
 
-body.light-mode .editor-output {
+body.light-mode .editor-output,
+.app-layout.light-mode .editor-output {
   background-color: #1E1F22;
   color: #59A869;
 }
