@@ -79,9 +79,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay open" id="settings-modal">
-      <div className="settings-panel">
-        <aside className="settings-sidebar">
+    <div className="settings-modal" id="settings-modal" style={{ position: "fixed", inset: 0, zIndex: 1000 }}>
+      <aside className="settings-sidebar">
           <h2 className="settings-title">Einstellungen</h2>
           <button 
             className={`settings-nav-item ${activeSettingsTab === "profile" ? "active" : ""}`} 
@@ -575,8 +574,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             )}
           </div>
+
+          <div className="settings-close-wrapper">
+            <button className="settings-close-btn" onClick={onClose} title="Einstellungen schließen (Esc)">
+              <Icon icon="mage:multiply" />
+            </button>
+            <span className="settings-close-label">ESC</span>
+          </div>
         </main>
-      </div>
     </div>
   );
 };
