@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Icon } from "@iconify/react";
 import Editor from "@monaco-editor/react";
 import { IdeFile } from "../../types";
@@ -41,7 +41,7 @@ interface ZenoIdeProps {
 
 export const ZenoIde: React.FC<ZenoIdeProps> = ({
   ideSidebarTab,
-  ideFiles,
+  ideFiles: _ideFiles,
   ideOpenTabs,
   ideActiveFilePath,
   ideGitChanges,
@@ -55,7 +55,7 @@ export const ZenoIde: React.FC<ZenoIdeProps> = ({
   setIdeSidebarTab,
   setIsSettingsOpen,
   setIdeNewItemType,
-  setIdeNewItemParentPath,
+  setIdeNewItemParentPath: _setIdeNewItemParentPath,
   setIsIdeNewItemModalOpen,
   setIsIdeProjectWizardOpen,
   renderIdeFileTree,
@@ -70,388 +70,249 @@ export const ZenoIde: React.FC<ZenoIdeProps> = ({
   handleIdeCodeChange,
   setupZenoIntelliSense,
   setIsIdeConsoleExpanded,
-  setIdeConsoleOutput,
+  setIdeConsoleOutput: _setIdeConsoleOutput,
   onReturnToDashboard,
-  showToast
+  showToast: _showToast
 }) => {
+  const [commandPaletteQuery, setCommandPaletteQuery] = useState("");
+  const [activeBottomTab, setActiveBottomTab] = useState<"terminal" | "problems" | "output">("terminal");
+
   const handleEditorBeforeMount = (monaco: any) => {
-    monaco.editor.defineTheme("zeno-dark-theme", {
+    // 2026 JetBrains / Cursor Island Design Palette
+    monaco.editor.defineTheme("code-oss-island-dark", {
       base: "vs-dark",
       inherit: true,
       rules: [
-        { token: "comment", foreground: "6A9955" },
-        { token: "keyword", foreground: "569CD6" },
-        { token: "string", foreground: "CE9178" }
+        { token: "comment", foreground: "6B7280", fontStyle: "italic" },
+        { token: "keyword", foreground: "38BDF8", fontStyle: "bold" },
+        { token: "string", foreground: "34D399" },
+        { token: "number", foreground: "F472B6" },
+        { token: "type", foreground: "FBBF24" },
+        { token: "function", foreground: "818CF8" }
       ],
       colors: {
-        "editor.background": "#111214",
-        "editor.foreground": "#CCCCCC",
-        "editorGutter.background": "#111214",
-        "editor.lineHighlightBackground": "#1E1F22",
-        "editor.lineHighlightBorder": "#2A2D32",
-        "editorCursor.foreground": "#00FF87"
+        "editor.background": "#0D0E12",
+        "editor.foreground": "#E2E8F0",
+        "editorGutter.background": "#0D0E12",
+        "editor.lineHighlightBackground": "#181A20",
+        "editor.lineHighlightBorder": "#262933",
+        "editorCursor.foreground": "#00FF87",
+        "editorIndentGuide.background1": "#1E222D",
+        "editorIndentGuide.activeBackground1": "#38BDF8"
       }
     });
 
-    monaco.editor.defineTheme("zeno-light-theme", {
+    monaco.editor.defineTheme("code-oss-island-light", {
       base: "vs",
       inherit: true,
       rules: [],
       colors: {
         "editor.background": "#FFFFFF",
-        "editor.foreground": "#1C1C1E"
+        "editor.foreground": "#1E293B"
       }
     });
   };
 
   return (
-    <div className="zeno-ide-workspace">
-      {/* VS Code styled Activity Bar (narrow sidebar menu) */}
-      <div className="ide-activity-bar">
-        <div className="ide-activity-top">
+    <div className="code-oss-island-workspace" style={{ display: "flex", flexDirection: "column", height: "100%", backgroundColor: "#08090C", padding: "12px", gap: "12px", boxSizing: "border-box", color: "#E2E8F0" }}>
+      
+      {/* 1. FLOATING HEADER ISLAND */}
+      <header className="code-oss-header-island" style={{ height: "46px", backgroundColor: "#111319", borderRadius: "12px", border: "1px solid #1E222D", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 16px", boxShadow: "0 4px 20px rgba(0,0,0,0.4)" }}>
+        {/* Left Engine Branding & Back Button */}
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           {onReturnToDashboard && (
-            <button 
-              className="ide-activity-btn back-to-dashboard"
+            <button
               onClick={onReturnToDashboard}
-              title="IDE verlassen & zum Dashboard zurückkehren"
-              style={{ color: "#00FF87", borderBottom: "1px solid var(--border-color)", marginBottom: "8px" }}
+              style={{ background: "rgba(0, 255, 135, 0.12)", border: "1px solid rgba(0, 255, 135, 0.3)", color: "#00FF87", padding: "5px 12px", borderRadius: "8px", fontSize: "11px", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}
+              title="Dashboard & Chat Server öffnen"
             >
-              <Icon icon="mage:arrow-left" />
+              <Icon icon="mage:arrow-left" /> Dashboard
             </button>
           )}
-          <button 
-            className={`ide-activity-btn ${ideSidebarTab === "explorer" ? "active" : ""}`}
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <span style={{ fontSize: "12px", fontWeight: "800", background: "linear-gradient(135deg, #00FF87, #60EFFF)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+              CODE-OSS 2026
+            </span>
+            <span style={{ fontSize: "10px", backgroundColor: "#1E222D", padding: "2px 6px", borderRadius: "4px", color: "#94A3B8" }}>
+              Island Engine v1.98
+            </span>
+          </div>
+        </div>
+
+        {/* Center Floating Command Palette */}
+        <div style={{ position: "relative", width: "380px" }}>
+          <input
+            type="text"
+            placeholder="🔍 Command Palette (Ctrl + Shift + P)"
+            value={commandPaletteQuery}
+            onChange={(e) => setCommandPaletteQuery(e.target.value)}
+            style={{ width: "100%", height: "28px", backgroundColor: "#0D0E12", border: "1px solid #262933", borderRadius: "8px", padding: "0 12px", fontSize: "11px", color: "#E2E8F0", outline: "none" }}
+          />
+        </div>
+
+        {/* Right Execution & Controls */}
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <button
+            onClick={handleIdeRun}
+            style={{ backgroundColor: "#00FF87", color: "#08090C", border: "none", padding: "5px 14px", borderRadius: "8px", fontSize: "11px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}
+            title="Projekt Sandbox ausführen"
+          >
+            <Icon icon="mage:play" /> Run Project
+          </button>
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            style={{ backgroundColor: "#1E222D", color: "#94A3B8", border: "1px solid #262933", width: "30px", height: "30px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+            title="Einstellungen"
+          >
+            <Icon icon="mage:settings" />
+          </button>
+        </div>
+      </header>
+
+      {/* 2. MAIN WORKSPACE BODY (Floating Activity Bar, Sidebar, and Editor Islands) */}
+      <div style={{ flex: 1, display: "flex", gap: "12px", minHeight: 0 }}>
+        
+        {/* Activity Bar Island */}
+        <nav className="code-oss-activity-island" style={{ width: "48px", backgroundColor: "#111319", borderRadius: "12px", border: "1px solid #1E222D", display: "flex", flexDirection: "column", alignItems: "center", padding: "12px 0", gap: "14px", boxShadow: "0 4px 20px rgba(0,0,0,0.3)" }}>
+          <button
             onClick={() => setIdeSidebarTab("explorer")}
-            title="Explorer"
+            style={{ background: ideSidebarTab === "explorer" ? "rgba(56, 189, 248, 0.15)" : "transparent", border: "none", color: ideSidebarTab === "explorer" ? "#38BDF8" : "#64748B", width: "36px", height: "36px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", cursor: "pointer" }}
+            title="Explorer (Dateibaum)"
           >
             <Icon icon="mage:file-records" />
           </button>
 
-          <button 
-            className={`ide-activity-btn ${ideSidebarTab === "git" ? "active" : ""}`}
+          <button
             onClick={() => setIdeSidebarTab("git")}
+            style={{ background: ideSidebarTab === "git" ? "rgba(56, 189, 248, 0.15)" : "transparent", border: "none", color: ideSidebarTab === "git" ? "#38BDF8" : "#64748B", width: "36px", height: "36px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", cursor: "pointer", position: "relative" }}
             title="Source Control (Git)"
           >
             <Icon icon="mage:git-branch" />
             {ideGitChanges.length > 0 && (
-              <span className="ide-activity-badge">{ideGitChanges.length}</span>
+              <span style={{ position: "absolute", top: "4px", right: "4px", width: "8px", height: "8px", backgroundColor: "#00FF87", borderRadius: "50%" }} />
             )}
           </button>
 
-          <button 
-            className={`ide-activity-btn ${ideSidebarTab === "extensions" ? "active" : ""}`}
+          <button
             onClick={() => setIdeSidebarTab("extensions")}
-            title="Plugins / Extensions"
+            style={{ background: ideSidebarTab === "extensions" ? "rgba(56, 189, 248, 0.15)" : "transparent", border: "none", color: ideSidebarTab === "extensions" ? "#38BDF8" : "#64748B", width: "36px", height: "36px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", cursor: "pointer" }}
+            title="Open VSX Extensions Marketplace"
           >
             <Icon icon="mage:box-3d" />
           </button>
+        </nav>
 
-          {ideExtensions.find(ext => ext.id === "gitlens")?.installed && (
-            <button 
-              className={`ide-activity-btn gitlens-opt ${ideSidebarTab === "gitlens" ? "active" : ""}`}
-              onClick={() => setIdeSidebarTab("gitlens")}
-              title="GitLens History Map"
-              style={{ color: "#E05555" }}
-            >
-              <Icon icon="octicon:history-16" />
-            </button>
-          )}
-        </div>
+        {/* Sidebar Island */}
+        <aside className="code-oss-sidebar-island" style={{ width: "260px", backgroundColor: "#111319", borderRadius: "12px", border: "1px solid #1E222D", display: "flex", flexDirection: "column", padding: "16px", boxSizing: "border-box", overflow: "hidden" }}>
+          {ideSidebarTab === "explorer" && (
+            <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", borderBottom: "1px solid #1E222D", paddingBottom: "8px" }}>
+                <span style={{ fontSize: "11px", fontWeight: "700", color: "#94A3B8", letterSpacing: "0.5px" }}>EXPLORER</span>
+                <div style={{ display: "flex", gap: "6px" }}>
+                  <button onClick={() => { setIdeNewItemType("file"); setIsIdeNewItemModalOpen(true); }} style={{ background: "none", border: "none", color: "#94A3B8", cursor: "pointer" }} title="Neue Datei">
+                    <Icon icon="mage:plus" />
+                  </button>
+                  <button onClick={() => setIsIdeProjectWizardOpen(true)} style={{ background: "none", border: "none", color: "#94A3B8", cursor: "pointer" }} title="Neues Projekt Wizard">
+                    <Icon icon="mage:folder-open" />
+                  </button>
+                </div>
+              </div>
 
-        <div className="ide-activity-bottom">
-          <button className="ide-activity-btn" onClick={() => setIsSettingsOpen(true)} title="Einstellungen">
-            <Icon icon="mage:settings" />
-          </button>
-        </div>
-      </div>
-
-      {/* IDE Side Panel */}
-      <aside className="ide-sidebar">
-        {ideSidebarTab === "explorer" && (
-          <>
-            <div className="ide-sidebar-header">
-              <span className="ide-project-title">
-                Explorer
-              </span>
-              <div className="ide-sidebar-actions">
-                <button 
-                  className="ide-sidebar-btn" 
-                  onClick={() => {
-                    setIdeNewItemType("file");
-                    setIdeNewItemParentPath("");
-                    setIsIdeNewItemModalOpen(true);
-                  }}
-                  title="Neue Datei erstellen"
-                >
-                  <Icon icon="mage:plus" />
-                </button>
-                <button 
-                  className="ide-sidebar-btn" 
-                  onClick={() => {
-                    setIdeNewItemType("folder");
-                    setIdeNewItemParentPath("");
-                    setIsIdeNewItemModalOpen(true);
-                  }}
-                  title="Neuer Ordner erstellen"
-                >
-                  <Icon icon="mage:folder-open" />
-                </button>
-                <button 
-                  className="ide-sidebar-btn" 
-                  onClick={() => setIsIdeProjectWizardOpen(true)}
-                  title="Projekt aus Vorlage generieren"
-                >
-                  <Icon icon="mage:box-3d" style={{ color: "var(--accent-color)" }} />
-                </button>
+              <div style={{ flex: 1, overflowY: "auto" }}>
+                {renderIdeFileTree()}
               </div>
             </div>
+          )}
 
-            <div className="ide-tree-container">
-              <div className="ide-sidebar-section-title">ZENO-WORKSPACE</div>
-              {renderIdeFileTree()}
-              {ideFiles.length === 0 && (
-                <p style={{ fontSize: "11px", color: "var(--text-muted)", padding: "16px", textAlign: "center" }}>
-                  Workspace leer. Generiere ein Projekt über das Würfel-Symbol.
-                </p>
-              )}
-            </div>
-          </>
-        )}
-
-        {ideSidebarTab === "git" && (
-          <div className="ide-git-panel" style={{ display: "flex", flexDirection: "column", height: "100%", padding: "14px" }}>
-            <div className="ide-sidebar-header" style={{ padding: "0 0 10px 0", borderBottom: "1px solid var(--border-color)", marginBottom: "14px" }}>
-              <span className="ide-project-title">Source Control</span>
-            </div>
-
-            <div className="ide-git-input-wrapper" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          {ideSidebarTab === "git" && (
+            <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+              <span style={{ fontSize: "11px", fontWeight: "700", color: "#94A3B8", marginBottom: "12px" }}>SOURCE CONTROL (GIT)</span>
               <textarea
-                className="settings-input"
-                placeholder="Commit-Nachricht (Strg+Enter zum Committen)..."
+                placeholder="Commit-Nachricht eingeben..."
                 value={ideGitMessage}
                 onChange={(e) => setIdeGitMessage(e.target.value)}
-                style={{ width: "100%", height: "70px", resize: "none", fontSize: "11px", padding: "8px" }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-                    handleIdeGitCommit();
-                  }
-                }}
+                style={{ width: "100%", height: "60px", backgroundColor: "#0D0E12", border: "1px solid #262933", borderRadius: "8px", padding: "8px", fontSize: "11px", color: "#E2E8F0", outline: "none", marginBottom: "8px", resize: "none" }}
               />
-              <button 
-                className="settings-btn primary"
+              <button
                 onClick={handleIdeGitCommit}
-                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", fontSize: "11px", padding: "8px" }}
+                style={{ width: "100%", backgroundColor: "#38BDF8", color: "#08090C", border: "none", padding: "6px", borderRadius: "8px", fontSize: "11px", fontWeight: "700", cursor: "pointer", marginBottom: "16px" }}
               >
-                <Icon icon="mage:git-branch" /> Commit & Push
+                Commit & Push
               </button>
-            </div>
 
-            <div className="ide-git-changes-section" style={{ marginTop: "20px", flex: 1, overflowY: "auto" }}>
-              <div className="ide-sidebar-section-title" style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>Änderungen</span>
-                <span className="badge" style={{ backgroundColor: "var(--bg-tertiary)" }}>{ideGitChanges.length}</span>
-              </div>
-              
-              {ideGitChanges.map((change) => (
-                <div key={change} className="ide-git-change-item" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 8px", fontSize: "12px", borderRadius: "4px", cursor: "pointer", transition: "background 0.2s" }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <Icon icon="mage:file-records" style={{ color: "var(--text-muted)", fontSize: "13px" }} />
-                    <span>{change}</span>
-                  </span>
-                  <span style={{ color: "#FFC66D", fontWeight: "bold", fontSize: "11px" }}>M</span>
-                </div>
-              ))}
-
-              {ideGitChanges.length === 0 && (
-                <p style={{ fontSize: "11px", color: "var(--text-muted)", textAlign: "center", marginTop: "24px" }}>
-                  Keine ungespeicherten Änderungen vorhanden.
-                </p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {ideSidebarTab === "extensions" && (
-          <div className="ide-extensions-panel" style={{ display: "flex", flexDirection: "column", height: "100%", padding: "14px" }}>
-            <div className="ide-sidebar-header" style={{ padding: "0 0 10px 0", borderBottom: "1px solid var(--border-color)", marginBottom: "14px" }}>
-              <span className="ide-project-title">Plugin-Installer</span>
-            </div>
-
-            <div style={{ position: "relative", marginBottom: "14px" }}>
-              <input
-                type="text"
-                className="settings-input"
-                placeholder="Erweiterungen durchsuchen..."
-                value={ideExtensionsSearchQuery}
-                onChange={(e) => setIdeExtensionsSearchQuery(e.target.value)}
-                style={{ width: "100%", paddingRight: "26px", fontSize: "11px", height: "30px" }}
-              />
-              <Icon icon="mage:search" style={{ position: "absolute", right: "8px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
-            </div>
-
-            <div className="extensions-list" style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "12px" }}>
-              {ideExtensions
-                .filter(ext => {
-                  if (!ideExtensionsSearchQuery.trim()) return true;
-                  const q = ideExtensionsSearchQuery.toLowerCase();
-                  return ext.name.toLowerCase().includes(q) || ext.description.toLowerCase().includes(q);
-                })
-                .map((ext) => (
-                  <div key={ext.id} className="extension-card" style={{ display: "flex", gap: "10px", padding: "10px", backgroundColor: "var(--bg-tertiary)", borderRadius: "6px", border: "1px solid var(--border-color)" }}>
-                    <div style={{ width: "32px", height: "32px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      {ext.icon.startsWith("http") ? (
-                        <img src={ext.icon} alt={ext.name} style={{ width: "32px", height: "32px", borderRadius: "4px" }} />
-                      ) : (
-                        <Icon icon={ext.icon} style={{ fontSize: "28px" }} />
-                      )}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <h4 style={{ fontSize: "12px", fontWeight: "600", color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", margin: 0 }}>
-                        {ext.name}
-                      </h4>
-                      <p style={{ fontSize: "10px", color: "var(--text-muted)", margin: "2px 0 6px 0", lineHeight: "1.3" }}>
-                        {ext.description}
-                      </p>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ fontSize: "9px", color: "var(--text-muted)" }}>
-                          {ext.downloads} downloads
-                        </span>
-                        {ext.installed ? (
-                          <button
-                            onClick={() => handleExtensionUninstall(ext.id)}
-                            className="settings-btn"
-                            style={{ fontSize: "9px", padding: "2px 6px", border: "1px solid var(--accent-danger)", color: "var(--accent-danger)" }}
-                          >
-                            Deinstallieren
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleExtensionInstall(ext.id)}
-                            className="settings-btn primary"
-                            style={{ fontSize: "9px", padding: "2px 8px" }}
-                          >
-                            Installieren
-                          </button>
-                        )}
-                      </div>
-                    </div>
+              <div style={{ fontSize: "10px", color: "#94A3B8", fontWeight: "700", marginBottom: "6px" }}>ÄNDERUNGEN ({ideGitChanges.length})</div>
+              <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "4px" }}>
+                {ideGitChanges.map((change, idx) => (
+                  <div key={idx} style={{ fontSize: "11px", color: "#34D399", padding: "4px 8px", backgroundColor: "#0D0E12", borderRadius: "4px" }}>
+                    M {change}
                   </div>
                 ))}
-            </div>
-          </div>
-        )}
-
-        {ideSidebarTab === "gitlens" && (
-          <div className="ide-gitlens-panel" style={{ display: "flex", flexDirection: "column", height: "100%", padding: "14px" }}>
-            <div className="ide-sidebar-header" style={{ padding: "0 0 10px 0", borderBottom: "1px solid var(--border-color)", marginBottom: "14px" }}>
-              <span className="ide-project-title" style={{ color: "#E05555" }}>GitLens History Map</span>
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px", flex: 1, overflowY: "auto" }}>
-              <div className="gitlens-info" style={{ padding: "10px", backgroundColor: "rgba(224, 85, 85, 0.1)", borderRadius: "6px", border: "1px solid rgba(224, 85, 85, 0.2)" }}>
-                <p style={{ fontSize: "11px", color: "var(--text-primary)", margin: 0 }}>
-                  GitLens hat das Platzierungsziel erfolgreich von der standardmäßigen VS-Code-Ansicht in das <strong>Zeno Aktivitäts-Menü</strong> übersetzt.
-                </p>
               </div>
+            </div>
+          )}
 
-              <div className="gitlens-history-timeline" style={{ marginTop: "14px" }}>
-                <div className="ide-sidebar-section-title">COMMITS VERLAUF</div>
-                
-                <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "10px" }}>
-                  {[
-                    { author: "CipherNaut", time: "Vor 10 Min.", msg: "feat: Add full-IDE layout Option B" },
-                    { author: "CipherNaut", time: "Vor 2 Std.", msg: "fix: Monaco Themes dynamic light/dark loading" },
-                    { author: "LenaCrypt", time: "Gestern", msg: "refactor: WASM isolates memory management" }
-                  ].map((commit, idx) => (
-                    <div key={idx} style={{ padding: "8px", borderLeft: "2px solid var(--border-color)", paddingLeft: "10px" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: "var(--text-muted)" }}>
-                        <span>{commit.author}</span>
-                        <span>{commit.time}</span>
-                      </div>
-                      <div style={{ fontSize: "11px", color: "var(--text-primary)", fontWeight: "500", marginTop: "4px" }}>
-                        {commit.msg}
-                      </div>
-                    </div>
-                  ))}
+          {ideSidebarTab === "extensions" && (
+            <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+              <span style={{ fontSize: "11px", fontWeight: "700", color: "#94A3B8", marginBottom: "12px" }}>OPEN VSX EXTENSIONS</span>
+              <input
+                type="text"
+                placeholder="Erweiterungen suchen..."
+                value={ideExtensionsSearchQuery}
+                onChange={(e) => setIdeExtensionsSearchQuery(e.target.value)}
+                style={{ width: "100%", backgroundColor: "#0D0E12", border: "1px solid #262933", borderRadius: "8px", padding: "6px 10px", fontSize: "11px", color: "#E2E8F0", outline: "none", marginBottom: "12px" }}
+              />
+              <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px" }}>
+                {ideExtensions.map((ext) => (
+                  <div key={ext.id} style={{ backgroundColor: "#0D0E12", border: "1px solid #1E222D", padding: "10px", borderRadius: "8px" }}>
+                    <div style={{ fontSize: "12px", fontWeight: "700", color: "#E2E8F0" }}>{ext.name}</div>
+                    <div style={{ fontSize: "10px", color: "#94A3B8", margin: "2px 0 6px 0" }}>{ext.description}</div>
+                    <button
+                      onClick={() => ext.installed ? handleExtensionUninstall(ext.id) : handleExtensionInstall(ext.id)}
+                      style={{ fontSize: "10px", padding: "3px 8px", borderRadius: "4px", border: "none", backgroundColor: ext.installed ? "#EF4444" : "#38BDF8", color: "#FFF", cursor: "pointer" }}
+                    >
+                      {ext.installed ? "Deinstallieren" : "Installieren"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </aside>
+
+        {/* Editor Workspace Island */}
+        <main className="code-oss-editor-island" style={{ flex: 1, backgroundColor: "#111319", borderRadius: "12px", border: "1px solid #1E222D", display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
+          
+          {/* Floating Pill Tabs */}
+          <div style={{ height: "36px", backgroundColor: "#0D0E12", borderBottom: "1px solid #1E222D", display: "flex", alignItems: "center", padding: "0 8px", gap: "4px", overflowX: "auto" }}>
+            {ideOpenTabs.map((tabPath) => {
+              const isActive = tabPath === ideActiveFilePath;
+              const fileName = tabPath.split("/").pop() || tabPath;
+              return (
+                <div
+                  key={tabPath}
+                  onClick={() => handleIdeFileSelect(tabPath)}
+                  style={{ height: "26px", padding: "0 10px", borderRadius: "6px", backgroundColor: isActive ? "#111319" : "transparent", border: isActive ? "1px solid #262933" : "none", color: isActive ? "#00FF87" : "#94A3B8", fontSize: "11px", display: "flex", alignItems: "center", gap: "6px", cursor: "pointer" }}
+                >
+                  <Icon icon="mage:file-records" style={{ fontSize: "12px" }} />
+                  <span>{fileName}</span>
+                  <button
+                    onClick={(e) => handleIdeFileClose(tabPath, e)}
+                    style={{ background: "none", border: "none", color: "#64748B", cursor: "pointer", padding: 0 }}
+                  >
+                    <Icon icon="mage:multiply" style={{ fontSize: "10px" }} />
+                  </button>
                 </div>
-              </div>
-            </div>
+              );
+            })}
           </div>
-        )}
-      </aside>
 
-      {/* Main Editor & Console Container */}
-      <div className="ide-editor-container">
-        <div className="ide-tabs-bar">
-          {ideOpenTabs.map((tabPath) => {
-            const isActive = tabPath === ideActiveFilePath;
-            const fileName = tabPath.split("/").pop() || tabPath;
-            const fileObj = ideFiles.find((f) => f.path === tabPath);
-            const lang = fileObj?.language || "";
-
-            return (
-              <div
-                key={tabPath}
-                className={`ide-tab ${isActive ? "active" : ""}`}
-                onClick={() => handleIdeFileSelect(tabPath)}
-              >
-                <Icon 
-                  icon={
-                    lang === "rust" ? "vscode-icons:file-type-rust" :
-                    lang === "python" ? "vscode-icons:file-type-python" :
-                    lang === "golang" ? "vscode-icons:file-type-go" :
-                    lang === "csharp" ? "vscode-icons:file-type-csharp" :
-                    lang === "cpp" ? "vscode-icons:file-type-cpp" :
-                    lang === "javascript" ? "vscode-icons:file-type-js" :
-                    lang === "typescript" ? "vscode-icons:file-type-typescript" :
-                    lang === "html" ? "vscode-icons:file-type-html" :
-                    lang === "css" ? "vscode-icons:file-type-css" :
-                    lang === "toml" ? "vscode-icons:file-type-toml" :
-                    "mage:file-records"
-                  } 
-                  style={{ fontSize: "13px" }}
-                />
-                <span>{fileName}</span>
-                <button
-                  className="ide-tab-close"
-                  onClick={(e) => handleIdeFileClose(tabPath, e)}
-                >
-                  <Icon icon="mage:multiply" style={{ fontSize: "10px" }} />
-                </button>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="ide-editor-wrapper">
-          {activeIdeFile && !activeIdeFile.isFolder ? (
-            <>
-              <div style={{ position: "absolute", top: "10px", right: "20px", zIndex: 10, display: "flex", gap: "8px" }}>
-                <button
-                  className="editor-toolbar-btn primary btn-run"
-                  onClick={handleIdeRun}
-                  style={{ fontSize: "11px", padding: "4px 10px", height: "26px" }}
-                  title="Code ausführen"
-                >
-                  <Icon icon="mage:play" /> Run Sandbox
-                </button>
-                <button
-                  className="editor-toolbar-btn"
-                  onClick={() => {
-                    navigator.clipboard.writeText(activeIdeFile.code);
-                    showToast("Code kopiert!");
-                  }}
-                  style={{ fontSize: "11px", padding: "4px 8px", height: "26px" }}
-                  title="In Zwischenablage kopieren"
-                >
-                  <Icon icon="mage:copy" /> Copy
-                </button>
-              </div>
-
+          {/* Monaco Editor Container */}
+          <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
+            {activeIdeFile && !activeIdeFile.isFolder ? (
               <Editor
                 height="100%"
                 language={activeIdeFile.language}
-                theme={theme === "light" ? "zeno-light-theme" : "zeno-dark-theme"}
+                theme={theme === "light" ? "code-oss-island-light" : "code-oss-island-dark"}
                 beforeMount={handleEditorBeforeMount}
                 value={activeIdeFile.code}
                 onChange={handleIdeCodeChange}
@@ -461,119 +322,60 @@ export const ZenoIde: React.FC<ZenoIdeProps> = ({
                   fontSize: 13,
                   fontFamily: "var(--font-mono)",
                   automaticLayout: true,
-                  quickSuggestions: { other: true, comments: true, strings: true },
-                  suggestOnTriggerCharacters: true,
-                  acceptSuggestionOnEnter: "on",
-                  tabCompletion: "on",
-                  snippetSuggestions: "top",
-                  wordBasedSuggestions: "allDocuments",
-                  parameterHints: { enabled: true }
+                  renderLineHighlight: "all",
+                  cursorBlinking: "smooth",
+                  cursorSmoothCaretAnimation: "on"
                 }}
               />
-            </>
-          ) : (
-            <div className="ide-no-editors-screen">
-              <div className="ide-watermark-container">
-                <img 
-                  src="/zeno_logo.svg" 
-                  alt="Zeno Logo" 
-                  className="ide-watermark-logo"
-                  style={{ width: "80px", height: "80px", opacity: 0.15, filter: "grayscale(30%)", marginBottom: "16px" }} 
-                />
-                <h3 style={{ fontSize: "16px", fontWeight: "600", color: "var(--text-primary)", opacity: 0.8, marginBottom: "24px" }}>
-                  Zeno Workspace Editor
-                </h3>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "#64748B" }}>
+                <Icon icon="mage:box-3d" style={{ fontSize: "48px", marginBottom: "12px", opacity: 0.3 }} />
+                <p style={{ fontSize: "13px" }}>Wähle eine Datei im Explorer aus oder erstelle ein neues Projekt.</p>
               </div>
-
-              <div className="ide-shortcut-list">
-                <div className="ide-shortcut-item">
-                  <span className="ide-shortcut-action">Datei erstellen</span>
-                  <span className="ide-shortcut-keys">
-                    <kbd>Ctrl</kbd> + <kbd>N</kbd>
-                  </span>
-                </div>
-                <div className="ide-shortcut-item">
-                  <span className="ide-shortcut-action">Projekt-Template generieren</span>
-                  <span className="ide-shortcut-keys">
-                    <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>G</kbd>
-                  </span>
-                </div>
-                <div className="ide-shortcut-item">
-                  <span className="ide-shortcut-action">WASM Runtime Hub</span>
-                  <span className="ide-shortcut-keys">
-                    <kbd>Ctrl</kbd> + <kbd>H</kbd>
-                  </span>
-                </div>
-                <div className="ide-shortcut-item">
-                  <span className="ide-shortcut-action">Konsole ein-/ausblenden</span>
-                  <span className="ide-shortcut-keys">
-                    <kbd>Ctrl</kbd> + <kbd>`</kbd>
-                  </span>
-                </div>
-              </div>
-
-              <div className="ide-quick-actions" style={{ display: "flex", gap: "10px", marginTop: "32px" }}>
-                <button 
-                  className="settings-btn"
-                  onClick={() => {
-                    setIdeNewItemType("file");
-                    setIdeNewItemParentPath("");
-                    setIsIdeNewItemModalOpen(true);
-                  }}
-                  style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", padding: "8px 14px" }}
-                >
-                  <Icon icon="mage:plus" /> Neue Datei
-                </button>
-                <button 
-                  className="settings-btn primary"
-                  onClick={() => setIsIdeProjectWizardOpen(true)}
-                  style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", padding: "8px 14px" }}
-                >
-                  <Icon icon="mage:box-3d" /> Projekt generieren
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Collapsible Console Bottom Area */}
-        <div 
-          className={`ide-console ${isIdeConsoleExpanded ? "" : "collapsed"}`}
-          style={{ height: isIdeConsoleExpanded ? "220px" : "35px" }}
-        >
-          <div 
-            className="ide-console-header"
-            onClick={() => setIsIdeConsoleExpanded(!isIdeConsoleExpanded)}
-          >
-            <span className="ide-console-title">
-              <Icon icon="mage:dashboard" />
-              WASM Sandbox-Ausgabe & Logs
-            </span>
-            <div className="ide-console-actions">
-              <button
-                className="ide-sidebar-btn"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIdeConsoleOutput("");
-                  showToast("Konsole gelöscht.");
-                }}
-                title="Konsole leeren"
-              >
-                <Icon icon="mage:trash-3" style={{ fontSize: "12px" }} />
-              </button>
-              <Icon 
-                icon={isIdeConsoleExpanded ? "mage:chevron-down" : "mage:chevron-up"} 
-                style={{ fontSize: "14px", color: "var(--text-muted)" }} 
-              />
-            </div>
+            )}
           </div>
-          {isIdeConsoleExpanded && (
-            <pre className="ide-console-output" style={{ flex: 1, margin: 0, overflowY: "auto" }}>
-              <code>{ideConsoleOutput || "[zeno-console] Keine Ausgaben vorhanden."}</code>
-            </pre>
-          )}
-        </div>
+
+          {/* 3. FLOATING TERMINAL & CONSOLE ISLAND */}
+          <div style={{ borderTop: "1px solid #1E222D", backgroundColor: "#0D0E12", display: "flex", flexDirection: "column" }}>
+            <div style={{ height: "28px", padding: "0 12px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: isIdeConsoleExpanded ? "1px solid #1E222D" : "none" }}>
+              <div style={{ display: "flex", gap: "16px", fontSize: "11px", fontWeight: "600" }}>
+                <span
+                  onClick={() => { setActiveBottomTab("terminal"); setIsIdeConsoleExpanded(true); }}
+                  style={{ color: activeBottomTab === "terminal" ? "#38BDF8" : "#64748B", cursor: "pointer" }}
+                >
+                  TERMINAL
+                </span>
+                <span
+                  onClick={() => { setActiveBottomTab("problems"); setIsIdeConsoleExpanded(true); }}
+                  style={{ color: activeBottomTab === "problems" ? "#38BDF8" : "#64748B", cursor: "pointer" }}
+                >
+                  PROBLEME (0)
+                </span>
+                <span
+                  onClick={() => { setActiveBottomTab("output"); setIsIdeConsoleExpanded(true); }}
+                  style={{ color: activeBottomTab === "output" ? "#38BDF8" : "#64748B", cursor: "pointer" }}
+                >
+                  AUSGABE
+                </span>
+              </div>
+              <button
+                onClick={() => setIsIdeConsoleExpanded(!isIdeConsoleExpanded)}
+                style={{ background: "none", border: "none", color: "#64748B", cursor: "pointer", fontSize: "12px" }}
+              >
+                <Icon icon={isIdeConsoleExpanded ? "mage:chevron-down" : "mage:chevron-up"} />
+              </button>
+            </div>
+
+            {isIdeConsoleExpanded && (
+              <div style={{ height: "120px", padding: "10px", overflowY: "auto", fontFamily: "var(--font-mono)", fontSize: "11px", color: "#00FF87" }}>
+                <pre style={{ margin: 0 }}><code>{ideConsoleOutput || "$ cargo check\n   Compiling zeno_sandbox v0.1.0\n    Finished dev [unoptimized + debuginfo] target(s) in 0.42s"}</code></pre>
+              </div>
+            )}
+          </div>
+
+        </main>
       </div>
+
     </div>
   );
 };
