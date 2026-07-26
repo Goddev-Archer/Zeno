@@ -1593,6 +1593,16 @@ input:checked + .slider:before {
   align-items: flex-end; /* Align child buttons to the right */
 }
 
+.settings-title {
+  width: 190px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 14px;
+  padding: 0 10px;
+  text-align: left;
+}
+
 .settings-sidebar-header {
   width: 190px;
   font-size: 11px;

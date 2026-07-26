@@ -161,7 +161,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                 {/* Custom Profile CSS & Template Customizer Section */}
                 <div className="settings-form-group" style={{ marginTop: "24px", paddingTop: "20px", borderTop: "1px solid var(--border-color)" }}>
-                  <h4 style={{ fontSize: "14px", fontWeight: "700", color: "#FFF", marginBottom: "4px", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <h4 style={{ fontSize: "14px", fontWeight: "700", color: "var(--text-primary)", marginBottom: "4px", display: "flex", alignItems: "center", gap: "8px" }}>
                     <Icon icon="mage:palette" style={{ color: "var(--accent-color)" }} />
                     Profil-Design & Custom-CSS Templates
                   </h4>
@@ -206,7 +206,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         value={userStatusQuote}
                         onChange={(e) => setUserStatusQuote(e.target.value)}
                         placeholder="Zeno verschlüsselt meine Daten."
-                        style={{ width: "100%", padding: "8px 12px", background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "6px", color: "#FFF", fontSize: "12px" }}
+                        style={{ width: "100%", padding: "8px 12px", background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "6px", color: "var(--text-primary)", fontSize: "12px" }}
                       />
                     </div>
 
@@ -220,7 +220,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         value={userBadge}
                         onChange={(e) => setUserBadge(e.target.value)}
                         placeholder="⚡ VIP CYBERNAUT"
-                        style={{ width: "100%", padding: "8px 12px", background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "6px", color: "#FFF", fontSize: "12px" }}
+                        style={{ width: "100%", padding: "8px 12px", background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "6px", color: "var(--text-primary)", fontSize: "12px" }}
                       />
                     </div>
                   </div>
@@ -259,7 +259,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       value={userBannerGradient}
                       onChange={(e) => setUserBannerGradient(e.target.value)}
                       placeholder="linear-gradient(135deg, #7928CA 0%, #FF0080 100%)"
-                      style={{ width: "100%", padding: "8px 12px", background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "6px", color: "#FFF", fontSize: "12px", fontFamily: "monospace" }}
+                      style={{ width: "100%", padding: "8px 12px", background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "6px", color: "var(--text-primary)", fontSize: "12px", fontFamily: "monospace" }}
                     />
                   </div>
 
@@ -291,9 +291,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
 
                   {/* Live Profile Card Preview & Save Action */}
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: "20px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--border-color)", borderRadius: "10px", padding: "16px" }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: "20px", background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "10px", padding: "16px" }}>
                     <div style={{ flex: 1 }}>
-                      <h5 style={{ margin: "0 0 6px 0", color: "#FFF", fontSize: "13px" }}>Echtzeit Profil-Vorschau</h5>
+                      <h5 style={{ margin: "0 0 6px 0", color: "var(--text-primary)", fontSize: "13px" }}>Echtzeit Profil-Vorschau</h5>
                       <p style={{ fontSize: "11px", color: "var(--text-muted)", margin: "0 0 14px 0" }}>
                         So erscheint deine Profilkarte für andere Mitglieder im Chat und in der Mitgliederliste.
                       </p>
