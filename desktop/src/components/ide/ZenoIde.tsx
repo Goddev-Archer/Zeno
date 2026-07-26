@@ -113,6 +113,19 @@ export const ZenoIde: React.FC<ZenoIdeProps> = ({
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          {serverStatus.online && (
+            <button
+              onClick={() => {
+                window.open(openVsCodeUrl, "_blank");
+                showToast("Echtes VS Code (OpenVSCode Workbench) in neuem Fenster geöffnet! 🚀");
+              }}
+              style={{ backgroundColor: "#00FF87", color: "#08090C", border: "none", padding: "5px 14px", borderRadius: "8px", fontSize: "11px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}
+              title="Öffnet das echte VS Code ohne Iframe-Einschränkungen in einem eigenen Fenster"
+            >
+              <Icon icon="mage:external-link" /> In neuem Fenster öffnen
+            </button>
+          )}
+
           {!serverStatus.online && (
             <button
               onClick={() => {
@@ -125,11 +138,12 @@ export const ZenoIde: React.FC<ZenoIdeProps> = ({
               <Icon icon="mage:terminal" /> Terminal Launch Command
             </button>
           )}
+
           <button
             onClick={() => setUseEmbeddedFallback(!useEmbeddedFallback)}
             style={{ backgroundColor: "#1E222D", color: "#E2E8F0", border: "1px solid #262933", padding: "5px 12px", borderRadius: "8px", fontSize: "11px", cursor: "pointer" }}
           >
-            {useEmbeddedFallback ? "Zum OpenVSCode Server wechseln" : "Zurück zur Standalone Sandbox"}
+            {useEmbeddedFallback ? "Zum OpenVSCode Server" : "Standalone Island Editor"}
           </button>
         </div>
       </header>
@@ -137,12 +151,25 @@ export const ZenoIde: React.FC<ZenoIdeProps> = ({
       {/* MAIN WORKSPACE VIEW */}
       <div style={{ flex: 1, backgroundColor: "#111319", borderRadius: "12px", border: "1px solid #1E222D", overflow: "hidden", display: "flex", flexDirection: "column" }}>
         {serverStatus.online && !useEmbeddedFallback ? (
-          /* GENUINE 100% OPENVSCODE WEB WORKBENCH IFRAME EMBED */
-          <iframe
-            src={openVsCodeUrl}
-            title="OpenVSCode Genuine Server Workbench"
-            style={{ width: "100%", height: "100%", border: "none", borderRadius: "12px" }}
-          />
+          /* GENUINE 100% OPENVSCODE WEB WORKBENCH EMBED & WINDOW LAUNCHER */
+          <div style={{ display: "flex", flexDirection: "column", height: "100%", position: "relative" }}>
+            <div style={{ backgroundColor: "#181A20", padding: "10px 16px", borderBottom: "1px solid #1E222D", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: "11px", color: "#00FF87", fontWeight: "600", display: "flex", alignItems: "center", gap: "6px" }}>
+                <Icon icon="mage:check-circle" /> Echtes OpenVSCode unter {openVsCodeUrl} aktiv!
+              </span>
+              <button
+                onClick={() => window.open(openVsCodeUrl, "_blank")}
+                style={{ background: "#00FF87", color: "#08090C", border: "none", padding: "4px 12px", borderRadius: "6px", fontSize: "11px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px" }}
+              >
+                <Icon icon="mage:external-link" /> In neuem Fenster öffnen (Empfohlen)
+              </button>
+            </div>
+            <iframe
+              src={openVsCodeUrl}
+              title="OpenVSCode Genuine Server Workbench"
+              style={{ width: "100%", height: "100%", border: "none" }}
+            />
+          </div>
         ) : (
           /* STANDALONE CODE-OSS ISLAND EMBEDDED EDITOR */
           <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
