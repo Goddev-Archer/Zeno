@@ -881,7 +881,7 @@ function getCurrentTimestamp(): string {
   return now.toTimeString().slice(0, 5);
 }
 
-export default function App() {
+function ZenoMainApp() {
   // --- STATE ---
   const [servers, setServers] = useState<Server[]>(initialServers);
   const [activeServerId, setActiveServerId] = useState<string>("home");
@@ -1738,13 +1738,15 @@ return \`
 
   // --- CORE UI ACTIONS ---
   const handleServerSelect = (server: Server) => {
+    if (!server) return;
     setAnimatingServerId(server.id);
     setActiveServerId(server.id);
-    // Auto-select first text channel on server change
-    const firstTextChan = server.categories.find((c) => c.type === "text")?.channels[0];
-    if (firstTextChan) {
-      setActiveChannel(firstTextChan);
-    }
+    // Auto-select first text channel or fallback to any channel on server change
+    const firstTextChan = server.categories?.find((c) => c.type === "text")?.channels[0];
+    const fallbackChan = server.categories?.flatMap((c) => c.channels)[0];
+    const targetChan = firstTextChan || fallbackChan || { id: "allgemein", name: "allgemein" };
+    setActiveChannel(targetChan);
+
     setTimeout(() => {
       setAnimatingServerId(null);
     }, 300);
@@ -4222,9 +4224,9 @@ sys.stderr = io.StringIO()
             <header className="chat-header">
           <div className="chat-header-info">
             <span className="chat-header-icon"><Icon icon="mage:hashtag" /></span>
-            <h2 className="chat-header-channel">{activeChannel.name}</h2>
+            <h2 className="chat-header-channel">{activeChannel?.name || "allgemein"}</h2>
             <span className="chat-header-divider" />
-            <p className="chat-header-description">Kanal für {activeChannel.name} in {activeServer.name}</p>
+            <p className="chat-header-description">Kanal für {activeChannel?.name || "allgemein"} in {activeServer?.name || "Server"}</p>
           </div>
           <div className="chat-header-actions">
             <button 
@@ -4248,12 +4250,12 @@ sys.stderr = io.StringIO()
         </header>
 
         {/* Message Feed */}
-        <div className="messages-container" key={activeChannel.id}>
+        <div className="messages-container" key={activeChannel?.id || "allgemein"}>
           <div className="date-separator" role="separator">
             <span className="date-separator-text">— Heute —</span>
           </div>
 
-          {(chatMessages[activeChannel.id] || []).map((msg, i) => {
+          {(chatMessages[activeChannel?.id || "allgemein"] || []).map((msg, i) => {
             const urlMatch = msg.text ? msg.text.match(/(https?:\/\/[^\s]+)/) : null;
             const foundUrl = urlMatch ? urlMatch[0] : null;
             const urlDetails = foundUrl ? cleanUrl(foundUrl) : null;
@@ -4466,7 +4468,7 @@ sys.stderr = io.StringIO()
                 type="text"
                 className="message-input"
                 id="chat-input-field"
-                placeholder={`Nachricht an # ${activeChannel.name}`}
+                placeholder={`Nachricht an #${activeChannel?.name || "allgemein"}`}
                 value={inputText}
                 onChange={(e) => {
                   const val = e.target.value;
@@ -5531,5 +5533,52 @@ sys.stderr = io.StringIO()
         ))}
       </div>
     </div>
+  );
+}
+
+class ZenoErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: any) {
+    console.error("Zeno UI Rendering Exception Caught:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", backgroundColor: "#18191B", color: "#DFE1E5", padding: "24px", textAlign: "center" }}>
+          <div style={{ fontSize: "48px", marginBottom: "16px" }}>⚡</div>
+          <h2 style={{ fontSize: "20px", fontWeight: "700", marginBottom: "8px" }}>Zeno UI-Wiederherstellung</h2>
+          <p style={{ fontSize: "13px", color: "#A8AAAD", maxWidth: "480px", marginBottom: "20px" }}>
+            Ein unerwarteter Darstellungsfehler wurde abgefangen. Das Layout kann im sicheren Modus sofort wiederhergestellt werden.
+          </p>
+          <button
+            onClick={() => {
+              this.setState({ hasError: false });
+              window.location.reload();
+            }}
+            style={{ padding: "10px 20px", backgroundColor: "#3574F0", color: "#FFF", borderRadius: "6px", fontWeight: "600", cursor: "pointer", border: "none" }}
+          >
+            🔄 Benutzeroberfläche neu laden
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export default function App() {
+  return (
+    <ZenoErrorBoundary>
+      <ZenoMainApp />
+    </ZenoErrorBoundary>
   );
 }
