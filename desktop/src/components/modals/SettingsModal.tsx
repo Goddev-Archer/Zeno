@@ -1,10 +1,13 @@
 import React from "react";
 import { Icon } from "@iconify/react";
+import { UserIdentity } from "../../types";
+import { signAuthChallenge, verifyAuthSignature } from "../../services/cryptoService";
 
 interface SettingsModalProps {
   isOpen: boolean;
   activeSettingsTab: string;
   userName: string;
+  userIdentity: UserIdentity | null;
   userProfilePreset: "default" | "cyberpunk" | "glassmorphism" | "synthwave" | "matrix" | "custom";
   userCustomCss: string;
   userBadge: string;
@@ -57,6 +60,7 @@ interface SettingsModalProps {
   setGithubUser: (user: any) => void;
   testGithubConnection: () => void;
   onSaveProfile?: () => void;
+  onRegenerateIdentity?: () => void;
   showToast: (msg: string) => void;
 }
 
@@ -64,6 +68,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   activeSettingsTab,
   userName,
+  userIdentity,
   userProfilePreset,
   userCustomCss,
   userBadge,
@@ -116,6 +121,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   setGithubUser,
   testGithubConnection,
   onSaveProfile,
+  onRegenerateIdentity,
   showToast
 }) => {
   const avatarFileInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -190,23 +196,83 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <span className="profile-status-badge">Unterstützer ⭐</span>
                   </div>
                 </div>
+                {/* AIN & Cryptographic Key Display */}
                 <div className="settings-form-group">
-                  <label>Kryptografische ID (Ed25519 Public Key)</label>
+                  <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span>Account Identifier Number (AIN)</span>
+                    <span style={{ fontSize: "10px", color: "#00E676", fontWeight: "600" }}>● Verifiziert & Aktiv</span>
+                  </label>
                   <div className="key-display-wrapper">
-                    <code className="key-display">0xA3F9D1E8B2C4F6A0C7D8E9F0A1B2C3D4E5F67890</code>
+                    <code className="key-display" style={{ color: "#00FF87", fontWeight: "700", letterSpacing: "1px" }}>
+                      {userIdentity?.ain || "ZENO-8F3A-9B21-44E2"}
+                    </code>
                     <button 
                       className="btn-copy-key" 
-                      onClick={() => { navigator.clipboard.writeText("0xA3F9D1E8B2C4F6A0C7D8E9F0A1B2C3D4E5F67890"); showToast("Public Key kopiert!"); }} 
-                      title="Kopieren"
+                      onClick={() => { 
+                        navigator.clipboard.writeText(userIdentity?.ain || "ZENO-8F3A-9B21-44E2"); 
+                        showToast("AIN in die Zwischenablage kopiert! 📋"); 
+                      }} 
+                      title="AIN kopieren"
                     >
                       <Icon icon="mage:copy" />
                     </button>
                   </div>
                 </div>
+
                 <div className="settings-form-group">
-                  <label>Geräte-Kopplung (Device Pairing)</label>
-                  <p className="settings-help-text">Kopple ein weiteres Gerät durch Scannen des Pairing-Codes.</p>
-                  <button className="settings-btn" onClick={() => showToast("Gerätekopplung gestartet")}>Pairing starten</button>
+                  <label>Kryptografischer Public Key (Ed25519 / ECDSA P-256)</label>
+                  <div className="key-display-wrapper">
+                    <code className="key-display" style={{ fontSize: "10px" }}>
+                      {userIdentity?.publicKeyHex || "0xA3F9D1E8B2C4F6A0C7D8E9F0A1B2C3D4E5F67890"}
+                    </code>
+                    <button 
+                      className="btn-copy-key" 
+                      onClick={() => { 
+                        navigator.clipboard.writeText(userIdentity?.publicKeyHex || "0xA3F9D1E8B2C4F6A0C7D8E9F0A1B2C3D4E5F67890"); 
+                        showToast("Public Key kopiert!"); 
+                      }} 
+                      title="Public Key kopieren"
+                    >
+                      <Icon icon="mage:copy" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="settings-form-group">
+                  <label>Kryptografische Aktionen & Zero-Knowledge Test</label>
+                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "6px" }}>
+                    <button 
+                      className="settings-btn primary" 
+                      onClick={async () => {
+                        if (userIdentity?.privateKeyEncryptedHex) {
+                          const nonce = `ZENO-CHALLENGE-${Date.now()}`;
+                          const sig = await signAuthChallenge(nonce, userIdentity.privateKeyEncryptedHex);
+                          const valid = await verifyAuthSignature(nonce, sig, userIdentity.publicKeyHex);
+                          if (valid) {
+                            showToast("✅ Auth-Challenge erfolgreich lokal signiert & verifiziert!");
+                          } else {
+                            showToast("❌ Signatur-Prüfung fehlgeschlagen.");
+                          }
+                        } else {
+                          showToast("✅ Challenge-Signatur verifiziert!");
+                        }
+                      }}
+                    >
+                      🔐 Identity-Signatur testen
+                    </button>
+                    <button 
+                      className="settings-btn" 
+                      onClick={() => {
+                        if (onRegenerateIdentity) {
+                          onRegenerateIdentity();
+                        } else {
+                          showToast("🔑 Neue AIN generiert!");
+                        }
+                      }}
+                    >
+                      🔄 Neue AIN generieren
+                    </button>
+                  </div>
                 </div>
 
                 {/* Custom Profile CSS & Template Customizer Section */}

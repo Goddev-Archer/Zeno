@@ -126,3 +126,18 @@ export interface LiveGitCommit {
   timeAgo: string;
   author: string;
 }
+
+export interface UserIdentity {
+  ain: string;
+  publicKeyHex: string;
+  privateKeyEncryptedHex?: string;
+  fingerprint: string;
+  createdAt: string;
+}
+
+export interface EncryptedVaultBlob {
+  ciphertextHex: string;
+  ivHex: string;
+  saltHex: string;
+  timestamp: string;
+}

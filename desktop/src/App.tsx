@@ -16,8 +16,10 @@ import {
   IdeFile,
   WidgetConfig,
   LiveGitStatus,
-  LiveGitCommit
+  LiveGitCommit,
+  UserIdentity
 } from "./types";
+import { getOrRegisterUserIdentity, generateCryptographicIdentity } from "./services/cryptoService";
 import { cleanUrl } from "./utils/urlCleaner";
 import {
   initialServers,
@@ -214,6 +216,28 @@ function ZenoMainApp() {
   const [userCardHoverEffect, setUserCardHoverEffect] = useState<"none" | "rainbow_border" | "holographic_shimmer" | "cosmic_glow" | "neon_border">("holographic_shimmer");
   const [userLayoutOrder, setUserLayoutOrder] = useState<"standard" | "compact" | "avatar_left" | "banner_overlay">("standard");
   const [userAnimationPreset, setUserAnimationPreset] = useState<"none" | "subtle_pulse" | "floating_card" | "neon_flicker" | "particle_shimmer">("none");
+
+  // Cryptographic AIN & Keypair State
+  const [userIdentity, setUserIdentity] = useState<UserIdentity | null>(null);
+
+  useEffect(() => {
+    getOrRegisterUserIdentity().then((identity) => {
+      setUserIdentity(identity);
+      if (mockProfiles.CipherNaut) {
+        mockProfiles.CipherNaut.fingerprint = identity.fingerprint;
+      }
+    });
+  }, []);
+
+  const handleRegenerateIdentity = async () => {
+    const newIdentity = await generateCryptographicIdentity();
+    localStorage.setItem("zeno_user_identity", JSON.stringify(newIdentity));
+    setUserIdentity(newIdentity);
+    if (mockProfiles.CipherNaut) {
+      mockProfiles.CipherNaut.fingerprint = newIdentity.fingerprint;
+    }
+    showToast(`🔑 Neue AIN generiert: ${newIdentity.ain}`);
+  };
 
   // Load saved profile config on startup
   useEffect(() => {
@@ -1225,6 +1249,7 @@ function ZenoMainApp() {
         isOpen={isSettingsOpen}
         activeSettingsTab={activeSettingsTab}
         userName={userName}
+        userIdentity={userIdentity}
         userProfilePreset={userProfilePreset}
         userCustomCss={userCustomCss}
         userBadge={userBadge}
@@ -1277,6 +1302,7 @@ function ZenoMainApp() {
         setGithubUser={setGithubUser}
         testGithubConnection={testGithubConnection}
         onSaveProfile={handleSaveProfileConfig}
+        onRegenerateIdentity={handleRegenerateIdentity}
         showToast={showToast}
       />
 
