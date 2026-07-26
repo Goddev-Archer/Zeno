@@ -746,6 +746,19 @@ const mockProfiles: Record<string, Profile> = {
     bannerGradient: "linear-gradient(135deg, #f857a6 0%, #ff5858 100%)",
     badge: "🌙 NIGHT OWL",
     themePreset: "synthwave"
+  },
+  QuantumLeap: {
+    id: "quantumleap",
+    name: "QuantumLeap",
+    avatar: "Q",
+    avatarColor: "purple",
+    role: "Offline",
+    roleColor: "muted",
+    status: '"QKD Entanglement aktiv."',
+    fingerprint: "0xFE9876543210ABCDEF1234567890ABCDEF123456",
+    bannerGradient: "linear-gradient(135deg, #00F2FE 0%, #4FACFE 100%)",
+    badge: "⚛️ QUANTUM DEV",
+    themePreset: "glassmorphism"
   }
 };
 
@@ -4500,14 +4513,15 @@ sys.stderr = io.StringIO()
             <ul className="role-group-list">
               {["MaxShield", "LenaCrypt", "CipherNaut"].map((user) => {
                 const profile = mockProfiles[user];
+                if (!profile) return null;
                 return (
                   <li key={user}>
                     <div className="member-item" onClick={() => setSelectedUserProfile(profile)}>
                       <div className="member-avatar-wrapper">
-                        <div className={`member-avatar ${profile.avatarColor}`}>{profile.avatar}</div>
+                        <div className={`member-avatar ${profile.avatarColor || "blue"}`}>{profile.avatar || user[0]}</div>
                         <span className="status-dot online" />
                       </div>
-                      <span className="member-name">{profile.name}</span>
+                      <span className="member-name">{profile.name || user}</span>
                       {profile.role === "Unterstützer" && <span className="badge supporter-badge">⭐</span>}
                     </div>
                   </li>
@@ -4537,14 +4551,15 @@ sys.stderr = io.StringIO()
             <ul className="role-group-list">
               {["DarkNode", "QuantumLeap"].map((user) => {
                 const profile = mockProfiles[user];
+                if (!profile) return null;
                 return (
                   <li key={user}>
                     <div className="member-item offline" onClick={() => setSelectedUserProfile(profile)}>
                       <div className="member-avatar-wrapper">
-                        <div className="member-avatar gray">{profile.avatar}</div>
+                        <div className="member-avatar gray">{profile.avatar || user[0]}</div>
                         <span className="status-dot offline" />
                       </div>
-                      <span className="member-name">{profile.name}</span>
+                      <span className="member-name">{profile.name || user}</span>
                     </div>
                   </li>
                 );
