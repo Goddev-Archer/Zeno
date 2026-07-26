@@ -471,7 +471,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                             <span className="badge" style={{ backgroundColor: "rgba(89,168,105,0.15)", color: "#59A869", border: "1px solid rgba(89,168,105,0.2)", fontSize: "10px", padding: "2px 6px" }}>Clean</span>
                           ) : (
                             <span className="badge" style={{ backgroundColor: "rgba(224,82,82,0.15)", color: "#e05252", border: "1px solid rgba(224,82,82,0.2)", fontSize: "10px", padding: "2px 6px" }}>
-                              {liveGitStatus ? `${liveGitStatus.modified + liveGitStatus.added + liveGitStatus.deleted + liveGitStatus.untracked} Änderungen` : "Geändert"}
+                              {liveGitStatus ? `${(liveGitStatus.modified || 0) + (liveGitStatus.added || 0) + (liveGitStatus.deleted || 0) + (liveGitStatus.untracked || 0) || liveGitStatus.uncommittedChanges || 0} Änderungen` : "Geändert"}
                             </span>
                           )}
                         </div>

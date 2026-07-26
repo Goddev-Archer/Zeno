@@ -939,7 +939,7 @@ function ZenoMainApp() {
 
   return (
     <div
-      className={`app-container ${theme} ${glassmorphism ? "glassmorphism" : ""}`}
+      className={`app-layout ${activeServerId === "home" && homeTab === "ide" ? "in-ide" : ""} ${theme} ${glassmorphism ? "glassmorphism" : ""}`}
       style={{
         "--canvas-bg": canvasColor,
         "--glow-color": glowColor
