@@ -49,6 +49,7 @@ interface DashboardProps {
   fetchRealWeather: () => void;
   showToast: (msg: string) => void;
   getContrastColor: (hex: string) => string;
+  onOpenMarketplace?: () => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -97,7 +98,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   fetchLiveGitData,
   fetchRealWeather,
   showToast,
-  getContrastColor
+  getContrastColor,
+  onOpenMarketplace
 }) => {
   return (
     <div className="zeno-dashboard" style={{ padding: "24px", overflowY: "auto", display: "flex", flexDirection: "column", height: "100%", boxSizing: "border-box" }}>
@@ -107,9 +109,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>Dein privates, sicheres Workspace-Dashboard. Zero-Knowledge, 100% clientseitig.</p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          {onOpenMarketplace && (
+            <button className="settings-btn" onClick={onOpenMarketplace} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", padding: "6px 12px" }}>
+              <Icon icon="mage:box-3d" style={{ color: "#00FF87" }} /> Widget Marketplace
+            </button>
+          )}
           {dashboardEditMode && (
             <button className="settings-btn primary" onClick={addCustomWidget} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", padding: "6px 12px" }}>
-              <Icon icon="mage:plus" /> Widget
+              <Icon icon="mage:plus" /> Eigenes Widget
             </button>
           )}
           <button className={`settings-btn ${dashboardEditMode ? "primary" : ""}`} onClick={() => { setDashboardEditMode((v) => !v); setEditingWidgetId(null); }} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", padding: "6px 12px" }}>

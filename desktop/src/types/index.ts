@@ -36,6 +36,18 @@ export interface Message {
   attachment?: MessageAttachment;
 }
 
+export interface SocialLink {
+  platform: "github" | "steam" | "discord" | "twitter" | "spotify" | "custom";
+  url: string;
+  label?: string;
+}
+
+export interface TopGame {
+  title: string;
+  hoursPlayed?: string;
+  icon?: string;
+}
+
 export interface Profile {
   id?: string;
   name: string;
@@ -60,6 +72,9 @@ export interface Profile {
   animationPreset?: "none" | "subtle_pulse" | "floating_card" | "neon_flicker" | "particle_shimmer";
   themePreset?: "default" | "cyberpunk" | "glassmorphism" | "synthwave" | "matrix" | "custom";
   customCss?: string;
+  aboutMe?: string;
+  socialLinks?: SocialLink[];
+  topGames?: TopGame[];
 }
 
 export interface Toast {

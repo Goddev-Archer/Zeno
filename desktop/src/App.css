@@ -1499,6 +1499,18 @@ body.light-mode .editor-output,
   padding: 0;
 }
 
+/* Monaco Editor Strict Dark/Light Theme Guarantee */
+.monaco-editor, 
+.monaco-editor-background, 
+.monaco-editor .margin {
+  background-color: #111214 !important;
+}
+body.light-mode .monaco-editor, 
+body.light-mode .monaco-editor-background, 
+body.light-mode .monaco-editor .margin {
+  background-color: #FFFFFF !important;
+}
+
 /* Custom Toggle Switch */
 .switch-control {
   display: flex;

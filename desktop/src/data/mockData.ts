@@ -164,6 +164,17 @@ export const mockProfiles: Record<string, Profile> = {
     bannerGradient: "linear-gradient(135deg, #7928CA 0%, #FF0080 100%)",
     badge: "⚡ VIP CYBERNAUT",
     badgePosition: "badge-center",
+    aboutMe: "Full-Stack Dev & Cryptography Enthusiast. Baue die Zukunft der privaten Echtzeit-Kommunikation mit Zeno! 🚀",
+    socialLinks: [
+      { platform: "github", url: "https://github.com", label: "GitHub" },
+      { platform: "steam", url: "https://store.steampowered.com", label: "Steam" },
+      { platform: "discord", url: "https://discord.gg", label: "Discord" }
+    ],
+    topGames: [
+      { title: "Zeno IDE", hoursPlayed: "142 Std.", icon: "⚡" },
+      { title: "Cyberpunk 2077", hoursPlayed: "88 Std.", icon: "🌆" },
+      { title: "Valorant", hoursPlayed: "54 Std.", icon: "🎯" }
+    ],
     themePreset: "cyberpunk",
     customCss: `
 /* Custom Cyberpunk Profile Theme */
@@ -384,7 +395,7 @@ export const INITIAL_WIDGETS: WidgetConfig[] = [
   {
     id: "w1",
     type: "recent-files",
-    title: "Zuletzt bearbeitete Dateien",
+    title: "📂 Workspace & Dateiverlauf",
     bgColor: "",
     colSpan: 1,
     rowSpan: 1,
@@ -394,7 +405,7 @@ export const INITIAL_WIDGETS: WidgetConfig[] = [
   {
     id: "w2",
     type: "git-status",
-    title: "Git Repository Status",
+    title: "⚡ Git Repository Live-Status",
     bgColor: "",
     colSpan: 1,
     rowSpan: 1,
@@ -402,25 +413,5 @@ export const INITIAL_WIDGETS: WidgetConfig[] = [
     customCode: "",
     gitMode: "local",
     gitRepo: "dev/ProjectZeno/Zeno"
-  },
-  {
-    id: "w3",
-    type: "weather",
-    title: "Wetter & Standort",
-    bgColor: "",
-    colSpan: 1,
-    rowSpan: 1,
-    order: 2,
-    customCode: ""
-  },
-  {
-    id: "w4",
-    type: "privacy-guard",
-    title: "Zeno Privacy Status",
-    bgColor: "",
-    colSpan: 1,
-    rowSpan: 1,
-    order: 3,
-    customCode: ""
   }
 ];

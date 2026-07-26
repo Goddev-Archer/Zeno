@@ -89,8 +89,66 @@ export const ProfileCardModal: React.FC<ProfileCardModalProps> = ({
             <h3 className="profile-card-name">{p.name}</h3>
             <span className="profile-card-role">{p.role.toUpperCase()}</span>
             {p.status && <div className="profile-card-status">{p.status}</div>}
+
+            {/* Bio / About Me */}
+            {p.aboutMe && (
+              <div className="profile-card-section" style={{ marginTop: "12px", textAlign: "left" }}>
+                <label style={{ fontSize: "10px", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: "700", display: "block", marginBottom: "4px" }}>Über mich</label>
+                <div style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: "1.4", background: "rgba(0,0,0,0.15)", padding: "8px 10px", borderRadius: "6px" }}>
+                  {p.aboutMe}
+                </div>
+              </div>
+            )}
+
+            {/* Top Games / Activity */}
+            {p.topGames && p.topGames.length > 0 && (
+              <div className="profile-card-section" style={{ marginTop: "12px", textAlign: "left" }}>
+                <label style={{ fontSize: "10px", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: "700", display: "block", marginBottom: "6px" }}>🎮 Spiele & Aktivitäten</label>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                  {p.topGames.map((game, i) => (
+                    <div key={i} style={{ background: "var(--bg-tertiary, rgba(255,255,255,0.08))", border: "1px solid var(--border-color)", padding: "4px 8px", borderRadius: "6px", fontSize: "11px", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span>{game.icon || "🎮"}</span>
+                      <span style={{ fontWeight: "600", color: "var(--text-primary)" }}>{game.title}</span>
+                      {game.hoursPlayed && <span style={{ fontSize: "10px", opacity: 0.7 }}>({game.hoursPlayed})</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Social Links & Platforms */}
+            {p.socialLinks && p.socialLinks.length > 0 && (
+              <div className="profile-card-section" style={{ marginTop: "12px", textAlign: "left" }}>
+                <label style={{ fontSize: "10px", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: "700", display: "block", marginBottom: "6px" }}>🌐 Verknüpfte Konten</label>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                  {p.socialLinks.map((link, i) => {
+                    const iconMap: Record<string, string> = {
+                      github: "mage:github-circle",
+                      steam: "mage:gamepad",
+                      discord: "mage:message-round",
+                      twitter: "mage:x",
+                      spotify: "mage:play",
+                      custom: "mage:link"
+                    };
+                    return (
+                      <a 
+                        key={i} 
+                        href={link.url} 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        style={{ display: "flex", alignItems: "center", gap: "5px", padding: "4px 10px", borderRadius: "6px", background: "rgba(255,255,255,0.06)", border: "1px solid var(--border-color)", color: "var(--text-primary)", fontSize: "11px", textDecoration: "none", transition: "all 0.2s" }}
+                        title={link.url}
+                      >
+                        <Icon icon={iconMap[link.platform] || "mage:link"} style={{ fontSize: "14px", color: "var(--accent-color, #00FF87)" }} />
+                        <span>{link.label || link.platform}</span>
+                      </a>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             
-            <div className="profile-card-section">
+            <div className="profile-card-section" style={{ marginTop: "12px" }}>
               <label>Kryptografischer Fingerprint</label>
               <div className="fingerprint-display">
                 {p.fingerprint}

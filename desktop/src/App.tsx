@@ -45,6 +45,8 @@ import { ZenoIde } from "./components/ide/ZenoIde";
 import { ProfileCardModal } from "./components/modals/ProfileCardModal";
 import { SettingsModal } from "./components/modals/SettingsModal";
 import { CodeEditorModal } from "./components/modals/CodeEditorModal";
+import { WidgetMarketplaceModal } from "./components/modals/WidgetMarketplaceModal";
+import { MarketplaceWidget } from "./data/widgetMarketplaceData";
 import { CustomWasmModal } from "./components/modals/CustomWasmModal";
 import { IdeProjectWizardModal, IdeNewItemModal } from "./components/modals/IdeModals";
 
@@ -446,6 +448,22 @@ function ZenoMainApp() {
   const [editingWidgetId, setEditingWidgetId] = useState<string | null>(null);
   const [draggedWidgetId, setDraggedWidgetId] = useState<string | null>(null);
   const [swappingWidgetIds, setSwappingWidgetIds] = useState<string[]>([]);
+  const [isMarketplaceOpen, setIsMarketplaceOpen] = useState<boolean>(false);
+
+  const handleInstallMarketplaceWidget = (item: MarketplaceWidget) => {
+    const newWidget: WidgetConfig = {
+      id: `w-mkt-${Date.now()}`,
+      type: "custom",
+      title: item.defaultTitle,
+      bgColor: "",
+      colSpan: item.colSpan,
+      rowSpan: item.rowSpan,
+      order: widgets.length,
+      customCode: item.customCodeSample
+    };
+    setWidgets((prev) => [...prev, newWidget]);
+    setIsMarketplaceOpen(false);
+  };
 
   // Weather Widget State
   const [weatherMode, setWeatherMode] = useState<"wttr" | "custom">("wttr");
@@ -1189,6 +1207,7 @@ function ZenoMainApp() {
             fetchRealWeather={fetchRealWeather}
             showToast={showToast}
             getContrastColor={getContrastColor}
+            onOpenMarketplace={() => setIsMarketplaceOpen(true)}
           />
         ) : homeTab === "wasm_hub" ? (
           <WasmHub
@@ -1402,6 +1421,13 @@ function ZenoMainApp() {
           showToast("Änderungsvorschlag gesendet!");
         }}
         handleDeleteCurrentFile={handleDeleteCurrentFile}
+        showToast={showToast}
+      />
+
+      <WidgetMarketplaceModal
+        isOpen={isMarketplaceOpen}
+        onClose={() => setIsMarketplaceOpen(false)}
+        onInstallWidget={handleInstallMarketplaceWidget}
         showToast={showToast}
       />
 

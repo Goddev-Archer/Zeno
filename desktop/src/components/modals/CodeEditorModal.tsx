@@ -64,6 +64,45 @@ export const CodeEditorModal: React.FC<CodeEditorModalProps> = ({
   handleDeleteCurrentFile,
   showToast
 }) => {
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !isRenaming) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, isRenaming]);
+
+  const handleEditorBeforeMount = (monaco: any) => {
+    monaco.editor.defineTheme("zeno-dark-theme", {
+      base: "vs-dark",
+      inherit: true,
+      rules: [
+        { token: "comment", foreground: "6A9955" },
+        { token: "keyword", foreground: "569CD6" },
+        { token: "string", foreground: "CE9178" }
+      ],
+      colors: {
+        "editor.background": "#111214",
+        "editor.foreground": "#CCCCCC",
+        "editorGutter.background": "#111214",
+        "editor.lineHighlightBackground": "#1E1F22",
+        "editorCursor.foreground": "#00FF87"
+      }
+    });
+
+    monaco.editor.defineTheme("zeno-light-theme", {
+      base: "vs",
+      inherit: true,
+      rules: [],
+      colors: {
+        "editor.background": "#FFFFFF",
+        "editor.foreground": "#1C1C1E"
+      }
+    });
+  };
+
   if (!isEditorOpen) return null;
 
   return (
@@ -194,6 +233,14 @@ export const CodeEditorModal: React.FC<CodeEditorModalProps> = ({
           <>
             <header className="editor-modal-header">
               <div className="editor-modal-title-area">
+                <button 
+                  className="settings-btn" 
+                  onClick={onClose}
+                  style={{ marginRight: "12px", fontSize: "11px", padding: "5px 10px", display: "flex", alignItems: "center", gap: "4px" }}
+                  title="IDE verlassen und zum Dashboard zurückkehren (Esc)"
+                >
+                  <Icon icon="mage:arrow-left" /> Dashboard
+                </button>
                 {isRenaming ? (
                   <input
                     type="text"
@@ -222,7 +269,7 @@ export const CodeEditorModal: React.FC<CodeEditorModalProps> = ({
                 )}
                 <span className="badge language-badge">{editorLanguage.toUpperCase()}</span>
               </div>
-              <button className="editor-close-btn modal-close" onClick={onClose} title="Schließen">
+              <button className="editor-close-btn modal-close" onClick={onClose} title="IDE schließen (Esc)">
                 <Icon icon="mage:multiply" />
               </button>
             </header>
@@ -232,6 +279,7 @@ export const CodeEditorModal: React.FC<CodeEditorModalProps> = ({
                 height="100%"
                 language={editorLanguage}
                 theme={theme === "light" ? "zeno-light-theme" : "zeno-dark-theme"}
+                beforeMount={handleEditorBeforeMount}
                 value={editorCode}
                 onChange={(val) => {
                   setEditorCode(val || "");
