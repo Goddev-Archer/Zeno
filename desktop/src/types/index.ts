@@ -41,6 +41,9 @@ export interface Profile {
   name: string;
   avatar: string;
   avatarColor: string;
+  avatarImage?: string;
+  avatarHoverEffect?: "none" | "float" | "spin" | "pulse" | "glow" | "bounce";
+  avatarEffectFrame?: "none" | "cyber_ring" | "neon_pulse" | "golden_aura" | "fire_particles" | "galaxy_orbit";
   bgColor?: string;
   role: string;
   roleColor?: string;
@@ -49,6 +52,12 @@ export interface Profile {
   bannerGradient?: string;
   badge?: string;
   badgePosition?: "badge-center" | "badge-right" | "badge-left";
+  badgeBgColor?: string;
+  badgeTextColor?: string;
+  cardBgColor?: string;
+  cardHoverEffect?: "none" | "rainbow_border" | "holographic_shimmer" | "cosmic_glow" | "neon_border";
+  layoutOrder?: "standard" | "compact" | "avatar_left" | "banner_overlay";
+  animationPreset?: "none" | "subtle_pulse" | "floating_card" | "neon_flicker" | "particle_shimmer";
   themePreset?: "default" | "cyberpunk" | "glassmorphism" | "synthwave" | "matrix" | "custom";
   customCss?: string;
 }

@@ -204,6 +204,15 @@ function ZenoMainApp() {
   const [userBadgePosition, setUserBadgePosition] = useState<"badge-center" | "badge-right" | "badge-left">("badge-center");
   const [userStatusQuote, setUserStatusQuote] = useState<string>("Zeno verschlüsselt meine Daten.");
   const [userBannerGradient, setUserBannerGradient] = useState<string>("linear-gradient(135deg, #7928CA 0%, #FF0080 100%)");
+  const [userAvatarImage, setUserAvatarImage] = useState<string>("");
+  const [userAvatarHoverEffect, setUserAvatarHoverEffect] = useState<"none" | "float" | "spin" | "pulse" | "glow" | "bounce">("float");
+  const [userAvatarEffectFrame, setUserAvatarEffectFrame] = useState<"none" | "cyber_ring" | "neon_pulse" | "golden_aura" | "fire_particles" | "galaxy_orbit">("cyber_ring");
+  const [userBadgeBgColor, setUserBadgeBgColor] = useState<string>("");
+  const [userBadgeTextColor, setUserBadgeTextColor] = useState<string>("");
+  const [userCardBgColor, setUserCardBgColor] = useState<string>("");
+  const [userCardHoverEffect, setUserCardHoverEffect] = useState<"none" | "rainbow_border" | "holographic_shimmer" | "cosmic_glow" | "neon_border">("holographic_shimmer");
+  const [userLayoutOrder, setUserLayoutOrder] = useState<"standard" | "compact" | "avatar_left" | "banner_overlay">("standard");
+  const [userAnimationPreset, setUserAnimationPreset] = useState<"none" | "subtle_pulse" | "floating_card" | "neon_flicker" | "particle_shimmer">("none");
 
   useEffect(() => {
     if (mockProfiles.CipherNaut) {
@@ -213,8 +222,21 @@ function ZenoMainApp() {
       mockProfiles.CipherNaut.badgePosition = userBadgePosition;
       mockProfiles.CipherNaut.status = `"${userStatusQuote}"`;
       mockProfiles.CipherNaut.bannerGradient = userBannerGradient;
+      mockProfiles.CipherNaut.avatarImage = userAvatarImage;
+      mockProfiles.CipherNaut.avatarHoverEffect = userAvatarHoverEffect;
+      mockProfiles.CipherNaut.avatarEffectFrame = userAvatarEffectFrame;
+      mockProfiles.CipherNaut.badgeBgColor = userBadgeBgColor;
+      mockProfiles.CipherNaut.badgeTextColor = userBadgeTextColor;
+      mockProfiles.CipherNaut.cardBgColor = userCardBgColor;
+      mockProfiles.CipherNaut.cardHoverEffect = userCardHoverEffect;
+      mockProfiles.CipherNaut.layoutOrder = userLayoutOrder;
+      mockProfiles.CipherNaut.animationPreset = userAnimationPreset;
     }
-  }, [userProfilePreset, userCustomCss, userBadge, userBadgePosition, userStatusQuote, userBannerGradient]);
+  }, [
+    userProfilePreset, userCustomCss, userBadge, userBadgePosition, userStatusQuote, userBannerGradient,
+    userAvatarImage, userAvatarHoverEffect, userAvatarEffectFrame, userBadgeBgColor, userBadgeTextColor,
+    userCardBgColor, userCardHoverEffect, userLayoutOrder, userAnimationPreset
+  ]);
 
   // Code Editor Modal State
   const [isEditorOpen, setIsEditorOpen] = useState<boolean>(false);
@@ -1155,6 +1177,15 @@ function ZenoMainApp() {
         userBadgePosition={userBadgePosition}
         userStatusQuote={userStatusQuote}
         userBannerGradient={userBannerGradient}
+        userAvatarImage={userAvatarImage}
+        userAvatarHoverEffect={userAvatarHoverEffect}
+        userAvatarEffectFrame={userAvatarEffectFrame}
+        userBadgeBgColor={userBadgeBgColor}
+        userBadgeTextColor={userBadgeTextColor}
+        userCardBgColor={userCardBgColor}
+        userCardHoverEffect={userCardHoverEffect}
+        userLayoutOrder={userLayoutOrder}
+        userAnimationPreset={userAnimationPreset}
         glassmorphism={glassmorphism}
         canvasColor={canvasColor}
         glowColor={glowColor}
@@ -1173,6 +1204,15 @@ function ZenoMainApp() {
         setUserBadgePosition={setUserBadgePosition}
         setUserStatusQuote={setUserStatusQuote}
         setUserBannerGradient={setUserBannerGradient}
+        setUserAvatarImage={setUserAvatarImage}
+        setUserAvatarHoverEffect={setUserAvatarHoverEffect}
+        setUserAvatarEffectFrame={setUserAvatarEffectFrame}
+        setUserBadgeBgColor={setUserBadgeBgColor}
+        setUserBadgeTextColor={setUserBadgeTextColor}
+        setUserCardBgColor={setUserCardBgColor}
+        setUserCardHoverEffect={setUserCardHoverEffect}
+        setUserLayoutOrder={setUserLayoutOrder}
+        setUserAnimationPreset={setUserAnimationPreset}
         setGlassmorphism={setGlassmorphism}
         setCanvasColor={setCanvasColor}
         setGlowColor={setGlowColor}

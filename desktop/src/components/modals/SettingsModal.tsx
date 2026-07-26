@@ -10,6 +10,15 @@ interface SettingsModalProps {
   userBadgePosition: "badge-center" | "badge-right" | "badge-left";
   userStatusQuote: string;
   userBannerGradient: string;
+  userAvatarImage: string;
+  userAvatarHoverEffect: "none" | "float" | "spin" | "pulse" | "glow" | "bounce";
+  userAvatarEffectFrame: "none" | "cyber_ring" | "neon_pulse" | "golden_aura" | "fire_particles" | "galaxy_orbit";
+  userBadgeBgColor: string;
+  userBadgeTextColor: string;
+  userCardBgColor: string;
+  userCardHoverEffect: "none" | "rainbow_border" | "holographic_shimmer" | "cosmic_glow" | "neon_border";
+  userLayoutOrder: "standard" | "compact" | "avatar_left" | "banner_overlay";
+  userAnimationPreset: "none" | "subtle_pulse" | "floating_card" | "neon_flicker" | "particle_shimmer";
   glassmorphism: boolean;
   canvasColor: string;
   glowColor: string;
@@ -28,6 +37,15 @@ interface SettingsModalProps {
   setUserBadgePosition: (pos: any) => void;
   setUserStatusQuote: (quote: string) => void;
   setUserBannerGradient: (gradient: string) => void;
+  setUserAvatarImage: (img: string) => void;
+  setUserAvatarHoverEffect: (eff: any) => void;
+  setUserAvatarEffectFrame: (frame: any) => void;
+  setUserBadgeBgColor: (bg: string) => void;
+  setUserBadgeTextColor: (color: string) => void;
+  setUserCardBgColor: (bg: string) => void;
+  setUserCardHoverEffect: (eff: any) => void;
+  setUserLayoutOrder: (layout: any) => void;
+  setUserAnimationPreset: (anim: any) => void;
   setGlassmorphism: (enabled: boolean) => void;
   setCanvasColor: (color: string) => void;
   setGlowColor: (color: string) => void;
@@ -48,6 +66,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   userBadgePosition,
   userStatusQuote,
   userBannerGradient,
+  userAvatarImage,
+  userAvatarHoverEffect,
+  userAvatarEffectFrame,
+  userBadgeBgColor,
+  userBadgeTextColor,
+  userCardBgColor,
+  userCardHoverEffect,
+  userLayoutOrder,
+  userAnimationPreset,
   glassmorphism,
   canvasColor,
   glowColor,
@@ -66,6 +93,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   setUserBadgePosition,
   setUserStatusQuote,
   setUserBannerGradient,
+  setUserAvatarImage,
+  setUserAvatarHoverEffect,
+  setUserAvatarEffectFrame,
+  setUserBadgeBgColor,
+  setUserBadgeTextColor,
+  setUserCardBgColor,
+  setUserCardHoverEffect,
+  setUserLayoutOrder,
+  setUserAnimationPreset,
   setGlassmorphism,
   setCanvasColor,
   setGlowColor,
@@ -76,6 +112,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   testGithubConnection,
   showToast
 }) => {
+  const avatarFileInputRef = React.useRef<HTMLInputElement | null>(null);
+
   if (!isOpen) return null;
 
   return (
@@ -163,13 +201,90 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="settings-form-group" style={{ marginTop: "24px", paddingTop: "20px", borderTop: "1px solid var(--border-color)" }}>
                   <h4 style={{ fontSize: "14px", fontWeight: "700", color: "var(--text-primary)", marginBottom: "4px", display: "flex", alignItems: "center", gap: "8px" }}>
                     <Icon icon="mage:palette" style={{ color: "var(--accent-color)" }} />
-                    Profil-Design & Custom-CSS Templates
+                    Zeno Profil-Studio & Design-Baukasten
                   </h4>
                   <p className="settings-help-text" style={{ marginBottom: "16px" }}>
-                    Passe deine Profil-Karte mit Theme-Presets oder eigenem Custom-CSS an. Andere Nutzer sehen dein Custom-Design, wenn sie auf dein Profil klicken!
+                    Gestalte deine Profil-Karte frei mit Animationen, Avatar-Dekorationen, Hover-Designs und benutzerdefinierten Farbverläufen. Keine malicious JS-Scripts erlaubt!
                   </p>
 
-                  {/* Theme Presets Grid */}
+                  {/* Hidden file input for custom avatar image */}
+                  <input 
+                    type="file" 
+                    ref={avatarFileInputRef} 
+                    accept="image/*"
+                    style={{ display: "none" }} 
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (ev) => {
+                          setUserAvatarImage(ev.target?.result as string);
+                          showToast("Benutzerdefiniertes Profilbild geladen!");
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                  />
+
+                  {/* 1. Profilbild, Hover-Effekt & Dekorations-Rahmen */}
+                  <div style={{ marginBottom: "20px", padding: "14px", background: "var(--bg-secondary)", borderRadius: "8px", border: "1px solid var(--border-color)" }}>
+                    <label style={{ fontSize: "12px", fontWeight: "700", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px" }}>
+                      <Icon icon="mage:user" /> Profilbild & Hover-Effekt
+                    </label>
+                    <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "12px" }}>
+                      <div className={`profile-card-avatar purple ${userAvatarHoverEffect !== "none" ? `avatar-hover-${userAvatarHoverEffect}` : ""} ${userAvatarEffectFrame !== "none" ? `avatar-frame-${userAvatarEffectFrame}` : ""}`} style={{ width: "54px", height: "54px", fontSize: "22px", flexShrink: 0 }}>
+                        {userAvatarImage ? (
+                          <img src={userAvatarImage} alt="Avatar" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }} />
+                        ) : (
+                          "C"
+                        )}
+                      </div>
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <button className="settings-btn primary" onClick={() => avatarFileInputRef.current?.click()} style={{ fontSize: "11px", padding: "6px 12px" }}>
+                          📷 Bild hochladen
+                        </button>
+                        {userAvatarImage && (
+                          <button className="settings-btn" onClick={() => { setUserAvatarImage(""); showToast("Profilbild zurückgesetzt."); }} style={{ fontSize: "11px", padding: "6px 12px" }}>
+                            ❌ Entfernen
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                      <div>
+                        <label style={{ fontSize: "10px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
+                          Avatar Hover-Animation
+                        </label>
+                        <select className="settings-select" value={userAvatarHoverEffect} onChange={(e) => setUserAvatarHoverEffect(e.target.value as any)} style={{ width: "100%", fontSize: "11px" }}>
+                          <option value="none">Keine Animation</option>
+                          <option value="float">🎈 Schweben (Float)</option>
+                          <option value="spin">🔄 Drehen (360° Spin)</option>
+                          <option value="pulse">💓 Pulsieren (Pulse)</option>
+                          <option value="glow">✨ Leuchten (Glow)</option>
+                          <option value="bounce">🏀 Hüpfen (Bounce)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "10px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
+                          Avatar Dekorations-Rahmen (Discord Style)
+                        </label>
+                        <select className="settings-select" value={userAvatarEffectFrame} onChange={(e) => setUserAvatarEffectFrame(e.target.value as any)} style={{ width: "100%", fontSize: "11px" }}>
+                          <option value="none">Kein Rahmen</option>
+                          <option value="cyber_ring">⚙️ Cyber Ring (Dashed Teal)</option>
+                          <option value="neon_pulse">💗 Neon Pulse (Pink Glow)</option>
+                          <option value="golden_aura">👑 Golden Aura (Gold)</option>
+                          <option value="fire_particles">🔥 Fire Particles (Orange)</option>
+                          <option value="galaxy_orbit">🌌 Galaxy Orbit (Purple/Cyan)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 2. Theme Presets Grid */}
+                  <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "6px" }}>
+                    Schnell-Presets
+                  </label>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "10px", marginBottom: "20px" }}>
                     {[
                       { id: "cyberpunk", label: "⚡ Cyberpunk", gradient: "linear-gradient(135deg, #7928CA 0%, #FF0080 100%)", badge: "⚡ VIP CYBERNAUT" },
@@ -194,7 +309,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     ))}
                   </div>
 
-                  {/* Inputs & Alignment Grid */}
+                  {/* 3. Inputs & Alignment Grid */}
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
                     <div>
                       <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
@@ -225,7 +340,89 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Badge Position Grid */}
+                  {/* 4. Badge- & Card-Farben Customizer */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "16px" }}>
+                    <div>
+                      <label style={{ fontSize: "10px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
+                        Badge-Hintergrund (CSS)
+                      </label>
+                      <input 
+                        type="text" 
+                        className="settings-input" 
+                        value={userBadgeBgColor} 
+                        onChange={(e) => setUserBadgeBgColor(e.target.value)} 
+                        placeholder="#111214 oder linear-gradient(...)" 
+                        style={{ width: "100%", fontSize: "11px" }} 
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: "10px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
+                        Badge-Textfarbe
+                      </label>
+                      <input 
+                        type="text" 
+                        className="settings-input" 
+                        value={userBadgeTextColor} 
+                        onChange={(e) => setUserBadgeTextColor(e.target.value)} 
+                        placeholder="#00DFD8 oder #FFFFFF" 
+                        style={{ width: "100%", fontSize: "11px" }} 
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: "10px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
+                        Karten-Body Hintergrund
+                      </label>
+                      <input 
+                        type="text" 
+                        className="settings-input" 
+                        value={userCardBgColor} 
+                        onChange={(e) => setUserCardBgColor(e.target.value)} 
+                        placeholder="#0d0b14 oder linear-gradient(...)" 
+                        style={{ width: "100%", fontSize: "11px" }} 
+                      />
+                    </div>
+                  </div>
+
+                  {/* 5. Card Hover, Animation Builder & Layout Placement */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "16px" }}>
+                    <div>
+                      <label style={{ fontSize: "10px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
+                        Karten-Hover Design (Shop Style)
+                      </label>
+                      <select className="settings-select" value={userCardHoverEffect} onChange={(e) => setUserCardHoverEffect(e.target.value as any)} style={{ width: "100%", fontSize: "11px" }}>
+                        <option value="none">Kein Hover-Effekt</option>
+                        <option value="rainbow_border">🌈 Rainbow Border</option>
+                        <option value="holographic_shimmer">✨ Holographic Shimmer</option>
+                        <option value="cosmic_glow">🌌 Cosmic Glow</option>
+                        <option value="neon_border">🟩 Neon Border Glow</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: "10px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
+                        Animation Baukasten (Sicher ohne JS)
+                      </label>
+                      <select className="settings-select" value={userAnimationPreset} onChange={(e) => setUserAnimationPreset(e.target.value as any)} style={{ width: "100%", fontSize: "11px" }}>
+                        <option value="none">Statisch (Keine Animation)</option>
+                        <option value="subtle_pulse">💓 Sanfter Puls (Subtle Pulse)</option>
+                        <option value="floating_card">🎈 Schwebende Karte (Floating)</option>
+                        <option value="neon_flicker">⚡ Neon Flackern (Flicker)</option>
+                        <option value="particle_shimmer">🌈 Prismatisches Shimmern</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: "10px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
+                        Element-Platzierung (Layout)
+                      </label>
+                      <select className="settings-select" value={userLayoutOrder} onChange={(e) => setUserLayoutOrder(e.target.value as any)} style={{ width: "100%", fontSize: "11px" }}>
+                        <option value="standard">Standard (Klassisch Zentriert)</option>
+                        <option value="avatar_left">◀️ Avatar Links bündig</option>
+                        <option value="compact">📱 Kompakter Banner-Header</option>
+                        <option value="banner_overlay">🔮 Glassmorphism Card Overlay</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* 6. Badge Position Grid */}
                   <div style={{ marginBottom: "16px" }}>
                     <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
                       Badge-Ausrichtung (Standard: Zentriert)
@@ -248,7 +445,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Banner Gradient Input */}
+                  {/* 7. Banner Gradient Input */}
                   <div style={{ marginBottom: "16px" }}>
                     <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
                       Banner CSS Gradient / Hintergrund
@@ -263,7 +460,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     />
                   </div>
 
-                  {/* Custom CSS Editor Box */}
+                  {/* 8. Custom CSS Editor Box */}
                   <div style={{ marginBottom: "20px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
                       <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)" }}>
@@ -290,7 +487,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     />
                   </div>
 
-                  {/* Live Profile Card Preview & Save Action */}
+                  {/* 9. Live Profile Card Preview & Save Action */}
                   <div style={{ display: "flex", alignItems: "flex-start", gap: "20px", background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "10px", padding: "16px" }}>
                     <div style={{ flex: 1 }}>
                       <h5 style={{ margin: "0 0 6px 0", color: "var(--text-primary)", fontSize: "13px" }}>Echtzeit Profil-Vorschau</h5>
@@ -307,17 +504,38 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                     {/* Live Mini Preview Card */}
                     <div style={{ width: "260px", position: "relative" }}>
-                      <div className={`profile-modal-card ${userProfilePreset}`} style={{ width: "100%", minHeight: "220px" }}>
+                      <div 
+                        className={`profile-modal-card ${userProfilePreset} ${userCardHoverEffect !== "none" ? `card-hover-${userCardHoverEffect}` : ""} ${userLayoutOrder !== "standard" ? `layout-${userLayoutOrder}` : ""} ${userAnimationPreset !== "none" ? `anim-preset-${userAnimationPreset}` : ""}`} 
+                        style={{ width: "100%", minHeight: "220px" }}
+                      >
                         {userCustomCss && <style>{userCustomCss}</style>}
                         <div className="profile-card-banner" style={{ background: userBannerGradient }} />
-                        <div className="profile-card-body" style={{ padding: "14px" }}>
+                        <div className="profile-card-body" style={{ padding: "14px", ...(userCardBgColor ? { background: userCardBgColor } : {}) }}>
                           <div className="profile-avatar-wrapper">
-                            <div className="profile-card-avatar purple" style={{ width: "54px", height: "54px", fontSize: "22px" }}>C</div>
-                            {userBadge && <span className={`profile-badge ${userBadgePosition}`}>{userBadge}</span>}
+                            <div 
+                              className={`profile-card-avatar purple ${userAvatarHoverEffect !== "none" ? `avatar-hover-${userAvatarHoverEffect}` : ""} ${userAvatarEffectFrame !== "none" ? `avatar-frame-${userAvatarEffectFrame}` : ""}`} 
+                              style={{ width: "54px", height: "54px", fontSize: "22px" }}
+                            >
+                              {userAvatarImage ? (
+                                <img src={userAvatarImage} alt="Avatar" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }} />
+                              ) : (
+                                "C"
+                              )}
+                            </div>
+                            {userBadge && (
+                              <span 
+                                className={`profile-badge ${userBadgePosition}`}
+                                style={{
+                                  ...(userBadgeBgColor ? { background: userBadgeBgColor } : {}),
+                                  ...(userBadgeTextColor ? { color: userBadgeTextColor } : {})
+                                }}
+                              >
+                                {userBadge}
+                              </span>
+                            )}
                           </div>
                           <h3 className="profile-card-name" style={{ fontSize: "14px" }}>CipherNaut</h3>
                           <span className="profile-card-role" style={{ fontSize: "8px" }}>UNTERSTÜTZER</span>
-                          <div className="profile-card-status" style={{ fontSize: "10px" }}>"{userStatusQuote}"</div>
                         </div>
                       </div>
                     </div>

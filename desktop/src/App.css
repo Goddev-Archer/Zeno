@@ -1919,6 +1919,99 @@ input:checked + .slider:before {
   transform: none;
 }
 
+/* ── Avatar Hover & Animation Builders ── */
+.avatar-hover-float:hover { transform: translateY(-4px) scale(1.05); transition: transform 0.25s cubic-bezier(0.1, 0.9, 0.2, 1); }
+.avatar-hover-spin:hover { transform: rotate(360deg); transition: transform 0.6s ease; }
+.avatar-hover-pulse:hover { animation: avatarPulse 1s infinite alternate; }
+.avatar-hover-glow:hover { box-shadow: 0 0 24px var(--accent-color, #3574F0); transition: box-shadow 0.25s ease; }
+.avatar-hover-bounce:hover { animation: avatarBounce 0.5s ease infinite alternate; }
+
+@keyframes avatarPulse {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.08); box-shadow: 0 0 20px rgba(53, 116, 240, 0.8); }
+}
+@keyframes avatarBounce {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-6px); }
+}
+
+/* ── Avatar Decoration Frames (Discord Style) ── */
+.avatar-frame-cyber_ring { border: 2px dashed #00DFD8 !important; box-shadow: 0 0 14px #00DFD8 !important; animation: rotateFrame 10s linear infinite; }
+.avatar-frame-neon_pulse { border: 2px solid #FF0080 !important; box-shadow: 0 0 16px #FF0080 !important; animation: neonPulse 1.5s ease-in-out infinite alternate; }
+.avatar-frame-golden_aura { border: 2px solid #FFD700 !important; box-shadow: 0 0 18px #FFD700, 0 0 36px rgba(255, 215, 0, 0.4) !important; }
+.avatar-frame-fire_particles { border: 2px solid #FF5500 !important; box-shadow: 0 0 20px #FF5500, inset 0 0 10px #FFD700 !important; }
+.avatar-frame-galaxy_orbit { border: 2px solid #9D00FF !important; box-shadow: 0 0 22px #9D00FF, 0 0 40px #00FFFF !important; }
+
+@keyframes rotateFrame { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes neonPulse { from { opacity: 0.7; box-shadow: 0 0 8px #FF0080; } to { opacity: 1; box-shadow: 0 0 22px #FF0080; } }
+
+/* ── Card Outer Hover Effects (Shop Style) ── */
+.card-hover-rainbow_border:hover {
+  border-color: transparent !important;
+  border-image: linear-gradient(45deg, #ff0000, #ff7300, #fffb00, #48ff00, #00ffd5, #002bff, #7a00ff, #ff00c8) 1 !important;
+  box-shadow: 0 0 24px rgba(0, 223, 216, 0.5) !important;
+  transition: all 0.3s ease;
+}
+.card-hover-holographic_shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.card-hover-holographic_shimmer:hover::after {
+  content: '';
+  position: absolute;
+  top: -50%; left: -100%; width: 60%; height: 200%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
+  transform: rotate(25deg);
+  animation: shimmerPass 1.2s ease infinite;
+}
+@keyframes shimmerPass { 0% { left: -100%; } 100% { left: 200%; } }
+
+.card-hover-cosmic_glow:hover {
+  box-shadow: 0 0 30px rgba(121, 40, 202, 0.8), 0 0 60px rgba(255, 0, 128, 0.6) !important;
+  transition: box-shadow 0.3s ease;
+}
+.card-hover-neon_border:hover {
+  border-color: #00FF87 !important;
+  box-shadow: 0 0 25px rgba(0, 255, 135, 0.7) !important;
+  transition: all 0.3s ease;
+}
+
+/* ── Safe CSS Builder Animation Presets ── */
+.anim-preset-subtle_pulse { animation: cardSubtlePulse 3s ease-in-out infinite; }
+.anim-preset-floating_card { animation: cardFloating 4s ease-in-out infinite; }
+.anim-preset-neon_flicker { animation: cardNeonFlicker 2.5s ease-in-out infinite; }
+.anim-preset-particle_shimmer { animation: cardParticleShimmer 5s linear infinite; }
+
+@keyframes cardSubtlePulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.015); } }
+@keyframes cardFloating { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes cardNeonFlicker { 0%, 100% { opacity: 1; } 50% { opacity: 0.92; filter: brightness(1.15); } }
+@keyframes cardParticleShimmer { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }
+
+/* ── Layout Placement Structures ── */
+.layout-avatar_left .profile-card-body {
+  align-items: flex-start !important;
+  text-align: left !important;
+}
+.layout-avatar_left .profile-avatar-wrapper {
+  margin-top: -36px !important;
+  align-self: flex-start !important;
+}
+.layout-compact .profile-avatar-wrapper {
+  margin-top: -65px !important;
+}
+.layout-compact .profile-card-banner {
+  height: 120px !important;
+}
+.layout-banner_overlay .profile-card-body {
+  margin-top: -20px;
+  background: rgba(20, 20, 25, 0.85);
+  backdrop-filter: blur(12px);
+  border-radius: 12px;
+  margin-left: 10px;
+  margin-right: 10px;
+  margin-bottom: 10px;
+}
+
 /* Custom Profile Theme Presets */
 .profile-modal-card.cyberpunk {
   border: 1px solid #FF0080;
