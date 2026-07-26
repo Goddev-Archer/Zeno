@@ -4,7 +4,19 @@ import Editor, { loader } from "@monaco-editor/react";
 import * as monaco from "monaco-editor";
 import "./App.css";
 
-// Configure Monaco Editor to use local bundled package instead of third-party CDN
+// Configure Monaco Environment to prevent dynamic worker fetch errors in Vite
+if (typeof window !== "undefined") {
+  (window as any).MonacoEnvironment = {
+    getWorker: function () {
+      const workerCode = `
+        self.onmessage = function() {};
+      `;
+      const blob = new Blob([workerCode], { type: "application/javascript" });
+      return new Worker(URL.createObjectURL(blob));
+    }
+  };
+}
+
 loader.config({ monaco });
 
 // --- TYPES & INTERFACES ---
