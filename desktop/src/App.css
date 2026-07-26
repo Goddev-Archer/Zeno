@@ -1939,6 +1939,64 @@ input:checked + .slider:before {
   100% { transform: translateY(-6px); }
 }
 
+/* ── Synchronized Badge Movement during Avatar Hover ── */
+.profile-card-avatar.avatar-hover-float:hover ~ .profile-badge.badge-center {
+  transform: translate(-50%, -4px) scale(1.05);
+  transition: transform 0.25s cubic-bezier(0.1, 0.9, 0.2, 1);
+}
+.profile-card-avatar.avatar-hover-float:hover ~ .profile-badge.badge-right,
+.profile-card-avatar.avatar-hover-float:hover ~ .profile-badge.badge-left {
+  transform: translateY(-4px) scale(1.05);
+  transition: transform 0.25s cubic-bezier(0.1, 0.9, 0.2, 1);
+}
+
+.profile-card-avatar.avatar-hover-bounce:hover ~ .profile-badge.badge-center {
+  animation: badgeBounceCenter 0.5s ease infinite alternate;
+}
+.profile-card-avatar.avatar-hover-bounce:hover ~ .profile-badge.badge-right,
+.profile-card-avatar.avatar-hover-bounce:hover ~ .profile-badge.badge-left {
+  animation: badgeBounceOther 0.5s ease infinite alternate;
+}
+
+@keyframes badgeBounceCenter {
+  0% { transform: translate(-50%, 0); }
+  100% { transform: translate(-50%, -6px); }
+}
+@keyframes badgeBounceOther {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-6px); }
+}
+
+.profile-card-avatar.avatar-hover-pulse:hover ~ .profile-badge.badge-center {
+  animation: badgePulseCenter 1s infinite alternate;
+}
+.profile-card-avatar.avatar-hover-pulse:hover ~ .profile-badge.badge-right,
+.profile-card-avatar.avatar-hover-pulse:hover ~ .profile-badge.badge-left {
+  animation: badgePulseOther 1s infinite alternate;
+}
+
+@keyframes badgePulseCenter {
+  0% { transform: translate(-50%, 0) scale(1); }
+  100% { transform: translate(-50%, -4px) scale(1.08); }
+}
+@keyframes badgePulseOther {
+  0% { transform: translateY(0) scale(1); }
+  100% { transform: translateY(-4px) scale(1.08); }
+}
+
+.profile-card-avatar.avatar-hover-spin:hover ~ .profile-badge.badge-center,
+.profile-card-avatar.avatar-hover-glow:hover ~ .profile-badge.badge-center {
+  transform: translate(-50%, -4px);
+  transition: transform 0.25s ease;
+}
+.profile-card-avatar.avatar-hover-spin:hover ~ .profile-badge.badge-right,
+.profile-card-avatar.avatar-hover-glow:hover ~ .profile-badge.badge-right,
+.profile-card-avatar.avatar-hover-spin:hover ~ .profile-badge.badge-left,
+.profile-card-avatar.avatar-hover-glow:hover ~ .profile-badge.badge-left {
+  transform: translateY(-4px);
+  transition: transform 0.25s ease;
+}
+
 /* ── Avatar Decoration Frames (Discord Style) ── */
 .avatar-frame-cyber_ring { border: 2px dashed #00DFD8 !important; box-shadow: 0 0 14px #00DFD8 !important; animation: rotateFrame 10s linear infinite; }
 .avatar-frame-neon_pulse { border: 2px solid #FF0080 !important; box-shadow: 0 0 16px #FF0080 !important; animation: neonPulse 1.5s ease-in-out infinite alternate; }

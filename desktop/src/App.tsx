@@ -188,6 +188,7 @@ function ZenoMainApp() {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   // Custom Profile State
+  const [userName, setUserName] = useState<string>("CipherNaut");
   const [userProfilePreset, setUserProfilePreset] = useState<"default" | "cyberpunk" | "glassmorphism" | "synthwave" | "matrix" | "custom">("cyberpunk");
   const [userCustomCss, setUserCustomCss] = useState<string>(
 `/* Custom Cyberpunk Profile Theme */
@@ -220,6 +221,7 @@ function ZenoMainApp() {
     if (savedConfig) {
       try {
         const parsed = JSON.parse(savedConfig);
+        if (parsed.name) setUserName(parsed.name);
         if (parsed.preset) setUserProfilePreset(parsed.preset);
         if (parsed.customCss) setUserCustomCss(parsed.customCss);
         if (parsed.badge) setUserBadge(parsed.badge);
@@ -243,6 +245,7 @@ function ZenoMainApp() {
 
   useEffect(() => {
     if (mockProfiles.CipherNaut) {
+      mockProfiles.CipherNaut.name = userName;
       mockProfiles.CipherNaut.themePreset = userProfilePreset;
       mockProfiles.CipherNaut.customCss = userCustomCss;
       mockProfiles.CipherNaut.badge = userBadge;
@@ -260,13 +263,14 @@ function ZenoMainApp() {
       mockProfiles.CipherNaut.animationPreset = userAnimationPreset;
     }
   }, [
-    userProfilePreset, userCustomCss, userBadge, userBadgePosition, userStatusQuote, userBannerGradient,
+    userName, userProfilePreset, userCustomCss, userBadge, userBadgePosition, userStatusQuote, userBannerGradient,
     userAvatarImage, userAvatarHoverEffect, userAvatarEffectFrame, userBadgeBgColor, userBadgeTextColor,
     userCardBgColor, userCardHoverEffect, userLayoutOrder, userAnimationPreset
   ]);
 
   const handleSaveProfileConfig = () => {
     const config = {
+      name: userName,
       preset: userProfilePreset,
       customCss: userCustomCss,
       badge: userBadge,
@@ -1220,6 +1224,7 @@ function ZenoMainApp() {
       <SettingsModal
         isOpen={isSettingsOpen}
         activeSettingsTab={activeSettingsTab}
+        userName={userName}
         userProfilePreset={userProfilePreset}
         userCustomCss={userCustomCss}
         userBadge={userBadge}
@@ -1247,6 +1252,7 @@ function ZenoMainApp() {
         githubConnecting={githubConnecting}
         onClose={() => setIsSettingsOpen(false)}
         setActiveSettingsTab={setActiveSettingsTab}
+        setUserName={setUserName}
         setUserProfilePreset={setUserProfilePreset}
         setUserCustomCss={setUserCustomCss}
         setUserBadge={setUserBadge}

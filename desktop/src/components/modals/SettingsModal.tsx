@@ -4,6 +4,7 @@ import { Icon } from "@iconify/react";
 interface SettingsModalProps {
   isOpen: boolean;
   activeSettingsTab: string;
+  userName: string;
   userProfilePreset: "default" | "cyberpunk" | "glassmorphism" | "synthwave" | "matrix" | "custom";
   userCustomCss: string;
   userBadge: string;
@@ -31,6 +32,7 @@ interface SettingsModalProps {
   githubConnecting: boolean;
   onClose: () => void;
   setActiveSettingsTab: (tab: string) => void;
+  setUserName: (name: string) => void;
   setUserProfilePreset: (preset: any) => void;
   setUserCustomCss: (css: string) => void;
   setUserBadge: (badge: string) => void;
@@ -61,6 +63,7 @@ interface SettingsModalProps {
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   activeSettingsTab,
+  userName,
   userProfilePreset,
   userCustomCss,
   userBadge,
@@ -88,6 +91,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   githubConnecting,
   onClose,
   setActiveSettingsTab,
+  setUserName,
   setUserProfilePreset,
   setUserCustomCss,
   setUserBadge,
@@ -174,9 +178,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="settings-tab-content" id="tab-profile">
                 <h3>Kryptografisches Profil</h3>
                 <div className="settings-profile-card">
-                  <div className="profile-avatar-large purple">C</div>
+                  <div className="profile-avatar-large purple">
+                    {userAvatarImage ? (
+                      <img src={userAvatarImage} alt="Avatar" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }} />
+                    ) : (
+                      "C"
+                    )}
+                  </div>
                   <div className="profile-info-large">
-                    <span className="profile-name">CipherNaut</span>
+                    <span className="profile-name">{userName || "CipherNaut"}</span>
                     <span className="profile-status-badge">Unterstützer ⭐</span>
                   </div>
                 </div>
@@ -324,7 +334,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       </div>
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px" }}>
+                      <div>
+                        <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "6px" }}>
+                          Benutzername / Profil-Name
+                        </label>
+                        <input
+                          type="text"
+                          className="settings-input"
+                          value={userName}
+                          onChange={(e) => setUserName(e.target.value)}
+                          placeholder="CipherNaut"
+                        />
+                      </div>
+
                       <div>
                         <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "6px" }}>
                           Status-Spruch
@@ -558,7 +581,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               </span>
                             )}
                           </div>
-                          <h3 className="profile-card-name" style={{ fontSize: "14px" }}>CipherNaut</h3>
+                          <h3 className="profile-card-name" style={{ fontSize: "14px" }}>{userName || "CipherNaut"}</h3>
                           <span className="profile-card-role" style={{ fontSize: "8px" }}>UNTERSTÜTZER</span>
                         </div>
                       </div>
