@@ -59,8 +59,11 @@ interface SettingsModalProps {
   setGithubToken: (token: string) => void;
   setGithubUser: (user: any) => void;
   testGithubConnection: () => void;
+  sessionToken?: string;
   onSaveProfile?: () => void;
   onRegenerateIdentity?: () => void;
+  onAuthBackend?: () => void;
+  onSyncVaultBackend?: () => void;
   showToast: (msg: string) => void;
 }
 
@@ -120,8 +123,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   setGithubToken,
   setGithubUser,
   testGithubConnection,
+  sessionToken,
   onSaveProfile,
   onRegenerateIdentity,
+  onAuthBackend,
+  onSyncVaultBackend,
   showToast
 }) => {
   const avatarFileInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -271,6 +277,44 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       }}
                     >
                       🔄 Neue AIN generieren
+                    </button>
+                  </div>
+                </div>
+
+                {/* Zero-Knowledge Server Backend Card */}
+                <div className="settings-form-group" style={{ background: "var(--bg-secondary)", padding: "16px", borderRadius: "10px", border: "1px solid var(--border-color)", marginTop: "16px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                    <div style={{ fontSize: "12px", fontWeight: "700", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <Icon icon="mage:cloud-upload" style={{ color: "#00FF87", fontSize: "16px" }} />
+                      Zero-Knowledge Server Backend
+                    </div>
+                    <span style={{ fontSize: "10px", color: sessionToken ? "#00E676" : "var(--text-muted)", fontWeight: "600" }}>
+                      {sessionToken ? "● Authentifiziert (Session Aktiv)" : "○ Offline / Unauthentifiziert"}
+                    </span>
+                  </div>
+
+                  <p style={{ fontSize: "11px", color: "var(--text-muted)", margin: "0 0 12px 0", lineHeight: "1.5" }}>
+                    Dein Profil wird serverseitig als Ende-zu-Ende verschlüsseltes Vault gespeichert. Der Server kennt weder deine Klartextdaten noch Passwörter.
+                  </p>
+
+                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                    <button 
+                      className="settings-btn primary" 
+                      onClick={() => {
+                        if (onAuthBackend) onAuthBackend();
+                      }}
+                      style={{ fontSize: "11px" }}
+                    >
+                      ⚡ Challenge-Response Auth
+                    </button>
+                    <button 
+                      className="settings-btn" 
+                      onClick={() => {
+                        if (onSyncVaultBackend) onSyncVaultBackend();
+                      }}
+                      style={{ fontSize: "11px" }}
+                    >
+                      ☁️ Encrypted Vault synchronisieren
                     </button>
                   </div>
                 </div>

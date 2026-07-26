@@ -20,6 +20,7 @@ import {
   UserIdentity
 } from "./types";
 import { getOrRegisterUserIdentity, generateCryptographicIdentity } from "./services/cryptoService";
+import { executeZeroKnowledgeAuth, syncEncryptedVaultToServer } from "./services/backendService";
 import { cleanUrl } from "./utils/urlCleaner";
 import {
   initialServers,
@@ -237,6 +238,54 @@ function ZenoMainApp() {
       mockProfiles.CipherNaut.fingerprint = newIdentity.fingerprint;
     }
     showToast(`🔑 Neue AIN generiert: ${newIdentity.ain}`);
+  };
+
+  // Zero-Knowledge Backend Auth & Sync State
+  const [sessionToken, setSessionToken] = useState<string>("");
+
+  const handleAuthenticateWithBackend = async () => {
+    if (!userIdentity) {
+      showToast("❌ Keine lokale AIN vorhanden.");
+      return;
+    }
+    const res = await executeZeroKnowledgeAuth(userIdentity);
+    if (res.success && res.sessionToken) {
+      setSessionToken(res.sessionToken);
+      showToast("✅ Zero-Knowledge Server-Auth erfolgreich! Session aktiviert.");
+    } else {
+      showToast(`❌ Auth fehlgeschlagen: ${res.message}`);
+    }
+  };
+
+  const handleSyncVaultBackend = async () => {
+    if (!userIdentity) return;
+    let token = sessionToken;
+    if (!token) {
+      const authRes = await executeZeroKnowledgeAuth(userIdentity);
+      if (authRes.success && authRes.sessionToken) {
+        token = authRes.sessionToken;
+        setSessionToken(token);
+      } else {
+        showToast("❌ Server-Authentifizierung fehlgeschlagen.");
+        return;
+      }
+    }
+
+    const profileData = JSON.stringify({
+      name: userName,
+      preset: userProfilePreset,
+      customCss: userCustomCss,
+      badge: userBadge,
+      statusQuote: userStatusQuote,
+      bannerGradient: userBannerGradient
+    });
+
+    const syncRes = await syncEncryptedVaultToServer(userIdentity.ain, token, profileData, "zeno-passcode-default");
+    if (syncRes.success) {
+      showToast(syncRes.message);
+    } else {
+      showToast(`❌ Sync-Fehler: ${syncRes.message}`);
+    }
   };
 
   // Load saved profile config on startup
@@ -1303,6 +1352,9 @@ function ZenoMainApp() {
         testGithubConnection={testGithubConnection}
         onSaveProfile={handleSaveProfileConfig}
         onRegenerateIdentity={handleRegenerateIdentity}
+        sessionToken={sessionToken}
+        onAuthBackend={handleAuthenticateWithBackend}
+        onSyncVaultBackend={handleSyncVaultBackend}
         showToast={showToast}
       />
 
