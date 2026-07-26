@@ -1995,25 +1995,63 @@ input:checked + .slider:before {
 .layout-avatar_left .profile-card-body {
   align-items: flex-start !important;
   text-align: left !important;
+  padding: 16px 20px !important;
 }
 .layout-avatar_left .profile-avatar-wrapper {
-  margin-top: -36px !important;
+  margin-top: -38px !important;
   align-self: flex-start !important;
+  margin-left: 4px;
+}
+.layout-avatar_left .profile-badge.badge-center {
+  left: 0 !important;
+  transform: none !important;
+}
+.layout-avatar_left .profile-card-name,
+.layout-avatar_left .profile-card-role,
+.layout-avatar_left .profile-card-status,
+.layout-avatar_left .profile-card-section {
+  text-align: left !important;
+  width: 100%;
+}
+
+.layout-compact .profile-card-banner {
+  height: 95px !important;
 }
 .layout-compact .profile-avatar-wrapper {
-  margin-top: -65px !important;
+  margin-top: -36px !important;
 }
-.layout-compact .profile-card-banner {
-  height: 120px !important;
+.layout-compact .profile-card-avatar {
+  width: 52px !important;
+  height: 52px !important;
+  font-size: 20px !important;
+}
+.layout-compact .profile-card-body {
+  padding: 12px 16px !important;
+}
+
+/* Glassmorphism Overlay (Milchiger Frosted Glass Kasten) */
+.layout-banner_overlay .profile-card-banner {
+  height: 160px !important;
 }
 .layout-banner_overlay .profile-card-body {
-  margin-top: -20px;
-  background: rgba(20, 20, 25, 0.85);
-  backdrop-filter: blur(12px);
-  border-radius: 12px;
-  margin-left: 10px;
-  margin-right: 10px;
-  margin-bottom: 10px;
+  margin-top: -60px !important;
+  background: rgba(255, 255, 255, 0.14) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
+  margin-left: 14px !important;
+  margin-right: 14px !important;
+  margin-bottom: 14px !important;
+  position: relative;
+  z-index: 2;
+}
+
+body.light-mode .layout-banner_overlay .profile-card-body {
+  background: rgba(255, 255, 255, 0.55) !important;
+  border: 1px solid rgba(255, 255, 255, 0.75) !important;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.15) !important;
 }
 
 /* Custom Profile Theme Presets */
