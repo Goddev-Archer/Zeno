@@ -1828,7 +1828,7 @@ input:checked + .slider:before {
    7. PROFILE MODAL CARD
    ============================================================ */
 .profile-modal-card {
-  width: 320px;
+  width: 330px;
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
@@ -1838,15 +1838,96 @@ input:checked + .slider:before {
   overflow: hidden;
   animation: zoomIn 180ms ease;
   background-image: var(--noise-texture);
+  position: relative;
+  transition: all 200ms ease;
 }
 
-.profile-card-header {
-  height: 48px;
-  background-color: rgba(0, 0, 0, 0.15);
+/* Profile Banner & Badge Header */
+.profile-card-banner {
+  height: 90px;
+  width: 100%;
+  position: relative;
   display: flex;
-  align-items: center;
   justify-content: flex-end;
-  padding: 0 10px;
+  padding: 10px;
+  background-size: cover;
+  background-position: center;
+  transition: all 200ms ease;
+}
+
+.profile-avatar-wrapper {
+  position: relative;
+  margin-top: -42px;
+  margin-bottom: 8px;
+}
+
+.profile-badge {
+  position: absolute;
+  bottom: -4px;
+  right: -10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  color: var(--text-primary);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+  white-space: nowrap;
+}
+
+/* Custom Profile Theme Presets */
+.profile-modal-card.cyberpunk {
+  border: 1px solid #FF0080;
+  box-shadow: 0 0 25px rgba(255, 0, 128, 0.5), 0 0 50px rgba(121, 40, 202, 0.3);
+  background: linear-gradient(180deg, #161224 0%, #0d0b14 100%);
+}
+.profile-modal-card.cyberpunk .profile-card-name {
+  color: #00DFD8;
+  text-shadow: 0 0 10px rgba(0, 223, 216, 0.8);
+  font-family: 'Consolas', monospace;
+}
+.profile-modal-card.cyberpunk .profile-card-role {
+  background: rgba(255, 0, 128, 0.2);
+  color: #FF0080;
+  border: 1px solid #FF0080;
+}
+
+.profile-modal-card.glassmorphism {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+.profile-modal-card.glassmorphism .profile-card-name {
+  color: #FFFFFF;
+  letter-spacing: 0.5px;
+}
+
+.profile-modal-card.synthwave {
+  border: 1px solid #f857a6;
+  box-shadow: 0 0 20px rgba(248, 87, 166, 0.5);
+  background: linear-gradient(180deg, #2b1055 0%, #171826 100%);
+}
+.profile-modal-card.synthwave .profile-card-name {
+  color: #FFDD00;
+  text-shadow: 0 0 10px #f857a6;
+}
+
+.profile-modal-card.matrix {
+  border: 1px solid #00FF87;
+  box-shadow: 0 0 20px rgba(0, 255, 135, 0.4);
+  background: #050E09;
+  font-family: 'Consolas', monospace;
+}
+.profile-modal-card.matrix .profile-card-name {
+  color: #00FF87;
+  text-shadow: 0 0 8px #00FF87;
+}
+.profile-modal-card.matrix .profile-card-role {
+  background: rgba(0, 255, 135, 0.15);
+  color: #00FF87;
+  border: 1px solid #00FF87;
 }
 
 .profile-card-body {

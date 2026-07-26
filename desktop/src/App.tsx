@@ -57,6 +57,7 @@ interface Message {
 }
 
 interface Profile {
+  id?: string;
   name: string;
   avatar: string;
   avatarColor: string;
@@ -65,6 +66,10 @@ interface Profile {
   roleColor?: string;
   status?: string;
   fingerprint: string;
+  bannerGradient?: string;
+  badge?: string;
+  themePreset?: "default" | "cyberpunk" | "glassmorphism" | "synthwave" | "matrix" | "custom";
+  customCss?: string;
 }
 
 interface Toast {
@@ -666,24 +671,33 @@ const initialMessages: Record<string, Message[]> = {
 
 const mockProfiles: Record<string, Profile> = {
   MaxShield: {
+    id: "maxshield",
     name: "MaxShield",
     avatar: "M",
     avatarColor: "blue",
     role: "Entwickler",
     roleColor: "blue",
     status: '"Latenz-Optimierung läuft..."',
-    fingerprint: "0x8B2C4F6A0C7D8E9F0A1B2C3D4E5F67890BCDEF12"
+    fingerprint: "0x8B2C4F6A0C7D8E9F0A1B2C3D4E5F67890BCDEF12",
+    bannerGradient: "linear-gradient(135deg, #00C6FF 0%, #0072FF 100%)",
+    badge: "⚡ CORE DEV",
+    themePreset: "glassmorphism"
   },
   LenaCrypt: {
+    id: "lenacrypt",
     name: "LenaCrypt",
     avatar: "L",
     avatarColor: "green",
     role: "Entwickler",
     roleColor: "green",
     status: '"Opus-Streams & SFrame standardisiert."',
-    fingerprint: "0x2C3D4E5F67890BCDEF1234567890ABCDEF123456"
+    fingerprint: "0x2C3D4E5F67890BCDEF1234567890ABCDEF123456",
+    bannerGradient: "linear-gradient(135deg, #00FF87 0%, #60EFFF 100%)",
+    badge: "🛡️ ARCHITECT",
+    themePreset: "matrix"
   },
   CipherNaut: {
+    id: "ciphernaut",
     name: "CipherNaut",
     avatar: "C",
     avatarColor: "purple",
@@ -691,34 +705,47 @@ const mockProfiles: Record<string, Profile> = {
     role: "Unterstützer",
     roleColor: "warning",
     status: '"Zeno verschlüsselt meine Daten."',
-    fingerprint: "0xA3F9D1E8B2C4F6A0C7D8E9F0A1B2C3D4E5F67890"
+    fingerprint: "0xA3F9D1E8B2C4F6A0C7D8E9F0A1B2C3D4E5F67890",
+    bannerGradient: "linear-gradient(135deg, #7928CA 0%, #FF0080 100%)",
+    badge: "⚡ VIP CYBERNAUT",
+    themePreset: "cyberpunk",
+    customCss: `
+/* Custom Cyberpunk Profile Theme */
+#profile-card-modal .profile-modal-card {
+  border: 1px solid #FF0080;
+  box-shadow: 0 0 25px rgba(255, 0, 128, 0.5), 0 0 50px rgba(121, 40, 202, 0.4);
+}
+#profile-card-modal .profile-card-name {
+  color: #00DFD8 !important;
+  text-shadow: 0 0 10px rgba(0, 223, 216, 0.8);
+}
+    `.trim()
   },
   ZenoBot: {
+    id: "zenobot",
     name: "ZenoBot",
     avatar: "Z",
     avatarColor: "orange",
     role: "Bot",
     roleColor: "warning",
     status: '"Typisierter RPC-Brückenwächter."',
-    fingerprint: "0x5F67890BCDEF1234567890ABCDEF1234567890AB"
+    fingerprint: "0x5F67890BCDEF1234567890ABCDEF1234567890AB",
+    bannerGradient: "linear-gradient(135deg, #FF8008 0%, #FFC837 100%)",
+    badge: "🤖 SYSTEM BOT",
+    themePreset: "default"
   },
   DarkNode: {
+    id: "darknode",
     name: "DarkNode",
     avatar: "D",
     avatarColor: "gray",
     role: "Offline",
     roleColor: "muted",
-    status: '"Offline - Tor relay ist online."',
-    fingerprint: "0xBCDEF1234567890ABCDEF1234567890ABCDEF123"
-  },
-  QuantumLeap: {
-    name: "QuantumLeap",
-    avatar: "Q",
-    avatarColor: "gray",
-    role: "Offline",
-    roleColor: "muted",
     status: '"Suche post-quantum Signaturen..."',
-    fingerprint: "0xABCDEF1234567890ABCDEF1234567890ABCDEF12"
+    fingerprint: "0xABCDEF1234567890ABCDEF1234567890ABCDEF12",
+    bannerGradient: "linear-gradient(135deg, #f857a6 0%, #ff5858 100%)",
+    badge: "🌙 NIGHT OWL",
+    themePreset: "synthwave"
   }
 };
 
@@ -888,6 +915,34 @@ export default function App() {
   const [isRenaming, setIsRenaming] = useState<boolean>(false);
   const [editorWorkflowStep, setEditorWorkflowStep] = useState<"select_action" | "input_filename" | "editor">("select_action");
   const [editorOutput, setEditorOutput] = useState<string>("");
+
+  // Custom Profile CSS & Template Customizer State
+  const [userProfilePreset, setUserProfilePreset] = useState<"default" | "cyberpunk" | "glassmorphism" | "synthwave" | "matrix" | "custom">("cyberpunk");
+  const [userCustomCss, setUserCustomCss] = useState<string>(
+`/* Custom Cyberpunk Profile Theme */
+#profile-card-modal .profile-modal-card {
+  border: 1px solid #FF0080;
+  box-shadow: 0 0 25px rgba(255, 0, 128, 0.5), 0 0 50px rgba(121, 40, 202, 0.4);
+}
+#profile-card-modal .profile-card-name {
+  color: #00DFD8 !important;
+  text-shadow: 0 0 10px rgba(0, 223, 216, 0.8);
+}`
+  );
+  const [userBadge, setUserBadge] = useState<string>("⚡ VIP CYBERNAUT");
+  const [userStatusQuote, setUserStatusQuote] = useState<string>("Zeno verschlüsselt meine Daten.");
+  const [userBannerGradient, setUserBannerGradient] = useState<string>("linear-gradient(135deg, #7928CA 0%, #FF0080 100%)");
+
+  // Synchronize User Custom Profile settings with mockProfiles.CipherNaut
+  useEffect(() => {
+    if (mockProfiles.CipherNaut) {
+      mockProfiles.CipherNaut.themePreset = userProfilePreset;
+      mockProfiles.CipherNaut.customCss = userCustomCss;
+      mockProfiles.CipherNaut.badge = userBadge;
+      mockProfiles.CipherNaut.status = `"${userStatusQuote}"`;
+      mockProfiles.CipherNaut.bannerGradient = userBannerGradient;
+    }
+  }, [userProfilePreset, userCustomCss, userBadge, userStatusQuote, userBannerGradient]);
 
 
 
@@ -4825,6 +4880,148 @@ sys.stderr = io.StringIO()
                     <p className="settings-help-text">Kopple ein weiteres Gerät durch Scannen des Pairing-Codes.</p>
                     <button className="settings-btn" onClick={() => showToast("Gerätekopplung gestartet")}>Pairing starten</button>
                   </div>
+
+                  {/* Custom Profile CSS & Template Customizer Section */}
+                  <div className="settings-form-group" style={{ marginTop: "24px", paddingTop: "20px", borderTop: "1px solid var(--border-color)" }}>
+                    <h4 style={{ fontSize: "14px", fontWeight: "700", color: "#FFF", marginBottom: "4px", display: "flex", alignItems: "center", gap: "8px" }}>
+                      <Icon icon="mage:palette" style={{ color: "var(--accent-color)" }} />
+                      Profil-Design & Custom-CSS Templates
+                    </h4>
+                    <p className="settings-help-text" style={{ marginBottom: "16px" }}>
+                      Passe deine Profil-Karte mit Theme-Presets oder eigenem Custom-CSS an. Andere Nutzer sehen dein Custom-Design, wenn sie auf dein Profil klicken!
+                    </p>
+
+                    {/* Theme Presets Grid */}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "10px", marginBottom: "20px" }}>
+                      {[
+                        { id: "cyberpunk", label: "⚡ Cyberpunk", gradient: "linear-gradient(135deg, #7928CA 0%, #FF0080 100%)", badge: "⚡ VIP CYBERNAUT" },
+                        { id: "glassmorphism", label: "❄️ Glassmorphism", gradient: "linear-gradient(135deg, #00C6FF 0%, #0072FF 100%)", badge: "❄️ FROSTED GLASS" },
+                        { id: "synthwave", label: "🌅 Synthwave 80s", gradient: "linear-gradient(135deg, #f857a6 0%, #ff5858 100%)", badge: "🌅 RETRO WAVE" },
+                        { id: "matrix", label: "🟩 Matrix Hacker", gradient: "linear-gradient(135deg, #00FF87 0%, #60EFFF 100%)", badge: "🟩 MATRIX CORE" },
+                        { id: "default", label: "🎨 Standard", gradient: "linear-gradient(135deg, #3574F0 0%, #1A44A5 100%)", badge: "⭐ VERIFIZIERT" }
+                      ].map((preset) => (
+                        <button
+                          key={preset.id}
+                          className={`settings-btn ${userProfilePreset === preset.id ? "primary" : ""}`}
+                          onClick={() => {
+                            setUserProfilePreset(preset.id as any);
+                            setUserBannerGradient(preset.gradient);
+                            setUserBadge(preset.badge);
+                            showToast(`Profil-Theme "${preset.label}" angewendet!`);
+                          }}
+                          style={{ padding: "8px 6px", fontSize: "11px", borderRadius: "8px", textAlign: "center" }}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Inputs Grid */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
+                      <div>
+                        <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
+                          Status-Spruch
+                        </label>
+                        <input
+                          type="text"
+                          className="settings-input"
+                          value={userStatusQuote}
+                          onChange={(e) => setUserStatusQuote(e.target.value)}
+                          placeholder="Zeno verschlüsselt meine Daten."
+                          style={{ width: "100%", padding: "8px 12px", background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "6px", color: "#FFF", fontSize: "12px" }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
+                          Profil Badge / Badge-Text
+                        </label>
+                        <input
+                          type="text"
+                          className="settings-input"
+                          value={userBadge}
+                          onChange={(e) => setUserBadge(e.target.value)}
+                          placeholder="⚡ VIP CYBERNAUT"
+                          style={{ width: "100%", padding: "8px 12px", background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "6px", color: "#FFF", fontSize: "12px" }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Banner Gradient Input */}
+                    <div style={{ marginBottom: "16px" }}>
+                      <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
+                        Banner CSS Gradient / Hintergrund
+                      </label>
+                      <input
+                        type="text"
+                        className="settings-input"
+                        value={userBannerGradient}
+                        onChange={(e) => setUserBannerGradient(e.target.value)}
+                        placeholder="linear-gradient(135deg, #7928CA 0%, #FF0080 100%)"
+                        style={{ width: "100%", padding: "8px 12px", background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "6px", color: "#FFF", fontSize: "12px", fontFamily: "monospace" }}
+                      />
+                    </div>
+
+                    {/* Custom CSS Editor Box */}
+                    <div style={{ marginBottom: "20px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                        <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)" }}>
+                          Custom CSS Code-Editor (Live-Styling)
+                        </label>
+                        <span style={{ fontSize: "10px", color: "#00E676" }}>● Scoped to #profile-card-modal</span>
+                      </div>
+                      <textarea
+                        value={userCustomCss}
+                        onChange={(e) => setUserCustomCss(e.target.value)}
+                        rows={6}
+                        style={{
+                          width: "100%",
+                          padding: "12px",
+                          background: "#111214",
+                          border: "1px solid var(--border-color)",
+                          borderRadius: "8px",
+                          color: "#00FF87",
+                          fontFamily: "monospace",
+                          fontSize: "11px",
+                          lineHeight: "1.5",
+                          resize: "vertical"
+                        }}
+                      />
+                    </div>
+
+                    {/* Live Profile Card Preview & Save Action */}
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "20px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--border-color)", borderRadius: "10px", padding: "16px" }}>
+                      <div style={{ flex: 1 }}>
+                        <h5 style={{ margin: "0 0 6px 0", color: "#FFF", fontSize: "13px" }}>Echtzeit Profil-Vorschau</h5>
+                        <p style={{ fontSize: "11px", color: "var(--text-muted)", margin: "0 0 14px 0" }}>
+                          So erscheint deine Profilkarte für andere Mitglieder im Chat und in der Mitgliederliste.
+                        </p>
+                        <button
+                          className="settings-btn primary"
+                          onClick={() => showToast("🎨 Profil-Design & Custom-CSS erfolgreich gespeichert!")}
+                        >
+                          💾 Profil-Design speichern
+                        </button>
+                      </div>
+
+                      {/* Live Mini Preview Card */}
+                      <div style={{ width: "260px", position: "relative" }}>
+                        <div className={`profile-modal-card ${userProfilePreset}`} style={{ width: "100%", minHeight: "220px" }}>
+                          {userCustomCss && <style>{userCustomCss}</style>}
+                          <div className="profile-card-banner" style={{ background: userBannerGradient }} />
+                          <div className="profile-card-body" style={{ padding: "14px" }}>
+                            <div className="profile-avatar-wrapper">
+                              <div className="profile-card-avatar purple" style={{ width: "54px", height: "54px", fontSize: "22px" }}>C</div>
+                              {userBadge && <span className="profile-badge">{userBadge}</span>}
+                            </div>
+                            <h3 className="profile-card-name" style={{ fontSize: "14px" }}>CipherNaut</h3>
+                            <span className="profile-card-role" style={{ fontSize: "8px" }}>UNTERSTÜTZER</span>
+                            <div className="profile-card-status" style={{ fontSize: "10px" }}>"{userStatusQuote}"</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -5081,21 +5278,37 @@ sys.stderr = io.StringIO()
       </div>
 
       {/* 7. PROFILE DETAILS MODAL */}
-      <div className={`modal-overlay ${selectedUserProfile ? "open" : ""}`} id="profile-modal">
+      <div className={`modal-overlay ${selectedUserProfile ? "open" : ""}`} id="profile-card-modal">
         {selectedUserProfile && (
-          <div className="profile-modal-card">
-            <header className="profile-card-header">
+          <div className={`profile-modal-card ${selectedUserProfile.themePreset || "default"}`}>
+            {/* Scoped Custom CSS Template Injection */}
+            {selectedUserProfile.customCss && (
+              <style>{selectedUserProfile.customCss}</style>
+            )}
+
+            {/* Profile Banner */}
+            <div 
+              className="profile-card-banner" 
+              style={{ background: selectedUserProfile.bannerGradient || "linear-gradient(135deg, #3574F0 0%, #1A44A5 100%)" }}
+            >
               <button className="modal-close" onClick={() => setSelectedUserProfile(null)} title="Schließen">
                 <Icon icon="mage:multiply" />
               </button>
-            </header>
+            </div>
+
             <div className="profile-card-body">
-              <div 
-                className={`profile-card-avatar ${selectedUserProfile.avatarColor}`}
-                style={selectedUserProfile.bgColor ? { backgroundColor: selectedUserProfile.bgColor } : {}}
-              >
-                {selectedUserProfile.avatar}
+              <div className="profile-avatar-wrapper">
+                <div 
+                  className={`profile-card-avatar ${selectedUserProfile.avatarColor}`}
+                  style={selectedUserProfile.bgColor ? { backgroundColor: selectedUserProfile.bgColor } : {}}
+                >
+                  {selectedUserProfile.avatar}
+                </div>
+                {selectedUserProfile.badge && (
+                  <span className="profile-badge">{selectedUserProfile.badge}</span>
+                )}
               </div>
+
               <h3 className="profile-card-name">{selectedUserProfile.name}</h3>
               <span className="profile-card-role">{selectedUserProfile.role.toUpperCase()}</span>
               {selectedUserProfile.status && <div className="profile-card-status">{selectedUserProfile.status}</div>}
