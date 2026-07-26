@@ -54,6 +54,7 @@ interface SettingsModalProps {
   setGithubToken: (token: string) => void;
   setGithubUser: (user: any) => void;
   testGithubConnection: () => void;
+  onSaveProfile?: () => void;
   showToast: (msg: string) => void;
 }
 
@@ -110,6 +111,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   setGithubToken,
   setGithubUser,
   testGithubConnection,
+  onSaveProfile,
   showToast
 }) => {
   const avatarFileInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -504,7 +506,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
 
                   {/* 9. Live Profile Card Preview & Save Action */}
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: "20px", background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "10px", padding: "16px" }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: "20px", background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "10px", padding: "20px", marginBottom: "60px" }}>
                     <div style={{ flex: 1 }}>
                       <h5 style={{ margin: "0 0 6px 0", color: "var(--text-primary)", fontSize: "13px" }}>Echtzeit Profil-Vorschau</h5>
                       <p style={{ fontSize: "11px", color: "var(--text-muted)", margin: "0 0 14px 0" }}>
@@ -512,14 +514,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       </p>
                       <button
                         className="settings-btn primary"
-                        onClick={() => showToast("🎨 Profil-Design & Custom-CSS erfolgreich gespeichert!")}
+                        onClick={() => {
+                          if (onSaveProfile) {
+                            onSaveProfile();
+                          } else {
+                            showToast("🎨 Profil-Design & Custom-CSS erfolgreich gespeichert!");
+                          }
+                        }}
                       >
                         💾 Profil-Design speichern
                       </button>
                     </div>
 
                     {/* Live Mini Preview Card */}
-                    <div style={{ width: "260px", position: "relative" }}>
+                    <div style={{ width: "260px", position: "relative" }} id="profile-card-modal">
                       <div 
                         className={`profile-modal-card ${userProfilePreset} ${userCardHoverEffect !== "none" ? `card-hover-${userCardHoverEffect}` : ""} ${userLayoutOrder !== "standard" ? `layout-${userLayoutOrder}` : ""} ${userAnimationPreset !== "none" ? `anim-preset-${userAnimationPreset}` : ""}`} 
                         style={{ width: "100%", minHeight: "220px" }}

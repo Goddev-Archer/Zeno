@@ -214,6 +214,33 @@ function ZenoMainApp() {
   const [userLayoutOrder, setUserLayoutOrder] = useState<"standard" | "compact" | "avatar_left" | "banner_overlay">("standard");
   const [userAnimationPreset, setUserAnimationPreset] = useState<"none" | "subtle_pulse" | "floating_card" | "neon_flicker" | "particle_shimmer">("none");
 
+  // Load saved profile config on startup
+  useEffect(() => {
+    const savedConfig = localStorage.getItem("zeno_user_profile");
+    if (savedConfig) {
+      try {
+        const parsed = JSON.parse(savedConfig);
+        if (parsed.preset) setUserProfilePreset(parsed.preset);
+        if (parsed.customCss) setUserCustomCss(parsed.customCss);
+        if (parsed.badge) setUserBadge(parsed.badge);
+        if (parsed.badgePosition) setUserBadgePosition(parsed.badgePosition);
+        if (parsed.statusQuote) setUserStatusQuote(parsed.statusQuote);
+        if (parsed.bannerGradient) setUserBannerGradient(parsed.bannerGradient);
+        if (parsed.avatarImage) setUserAvatarImage(parsed.avatarImage);
+        if (parsed.avatarHoverEffect) setUserAvatarHoverEffect(parsed.avatarHoverEffect);
+        if (parsed.avatarEffectFrame) setUserAvatarEffectFrame(parsed.avatarEffectFrame);
+        if (parsed.badgeBgColor) setUserBadgeBgColor(parsed.badgeBgColor);
+        if (parsed.badgeTextColor) setUserBadgeTextColor(parsed.badgeTextColor);
+        if (parsed.cardBgColor) setUserCardBgColor(parsed.cardBgColor);
+        if (parsed.cardHoverEffect) setUserCardHoverEffect(parsed.cardHoverEffect);
+        if (parsed.layoutOrder) setUserLayoutOrder(parsed.layoutOrder);
+        if (parsed.animationPreset) setUserAnimationPreset(parsed.animationPreset);
+      } catch (e) {
+        console.error("Failed to parse saved profile config", e);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     if (mockProfiles.CipherNaut) {
       mockProfiles.CipherNaut.themePreset = userProfilePreset;
@@ -237,6 +264,28 @@ function ZenoMainApp() {
     userAvatarImage, userAvatarHoverEffect, userAvatarEffectFrame, userBadgeBgColor, userBadgeTextColor,
     userCardBgColor, userCardHoverEffect, userLayoutOrder, userAnimationPreset
   ]);
+
+  const handleSaveProfileConfig = () => {
+    const config = {
+      preset: userProfilePreset,
+      customCss: userCustomCss,
+      badge: userBadge,
+      badgePosition: userBadgePosition,
+      statusQuote: userStatusQuote,
+      bannerGradient: userBannerGradient,
+      avatarImage: userAvatarImage,
+      avatarHoverEffect: userAvatarHoverEffect,
+      avatarEffectFrame: userAvatarEffectFrame,
+      badgeBgColor: userBadgeBgColor,
+      badgeTextColor: userBadgeTextColor,
+      cardBgColor: userCardBgColor,
+      cardHoverEffect: userCardHoverEffect,
+      layoutOrder: userLayoutOrder,
+      animationPreset: userAnimationPreset
+    };
+    localStorage.setItem("zeno_user_profile", JSON.stringify(config));
+    showToast("💾 Profil-Design & Custom-CSS dauerhaft gespeichert!");
+  };
 
   // Code Editor Modal State
   const [isEditorOpen, setIsEditorOpen] = useState<boolean>(false);
@@ -1221,6 +1270,7 @@ function ZenoMainApp() {
         setGithubToken={setGithubToken}
         setGithubUser={setGithubUser}
         testGithubConnection={testGithubConnection}
+        onSaveProfile={handleSaveProfileConfig}
         showToast={showToast}
       />
 
