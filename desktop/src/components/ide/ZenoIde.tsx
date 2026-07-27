@@ -176,11 +176,21 @@ export const ZenoIde: React.FC<ZenoIdeProps> = ({
         </div>
       </header>
 
-      {/* 2. MAIN WORKSPACE BODY (Floating Activity Bar, Sidebar, and Editor Islands) */}
+      {/* 2. MAIN WORKSPACE BODY */}
       <div style={{ flex: 1, display: "flex", gap: "12px", minHeight: 0 }}>
-        
-        {/* Activity Bar Island */}
-        <nav className="code-oss-activity-island" style={{ width: "48px", backgroundColor: "#111319", borderRadius: "12px", border: "1px solid #1E222D", display: "flex", flexDirection: "column", alignItems: "center", padding: "12px 0", gap: "14px", boxShadow: "0 4px 20px rgba(0,0,0,0.3)" }}>
+        {serverActive ? (
+          /* 100% PURE NATIVE VS CODE (CODE-OSS) WORKBENCH FRAME */
+          <div style={{ flex: 1, backgroundColor: "#1e1e1e", borderRadius: "12px", border: "1px solid #1E222D", overflow: "hidden" }}>
+            <iframe
+              src="http://localhost:3050"
+              title="Native Code-OSS Workbench Engine"
+              style={{ width: "100%", height: "100%", border: "none" }}
+            />
+          </div>
+        ) : (
+          <>
+            {/* Activity Bar Island */}
+            <nav className="code-oss-activity-island" style={{ width: "48px", backgroundColor: "#111319", borderRadius: "12px", border: "1px solid #1E222D", display: "flex", flexDirection: "column", alignItems: "center", padding: "12px 0", gap: "14px", boxShadow: "0 4px 20px rgba(0,0,0,0.3)" }}>
           <button
             onClick={() => setIdeSidebarTab("explorer")}
             style={{ background: ideSidebarTab === "explorer" ? "rgba(56, 189, 248, 0.15)" : "transparent", border: "none", color: ideSidebarTab === "explorer" ? "#38BDF8" : "#64748B", width: "36px", height: "36px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", cursor: "pointer" }}
@@ -402,6 +412,8 @@ export const ZenoIde: React.FC<ZenoIdeProps> = ({
           </div>
 
         </main>
+          </>
+        )}
       </div>
 
     </div>
