@@ -145,14 +145,41 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                               <span className="channel-name">{ch.name}</span>
                             </button>
 
-                            {!isText && ch.connectedUsers && (
-                              <ul className="voice-connected-users">
-                                {ch.connectedUsers.map((u) => (
-                                  <li key={u} className="voice-user">
-                                    <span className="voice-user-avatar">{u[0]}</span>
-                                    <span className="voice-user-name">{u}</span>
-                                  </li>
-                                ))}
+                            {!isText && (
+                              <ul className="voice-connected-users" style={{ paddingLeft: "24px", marginTop: "4px", display: "flex", flexDirection: "column", gap: "6px" }}>
+                                {(ch.connectedUsers || ["CipherNaut (Du)", "Alex", "Elena"]).map((user, uIdx) => {
+                                  const isSpeaking = uIdx === 0 && !muted && connectedVoice === ch.name;
+                                  return (
+                                    <li key={user} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "11px", color: isSpeaking ? "#00FF87" : "#94A3B8", padding: "2px 6px", borderRadius: "6px", backgroundColor: isSpeaking ? "rgba(0, 255, 135, 0.08)" : "transparent" }}>
+                                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                        <div 
+                                          className={`voice-user-avatar ${isSpeaking ? "user-speaking-ring" : ""}`}
+                                          style={{
+                                            width: "22px",
+                                            height: "22px",
+                                            borderRadius: "50%",
+                                            backgroundColor: "#3574F0",
+                                            color: "#FFF",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            fontSize: "10px",
+                                            fontWeight: "700",
+                                            border: isSpeaking ? "2px solid #00FF87" : "none",
+                                            boxShadow: isSpeaking ? "0 0 10px rgba(0, 255, 135, 0.6)" : "none"
+                                          }}
+                                        >
+                                          {user[0]}
+                                        </div>
+                                        <span>{user}</span>
+                                      </div>
+                                      <Icon 
+                                        icon={isSpeaking ? "mage:volume-up" : (uIdx === 1 ? "mage:microphone-mute" : "mage:microphone")} 
+                                        style={{ color: isSpeaking ? "#00FF87" : "#64748B", fontSize: "12px" }} 
+                                      />
+                                    </li>
+                                  );
+                                })}
                               </ul>
                             )}
                           </li>
