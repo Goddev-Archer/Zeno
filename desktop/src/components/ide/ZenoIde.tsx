@@ -260,7 +260,12 @@ export const ZenoIde: React.FC<ZenoIdeProps> = ({
 
           {ideSidebarTab === "extensions" && (
             <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-              <span style={{ fontSize: "11px", fontWeight: "700", color: "#94A3B8", marginBottom: "12px" }}>EXTENSIONS</span>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                <span style={{ fontSize: "11px", fontWeight: "700", color: "#94A3B8" }}>OPEN VSX EXTENSIONS</span>
+                <span style={{ fontSize: "10px", color: "#00FF87", backgroundColor: "rgba(0,255,135,0.1)", padding: "2px 6px", borderRadius: "4px" }}>
+                  {ideExtensions.filter(e => e.installed).length} Aktiv
+                </span>
+              </div>
               <input
                 type="text"
                 placeholder="Erweiterungen suchen..."
@@ -269,18 +274,29 @@ export const ZenoIde: React.FC<ZenoIdeProps> = ({
                 style={{ width: "100%", backgroundColor: "#0D0E12", border: "1px solid #262933", borderRadius: "8px", padding: "6px 10px", fontSize: "11px", color: "#E2E8F0", outline: "none", marginBottom: "12px" }}
               />
               <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px" }}>
-                {ideExtensions.map((ext) => (
-                  <div key={ext.id} style={{ backgroundColor: "#0D0E12", border: "1px solid #1E222D", padding: "10px", borderRadius: "8px" }}>
-                    <div style={{ fontSize: "12px", fontWeight: "700", color: "#E2E8F0" }}>{ext.name}</div>
-                    <div style={{ fontSize: "10px", color: "#94A3B8", margin: "2px 0 6px 0" }}>{ext.description}</div>
-                    <button
-                      onClick={() => ext.installed ? handleExtensionUninstall(ext.id) : handleExtensionInstall(ext.id)}
-                      style={{ fontSize: "10px", padding: "3px 8px", borderRadius: "4px", border: "none", backgroundColor: ext.installed ? "#EF4444" : "#38BDF8", color: "#FFF", cursor: "pointer" }}
-                    >
-                      {ext.installed ? "Deinstallieren" : "Installieren"}
-                    </button>
-                  </div>
-                ))}
+                {ideExtensions
+                  .filter(ext => 
+                    ext.name.toLowerCase().includes(ideExtensionsSearchQuery.toLowerCase()) ||
+                    ext.description.toLowerCase().includes(ideExtensionsSearchQuery.toLowerCase())
+                  )
+                  .map((ext) => (
+                    <div key={ext.id} style={{ backgroundColor: "#0D0E12", border: "1px solid #1E222D", padding: "10px", borderRadius: "8px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "4px" }}>
+                        <div style={{ fontSize: "12px", fontWeight: "700", color: "#E2E8F0", display: "flex", alignItems: "center", gap: "6px" }}>
+                          <Icon icon={ext.icon || "mage:box-3d"} style={{ color: "#38BDF8", fontSize: "14px" }} />
+                          <span>{ext.name}</span>
+                        </div>
+                        <span style={{ fontSize: "9px", color: "#64748B" }}>⬇ {ext.downloads}</span>
+                      </div>
+                      <div style={{ fontSize: "10px", color: "#94A3B8", margin: "2px 0 8px 0", lineHeight: "1.3" }}>{ext.description}</div>
+                      <button
+                        onClick={() => ext.installed ? handleExtensionUninstall(ext.id) : handleExtensionInstall(ext.id)}
+                        style={{ fontSize: "10px", fontWeight: "700", padding: "4px 10px", borderRadius: "6px", border: "none", backgroundColor: ext.installed ? "rgba(239, 68, 68, 0.15)" : "#00FF87", color: ext.installed ? "#EF4444" : "#08090C", cursor: "pointer" }}
+                      >
+                        {ext.installed ? "Deinstallieren" : "Installieren"}
+                      </button>
+                    </div>
+                  ))}
               </div>
             </div>
           )}
