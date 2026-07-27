@@ -313,9 +313,15 @@ export const ZenoIde: React.FC<ZenoIdeProps> = ({
             })}
           </div>
 
-          {/* Monaco Editor Container */}
+          {/* Monaco / Code-OSS Web Workbench Container */}
           <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
-            {activeIdeFile && !activeIdeFile.isFolder ? (
+            {serverActive ? (
+              <iframe
+                src="http://localhost:3050"
+                title="Zeno Code-OSS Unblocked Engine"
+                style={{ width: "100%", height: "100%", border: "none" }}
+              />
+            ) : activeIdeFile && !activeIdeFile.isFolder ? (
               <Editor
                 height="100%"
                 language={activeIdeFile.language}
