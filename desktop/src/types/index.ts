@@ -17,6 +17,9 @@ export interface Server {
   id: string;
   name: string;
   iconLetter: string;
+  icon?: string;
+  description?: string;
+  unreadCount?: number;
   categories: Category[];
 }
 

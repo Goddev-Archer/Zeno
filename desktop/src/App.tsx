@@ -42,6 +42,7 @@ import { WasmHub } from "./components/wasm/WasmHub";
 import { ZenoIde } from "./components/ide/ZenoIde";
 
 // --- MODALS ---
+import { CreateJoinServerModal } from "./components/modals/CreateJoinServerModal";
 import { ProfileCardModal } from "./components/modals/ProfileCardModal";
 import { SettingsModal } from "./components/modals/SettingsModal";
 import { CodeEditorModal } from "./components/modals/CodeEditorModal";
@@ -156,7 +157,7 @@ const lightPresets = [
 
 function ZenoMainApp() {
   // Navigation & View State
-  const [servers] = useState<Server[]>(initialServers);
+  const [servers, setServers] = useState<Server[]>(initialServers);
   const [activeServerId, setActiveServerId] = useState<string>("home");
   const [homeTab, setHomeTab] = useState<"dashboard" | "wasm_hub" | "ide">("dashboard");
   const [activeServer, setActiveServer] = useState<Server>(initialServers[0]);
@@ -422,6 +423,48 @@ function ZenoMainApp() {
   const [isIdeConsoleExpanded, setIsIdeConsoleExpanded] = useState<boolean>(true);
   const [ideGitChanges, setIdeGitChanges] = useState<string[]>(["src/main.rs"]);
   const [ideGitMessage, setIdeGitMessage] = useState<string>("");
+  const [isCreateJoinServerModalOpen, setIsCreateJoinServerModalOpen] = useState<boolean>(false);
+
+  const handleServerCreated = (newServer: Server) => {
+    setServers((prev: Server[]) => [...prev, newServer]);
+    setActiveServerId(newServer.id);
+    setActiveServer(newServer);
+    if (newServer.categories && newServer.categories[0] && newServer.categories[0].channels[0]) {
+      setActiveChannel(newServer.categories[0].channels[0]);
+    }
+  };
+
+  const handleServerJoined = (inviteCode: string) => {
+    const joinedServerId = `srv-joined-${Date.now()}`;
+    const joinedServer: Server = {
+      id: joinedServerId,
+      name: `Zeno Server (${inviteCode})`,
+      iconLetter: "🌐",
+      unreadCount: 0,
+      categories: [
+        {
+          name: "TEXTKANÄLE",
+          type: "text",
+          channels: [
+            { id: `c-${Date.now()}-1`, name: "allgemein" }
+          ]
+        },
+        {
+          name: "SPRACHKANÄLE",
+          type: "voice",
+          channels: [
+            { id: `c-${Date.now()}-2`, name: "voice-channel" }
+          ]
+        }
+      ]
+    };
+    setServers((prev: Server[]) => [...prev, joinedServer]);
+    setActiveServerId(joinedServer.id);
+    setActiveServer(joinedServer);
+    if (joinedServer.categories[0] && joinedServer.categories[0].channels[0]) {
+      setActiveChannel(joinedServer.categories[0].channels[0]);
+    }
+  };
   const [isIdeProjectWizardOpen, setIsIdeProjectWizardOpen] = useState<boolean>(false);
   const [isIdeNewItemModalOpen, setIsIdeNewItemModalOpen] = useState<boolean>(false);
   const [ideNewItemType, setIdeNewItemType] = useState<"file" | "folder">("file");
@@ -1127,7 +1170,7 @@ function ZenoMainApp() {
         animatingServerId={animatingServerId}
         onSelectServer={handleServerSelect}
         onGoHome={() => setActiveServerId("home")}
-        onAddServerClick={() => showToast("Server-Erstellung ist im Prototyp deaktiviert")}
+        onAddServerClick={() => setIsCreateJoinServerModalOpen(true)}
       />
 
       {/* 2. CHANNEL SIDEBAR */}
@@ -1449,6 +1492,14 @@ function ZenoMainApp() {
           setCustomWasmName("");
           setCustomWasmUrl("");
         }}
+      />
+
+      <CreateJoinServerModal
+        isOpen={isCreateJoinServerModalOpen}
+        onClose={() => setIsCreateJoinServerModalOpen(false)}
+        onServerCreated={handleServerCreated}
+        onServerJoined={handleServerJoined}
+        showToast={showToast}
       />
 
       <IdeProjectWizardModal
