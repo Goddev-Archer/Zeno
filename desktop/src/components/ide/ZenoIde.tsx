@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Icon } from "@iconify/react";
 import Editor from "@monaco-editor/react";
 import { IdeFile } from "../../types";
@@ -76,6 +76,23 @@ export const ZenoIde: React.FC<ZenoIdeProps> = ({
 }) => {
   const [commandPaletteQuery, setCommandPaletteQuery] = useState("");
   const [activeBottomTab, setActiveBottomTab] = useState<"terminal" | "problems" | "output">("terminal");
+  const [serverActive, setServerActive] = useState<boolean>(false);
+
+  useEffect(() => {
+    const checkHealth = async () => {
+      try {
+        const res = await fetch("http://localhost:3050/health");
+        if (res.ok) {
+          setServerActive(true);
+        }
+      } catch (e) {
+        setServerActive(false);
+      }
+    };
+    checkHealth();
+    const interval = setInterval(checkHealth, 3000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleEditorBeforeMount = (monaco: any) => {
     monaco.editor.defineTheme("code-oss-island-dark", {
@@ -122,8 +139,8 @@ export const ZenoIde: React.FC<ZenoIdeProps> = ({
             <span style={{ fontSize: "12px", fontWeight: "800", background: "linear-gradient(135deg, #00FF87, #60EFFF)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
               ZENO CODE-OSS
             </span>
-            <span style={{ fontSize: "10px", backgroundColor: "#1E222D", color: "#38BDF8", padding: "2px 8px", borderRadius: "4px", fontWeight: "600" }}>
-              2026 Island Studio
+            <span style={{ fontSize: "10px", backgroundColor: serverActive ? "rgba(0, 255, 135, 0.15)" : "#1E222D", color: serverActive ? "#00FF87" : "#38BDF8", padding: "2px 8px", borderRadius: "4px", fontWeight: "600" }}>
+              {serverActive ? "● Code-OSS Engine Verknüpft (Port 3050)" : "2026 Island Studio"}
             </span>
           </div>
         </div>

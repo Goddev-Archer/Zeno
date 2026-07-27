@@ -8,7 +8,7 @@ export interface OpenVsCodeServerStatus {
   message: string;
 }
 
-const DEFAULT_SERVER_URL = "http://localhost:3000";
+const DEFAULT_SERVER_URL = "http://localhost:3050";
 
 /**
  * Checks if a local OpenVSCode Server instance is running
