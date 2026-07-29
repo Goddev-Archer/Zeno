@@ -140,7 +140,7 @@ export const ZenoIde: React.FC<ZenoIdeProps> = ({
               ZENO CODE-OSS
             </span>
             <span style={{ fontSize: "10px", backgroundColor: serverActive ? "rgba(0, 255, 135, 0.15)" : "#1E222D", color: serverActive ? "#00FF87" : "#38BDF8", padding: "2px 8px", borderRadius: "4px", fontWeight: "600" }}>
-              {serverActive ? "● Code-OSS Engine Verknüpft (Port 3050)" : "2026 Island Studio"}
+              {serverActive ? "● Echte VS Code Web Engine Aktiv (Port 3050)" : "Offline (Standard Editor)"}
             </span>
           </div>
         </div>
