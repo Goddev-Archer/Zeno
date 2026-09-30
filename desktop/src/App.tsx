@@ -19,7 +19,10 @@ import {
   LiveGitCommit,
   UserIdentity
 } from "./types";
-import { getOrRegisterUserIdentity, generateCryptographicIdentity } from "./services/cryptoService";
+import {
+  getOrRegisterUserIdentity,
+  getActiveIdentityFromDb
+} from "./services/cryptoService";
 import { executeZeroKnowledgeAuth, syncEncryptedVaultToServer } from "./services/backendService";
 import {
   saveServerToDb,
@@ -57,6 +60,7 @@ import { WasmHub } from "./components/wasm/WasmHub";
 import { ZenoIde } from "./components/ide/ZenoIde";
 
 // --- MODALS ---
+import { SovereignAccountModal } from "./components/modals/SovereignAccountModal";
 import { CreateJoinServerModal } from "./components/modals/CreateJoinServerModal";
 import { ProfileCardModal } from "./components/modals/ProfileCardModal";
 import { SettingsModal } from "./components/modals/SettingsModal";
@@ -258,24 +262,51 @@ function ZenoMainApp() {
 
   // Cryptographic AIN & Keypair State
   const [userIdentity, setUserIdentity] = useState<UserIdentity | null>(null);
+  const [isSovereignModalOpen, setIsSovereignModalOpen] = useState<boolean>(false);
+  const [sovereignModalTab, setSovereignModalTab] = useState<"create" | "restore" | "manage">("create");
 
   useEffect(() => {
-    getOrRegisterUserIdentity().then((identity) => {
-      setUserIdentity(identity);
-      if (mockProfiles.CipherNaut) {
-        mockProfiles.CipherNaut.fingerprint = identity.fingerprint;
+    getActiveIdentityFromDb().then((activeIdn) => {
+      if (activeIdn) {
+        const idn: UserIdentity = {
+          ain: activeIdn.ain,
+          publicKeyHex: activeIdn.publicKeyHex,
+          privateKeyEncryptedHex: activeIdn.privateKeyEncryptedHex,
+          mnemonic: activeIdn.mnemonic,
+          fingerprint: activeIdn.fingerprint,
+          createdAt: activeIdn.createdAt
+        };
+        setUserIdentity(idn);
+        if (activeIdn.username) {
+          setUserName(activeIdn.username);
+        }
+        if (mockProfiles.CipherNaut) {
+          mockProfiles.CipherNaut.fingerprint = activeIdn.fingerprint;
+        }
+      } else {
+        getOrRegisterUserIdentity().then((identity) => {
+          setUserIdentity(identity);
+          if (mockProfiles.CipherNaut) {
+            mockProfiles.CipherNaut.fingerprint = identity.fingerprint;
+          }
+        });
       }
     });
   }, []);
 
-  const handleRegenerateIdentity = async () => {
-    const newIdentity = await generateCryptographicIdentity();
-    localStorage.setItem("zeno_user_identity", JSON.stringify(newIdentity));
+  const handleIdentityChanged = (newIdentity: UserIdentity, newUsername: string) => {
     setUserIdentity(newIdentity);
+    if (newUsername) {
+      setUserName(newUsername);
+    }
     if (mockProfiles.CipherNaut) {
       mockProfiles.CipherNaut.fingerprint = newIdentity.fingerprint;
     }
-    showToast(`🔑 Neue AIN generiert: ${newIdentity.ain}`);
+  };
+
+  const handleRegenerateIdentity = async () => {
+    setSovereignModalTab("create");
+    setIsSovereignModalOpen(true);
   };
 
   // Zero-Knowledge Backend Auth & Sync State
@@ -1310,6 +1341,12 @@ function ZenoMainApp() {
         setSelectedUserProfile={setSelectedUserProfile}
         showToast={showToast}
         formatVoiceTime={formatVoiceTime}
+        userAin={userIdentity?.ain}
+        userName={userName}
+        onOpenSovereignModal={() => {
+          setSovereignModalTab("manage");
+          setIsSovereignModalOpen(true);
+        }}
       />
 
       {/* 3. MAIN WORKSPACE VIEW */}
@@ -1613,6 +1650,15 @@ function ZenoMainApp() {
         onServerJoined={handleServerJoined}
         showToast={showToast}
         userAin={userIdentity?.ain}
+      />
+
+      <SovereignAccountModal
+        isOpen={isSovereignModalOpen}
+        onClose={() => setIsSovereignModalOpen(false)}
+        currentIdentity={userIdentity}
+        onIdentityChanged={handleIdentityChanged}
+        showToast={showToast}
+        initialTab={sovereignModalTab}
       />
 
       <IdeProjectWizardModal

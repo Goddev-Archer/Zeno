@@ -26,6 +26,9 @@ interface ChannelSidebarProps {
   setSelectedUserProfile: (profile: Profile | null) => void;
   showToast: (msg: string) => void;
   formatVoiceTime: (seconds: number) => string;
+  userAin?: string;
+  userName?: string;
+  onOpenSovereignModal?: () => void;
 }
 
 export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
@@ -51,7 +54,10 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   setIsSettingsOpen,
   setSelectedUserProfile,
   showToast,
-  formatVoiceTime
+  formatVoiceTime,
+  userAin,
+  userName,
+  onOpenSovereignModal
 }) => {
   if (activeServerId === "home" && homeTab === "ide") return null;
 
@@ -215,15 +221,29 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
         <div 
           className="user-info" 
           style={{ cursor: "pointer" }}
-          onClick={() => mockProfiles.CipherNaut && setSelectedUserProfile(mockProfiles.CipherNaut)}
+          onClick={() => {
+            if (onOpenSovereignModal) {
+              onOpenSovereignModal();
+            } else if (mockProfiles.CipherNaut) {
+              setSelectedUserProfile(mockProfiles.CipherNaut);
+            }
+          }}
+          title="Konto & souveräne Identität (12 Wörter / AIN) verwalten"
         >
           <div className="user-avatar-wrapper">
-            <div className="user-avatar purple">C</div>
+            <div className="user-avatar purple" style={{ backgroundColor: "#00FF87", color: "#08090C", fontWeight: "700" }}>
+              {(userName || "C").charAt(0).toUpperCase()}
+            </div>
             <span className="status-dot online" />
           </div>
-          <div className="user-details">
-            <span className="user-name">CipherNaut</span>
-            <span className="user-id">0xA3F...8B2</span>
+          <div className="user-details" style={{ overflow: "hidden" }}>
+            <span className="user-name" style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+              {userName || "CipherNaut"}
+              <Icon icon="mage:shield" style={{ fontSize: "11px", color: "#00FF87" }} />
+            </span>
+            <span className="user-id" style={{ fontFamily: "monospace", fontSize: "10px", color: "#94A3B8" }}>
+              {userAin || "ZENO-ANONYMOUS"}
+            </span>
           </div>
         </div>
         <div className="user-controls">

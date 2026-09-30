@@ -32,4 +32,5 @@ rand = "0.8"
 hex = "0.4"
 zeroize = { version = "1.7", features = ["derive"] }
 rusqlite = { version = "0.31", features = ["bundled"] }
+bip39 = "3.0.0"
 

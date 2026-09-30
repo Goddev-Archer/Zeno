@@ -15,6 +15,7 @@ use aes_gcm::{
 };
 use rand::RngCore;
 use zeroize::Zeroize;
+use bip39::Mnemonic;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,6 +23,7 @@ pub struct UserIdentity {
     pub ain: String,
     pub public_key_hex: String,
     pub private_key_encrypted_hex: Option<String>,
+    pub mnemonic: Option<String>,
     pub fingerprint: String,
     pub created_at: String,
 }
@@ -88,6 +90,60 @@ pub fn generate_identity() -> Result<UserIdentity, String> {
         ain,
         public_key_hex: pub_key_hex,
         private_key_encrypted_hex: Some(priv_key_hex),
+        mnemonic: None,
+        fingerprint,
+        created_at: chrono_like_now(),
+    })
+}
+
+/// Generates a Sovereign BIP-39 12-word cryptographic identity with deterministic ECDSA P-256 keypair
+pub fn generate_sovereign_identity() -> Result<UserIdentity, String> {
+    let mut entropy = [0u8; 16];
+    rand::rngs::OsRng.fill_bytes(&mut entropy);
+    let mnemonic = Mnemonic::from_entropy(&entropy)
+        .map_err(|e| format!("Fehler bei BIP-39 Entropie: {:?}", e))?;
+    
+    let words = mnemonic.to_string();
+    import_sovereign_identity(&words)
+}
+
+/// Restores an ECDSA P-256 sovereign identity deterministically from a 12-word BIP-39 mnemonic
+pub fn import_sovereign_identity(words: &str) -> Result<UserIdentity, String> {
+    let clean_words = words.trim().to_lowercase();
+    let mnemonic = Mnemonic::parse_normalized(&clean_words)
+        .map_err(|e| format!("Ungültige BIP-39 Wörter: {:?}", e))?;
+
+    // Derive 512-bit seed
+    let seed = mnemonic.to_seed("");
+    // SHA-256 of seed to guarantee valid 32-byte scalar
+    let mut hasher = Sha256::new();
+    hasher.update(&seed);
+    let scalar_bytes = hasher.finalize();
+
+    let signing_key = SigningKey::from_slice(&scalar_bytes)
+        .map_err(|e| format!("Fehler beim Ableiten des ECDSA Schlüssels: {:?}", e))?;
+    let verifying_key = VerifyingKey::from(&signing_key);
+
+    let doc = signing_key
+        .to_pkcs8_der()
+        .map_err(|e| format!("Fehler beim Kodieren des privaten Schlüssels: {}", e))?;
+    let mut priv_bytes = doc.as_bytes().to_vec();
+    let priv_key_hex = hex::encode_upper(&priv_bytes);
+    priv_bytes.zeroize();
+
+    let pub_doc = verifying_key
+        .to_public_key_der()
+        .map_err(|e| format!("Fehler beim Kodieren des öffentlichen Schlüssels: {}", e))?;
+    let pub_bytes = pub_doc.as_bytes();
+    let pub_key_hex = hex::encode_upper(pub_bytes);
+
+    let (ain, fingerprint) = derive_ain_from_public_key(pub_bytes);
+
+    Ok(UserIdentity {
+        ain,
+        public_key_hex: pub_key_hex,
+        private_key_encrypted_hex: Some(priv_key_hex),
+        mnemonic: Some(clean_words),
         fingerprint,
         created_at: chrono_like_now(),
     })

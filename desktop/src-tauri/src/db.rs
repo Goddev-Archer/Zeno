@@ -36,6 +36,19 @@ pub struct DbMessageRecord {
     pub created_at: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DbIdentityRecord {
+    pub ain: String,
+    pub username: String,
+    pub public_key_hex: String,
+    pub private_key_encrypted_hex: Option<String>,
+    pub mnemonic: Option<String>,
+    pub fingerprint: String,
+    pub is_active: bool,
+    pub created_at: String,
+}
+
 pub struct DbState {
     pub conn: Mutex<Connection>,
 }
@@ -86,13 +99,22 @@ fn init_schema(conn: &Connection) -> SqlResult<()> {
 
         CREATE TABLE IF NOT EXISTS identities (
             ain TEXT PRIMARY KEY,
+            username TEXT NOT NULL DEFAULT 'CipherNaut',
             public_key_hex TEXT NOT NULL,
             private_key_encrypted_hex TEXT,
+            mnemonic TEXT,
             fingerprint TEXT NOT NULL,
+            is_active INTEGER DEFAULT 1,
             created_at TEXT NOT NULL
         );
         ",
     )?;
+
+    // Safe column migrations in case identities table was created previously without these columns
+    let _ = conn.execute("ALTER TABLE identities ADD COLUMN username TEXT NOT NULL DEFAULT 'CipherNaut'", []);
+    let _ = conn.execute("ALTER TABLE identities ADD COLUMN mnemonic TEXT", []);
+    let _ = conn.execute("ALTER TABLE identities ADD COLUMN is_active INTEGER DEFAULT 1", []);
+
     Ok(())
 }
 
@@ -225,4 +247,132 @@ pub fn fetch_channel_messages(
         }
     }
     Ok(result)
+}
+
+// --- IDENTITY OPERATIONS ---
+
+pub fn insert_or_update_identity(conn: &Connection, idn: &DbIdentityRecord) -> Result<(), String> {
+    if idn.is_active {
+        let _ = conn.execute("UPDATE identities SET is_active = 0", []);
+    }
+
+    conn.execute(
+        "INSERT INTO identities (ain, username, public_key_hex, private_key_encrypted_hex, mnemonic, fingerprint, is_active, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+         ON CONFLICT(ain) DO UPDATE SET
+            username=excluded.username,
+            public_key_hex=excluded.public_key_hex,
+            private_key_encrypted_hex=excluded.private_key_encrypted_hex,
+            mnemonic=excluded.mnemonic,
+            fingerprint=excluded.fingerprint,
+            is_active=excluded.is_active;",
+        params![
+            idn.ain,
+            idn.username,
+            idn.public_key_hex,
+            idn.private_key_encrypted_hex,
+            idn.mnemonic,
+            idn.fingerprint,
+            if idn.is_active { 1 } else { 0 },
+            idn.created_at,
+        ],
+    ).map_err(|e| format!("SQLite Identity Insert Error: {}", e))?;
+    Ok(())
+}
+
+pub fn fetch_active_identity(conn: &Connection) -> Result<Option<DbIdentityRecord>, String> {
+    let mut stmt = conn
+        .prepare("SELECT ain, username, public_key_hex, private_key_encrypted_hex, mnemonic, fingerprint, is_active, created_at FROM identities WHERE is_active = 1 LIMIT 1")
+        .map_err(|e| format!("SQLite Query Error: {}", e))?;
+
+    let mut rows = stmt
+        .query_map([], |row| {
+            let active_int: i32 = row.get(6)?;
+            Ok(DbIdentityRecord {
+                ain: row.get(0)?,
+                username: row.get(1)?,
+                public_key_hex: row.get(2)?,
+                private_key_encrypted_hex: row.get(3)?,
+                mnemonic: row.get(4)?,
+                fingerprint: row.get(5)?,
+                is_active: active_int == 1,
+                created_at: row.get(7)?,
+            })
+        })
+        .map_err(|e| format!("SQLite Map Error: {}", e))?;
+
+    if let Some(res) = rows.next() {
+        return res.map(Some).map_err(|e| format!("SQLite Row Error: {}", e));
+    }
+
+    // Fallback: if no active one, return the latest identity
+    let mut stmt_fallback = conn
+        .prepare("SELECT ain, username, public_key_hex, private_key_encrypted_hex, mnemonic, fingerprint, is_active, created_at FROM identities ORDER BY rowid DESC LIMIT 1")
+        .map_err(|e| format!("SQLite Fallback Query Error: {}", e))?;
+
+    let mut fallback_rows = stmt_fallback
+        .query_map([], |row| {
+            let active_int: i32 = row.get(6)?;
+            Ok(DbIdentityRecord {
+                ain: row.get(0)?,
+                username: row.get(1)?,
+                public_key_hex: row.get(2)?,
+                private_key_encrypted_hex: row.get(3)?,
+                mnemonic: row.get(4)?,
+                fingerprint: row.get(5)?,
+                is_active: active_int == 1,
+                created_at: row.get(7)?,
+            })
+        })
+        .map_err(|e| format!("SQLite Fallback Map Error: {}", e))?;
+
+    if let Some(res) = fallback_rows.next() {
+        return res.map(Some).map_err(|e| format!("SQLite Row Error: {}", e));
+    }
+
+    Ok(None)
+}
+
+pub fn fetch_all_identities(conn: &Connection) -> Result<Vec<DbIdentityRecord>, String> {
+    let mut stmt = conn
+        .prepare("SELECT ain, username, public_key_hex, private_key_encrypted_hex, mnemonic, fingerprint, is_active, created_at FROM identities ORDER BY is_active DESC, rowid DESC")
+        .map_err(|e| format!("SQLite Identities Query Error: {}", e))?;
+
+    let rows = stmt
+        .query_map([], |row| {
+            let active_int: i32 = row.get(6)?;
+            Ok(DbIdentityRecord {
+                ain: row.get(0)?,
+                username: row.get(1)?,
+                public_key_hex: row.get(2)?,
+                private_key_encrypted_hex: row.get(3)?,
+                mnemonic: row.get(4)?,
+                fingerprint: row.get(5)?,
+                is_active: active_int == 1,
+                created_at: row.get(7)?,
+            })
+        })
+        .map_err(|e| format!("SQLite Identities Map Error: {}", e))?;
+
+    let mut result = Vec::new();
+    for r in rows {
+        if let Ok(id) = r {
+            result.push(id);
+        }
+    }
+    Ok(result)
+}
+
+pub fn set_active_identity(conn: &Connection, ain: &str) -> Result<(), String> {
+    conn.execute("UPDATE identities SET is_active = 0", [])
+        .map_err(|e| format!("SQLite Update Error: {}", e))?;
+    conn.execute("UPDATE identities SET is_active = 1 WHERE ain = ?1", params![ain])
+        .map_err(|e| format!("SQLite Update Error: {}", e))?;
+    Ok(())
+}
+
+pub fn remove_identity(conn: &Connection, ain: &str) -> Result<(), String> {
+    conn.execute("DELETE FROM identities WHERE ain = ?1", params![ain])
+        .map_err(|e| format!("SQLite Delete Error: {}", e))?;
+    Ok(())
 }

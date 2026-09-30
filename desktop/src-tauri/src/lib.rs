@@ -336,11 +336,50 @@ fn crypto_encrypt_vault(plaintext: String, passcode: String) -> Result<crypto::E
 }
 
 #[tauri::command]
+fn crypto_generate_sovereign_identity() -> Result<crypto::UserIdentity, String> {
+    crypto::generate_sovereign_identity()
+}
+
+#[tauri::command]
+fn crypto_import_sovereign_identity(words: String) -> Result<crypto::UserIdentity, String> {
+    crypto::import_sovereign_identity(&words)
+}
+
+#[tauri::command]
 fn crypto_decrypt_vault(vault: crypto::EncryptedVaultBlob, passcode: String) -> Result<String, String> {
     crypto::decrypt_vault(&vault, &passcode)
 }
 
 // --- PHASE 2: DATABASE COMMANDS ---
+#[tauri::command]
+fn db_save_identity(state: tauri::State<db::DbState>, identity: db::DbIdentityRecord) -> Result<(), String> {
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    db::insert_or_update_identity(&conn, &identity)
+}
+
+#[tauri::command]
+fn db_get_active_identity(state: tauri::State<db::DbState>) -> Result<Option<db::DbIdentityRecord>, String> {
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    db::fetch_active_identity(&conn)
+}
+
+#[tauri::command]
+fn db_get_all_identities(state: tauri::State<db::DbState>) -> Result<Vec<db::DbIdentityRecord>, String> {
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    db::fetch_all_identities(&conn)
+}
+
+#[tauri::command]
+fn db_set_active_identity(state: tauri::State<db::DbState>, ain: String) -> Result<(), String> {
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    db::set_active_identity(&conn, &ain)
+}
+
+#[tauri::command]
+fn db_delete_identity(state: tauri::State<db::DbState>, ain: String) -> Result<(), String> {
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    db::remove_identity(&conn, &ain)
+}
 #[tauri::command]
 fn db_save_server(state: tauri::State<db::DbState>, server: db::DbServerRecord) -> Result<(), String> {
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
@@ -459,11 +498,18 @@ pub fn run() {
             save_settings,
             // Phase 1 Crypto
             crypto_generate_identity,
+            crypto_generate_sovereign_identity,
+            crypto_import_sovereign_identity,
             crypto_sign_challenge,
             crypto_verify_signature,
             crypto_encrypt_vault,
             crypto_decrypt_vault,
             // Phase 2 Database
+            db_save_identity,
+            db_get_active_identity,
+            db_get_all_identities,
+            db_set_active_identity,
+            db_delete_identity,
             db_save_server,
             db_get_servers,
             db_delete_server,

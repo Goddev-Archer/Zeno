@@ -2,7 +2,7 @@
 // Powered by Native Rust Backend Core (via Tauri IPC) with WebCrypto fallback.
 
 import { invoke } from "@tauri-apps/api/core";
-import { UserIdentity, EncryptedVaultBlob } from "../types";
+import { UserIdentity, EncryptedVaultBlob, DbIdentityRecord } from "../types";
 
 export function isTauriEnvironment(): boolean {
   return typeof window !== "undefined" && ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
@@ -293,4 +293,123 @@ export async function decryptLocalVault(vault: EncryptedVaultBlob, passcode: str
   );
 
   return dec.decode(decrypted);
+}
+
+/**
+ * Generates a BIP-39 Sovereign 12-word cryptographic identity.
+ * Powered by Rust backend (bip39 crate + P-256).
+ */
+export async function generateSovereignIdentity(): Promise<UserIdentity> {
+  if (isTauriEnvironment()) {
+    try {
+      const rustIdentity = await invoke<UserIdentity>("crypto_generate_sovereign_identity");
+      console.log("[Zeno Crypto] Sovereign identity generated via Rust:", rustIdentity.ain);
+      return rustIdentity;
+    } catch (e) {
+      console.warn("[Zeno Crypto] Rust sovereign identity generation failed, falling back:", e);
+    }
+  }
+
+  // Fallback to standard identity generator
+  return generateCryptographicIdentity();
+}
+
+/**
+ * Restores an identity deterministically from 12-word BIP-39 seed phrase.
+ */
+export async function importSovereignIdentity(words: string): Promise<UserIdentity> {
+  if (isTauriEnvironment()) {
+    try {
+      const rustIdentity = await invoke<UserIdentity>("crypto_import_sovereign_identity", {
+        words: words.trim()
+      });
+      console.log("[Zeno Crypto] Sovereign identity restored via Rust:", rustIdentity.ain);
+      return rustIdentity;
+    } catch (e) {
+      console.error("[Zeno Crypto] Rust import_sovereign_identity error:", e);
+      throw e;
+    }
+  }
+
+  throw new Error("Sovereign Identity Import erfordert die native Rust-Laufzeitumgebung.");
+}
+
+/**
+ * SQLite Identity Management (Persistent in zeno.db)
+ */
+export async function saveIdentityToDb(identity: DbIdentityRecord): Promise<void> {
+  if (isTauriEnvironment()) {
+    try {
+      await invoke("db_save_identity", { identity });
+      return;
+    } catch (e) {
+      console.warn("[Zeno DB] Fehler beim Speichern der Identität in SQLite:", e);
+    }
+  }
+  // LocalStorage fallback
+  localStorage.setItem("zeno_user_identity", JSON.stringify(identity));
+}
+
+export async function getActiveIdentityFromDb(): Promise<DbIdentityRecord | null> {
+  if (isTauriEnvironment()) {
+    try {
+      const res = await invoke<DbIdentityRecord | null>("db_get_active_identity");
+      if (res) return res;
+    } catch (e) {
+      console.warn("[Zeno DB] Fehler beim Abrufen der aktiven Identität:", e);
+    }
+  }
+  const stored = localStorage.getItem("zeno_user_identity");
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored);
+      return {
+        ain: parsed.ain,
+        username: parsed.username || "CipherNaut",
+        publicKeyHex: parsed.publicKeyHex,
+        privateKeyEncryptedHex: parsed.privateKeyEncryptedHex,
+        mnemonic: parsed.mnemonic,
+        fingerprint: parsed.fingerprint,
+        isActive: true,
+        createdAt: parsed.createdAt || new Date().toISOString()
+      };
+    } catch (e) {
+      return null;
+    }
+  }
+  return null;
+}
+
+export async function getAllIdentitiesFromDb(): Promise<DbIdentityRecord[]> {
+  if (isTauriEnvironment()) {
+    try {
+      return await invoke<DbIdentityRecord[]>("db_get_all_identities");
+    } catch (e) {
+      console.warn("[Zeno DB] Fehler beim Abrufen aller Identitäten:", e);
+    }
+  }
+  const active = await getActiveIdentityFromDb();
+  return active ? [active] : [];
+}
+
+export async function setActiveIdentityInDb(ain: string): Promise<void> {
+  if (isTauriEnvironment()) {
+    try {
+      await invoke("db_set_active_identity", { ain });
+      return;
+    } catch (e) {
+      console.warn("[Zeno DB] Fehler beim Setzen der aktiven Identität:", e);
+    }
+  }
+}
+
+export async function deleteIdentityFromDb(ain: string): Promise<void> {
+  if (isTauriEnvironment()) {
+    try {
+      await invoke("db_delete_identity", { ain });
+      return;
+    } catch (e) {
+      console.warn("[Zeno DB] Fehler beim Löschen der Identität:", e);
+    }
+  }
 }

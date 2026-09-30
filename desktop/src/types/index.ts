@@ -198,7 +198,19 @@ export interface UserIdentity {
   ain: string;
   publicKeyHex: string;
   privateKeyEncryptedHex?: string;
+  mnemonic?: string;
   fingerprint: string;
+  createdAt: string;
+}
+
+export interface DbIdentityRecord {
+  ain: string;
+  username: string;
+  publicKeyHex: string;
+  privateKeyEncryptedHex?: string;
+  mnemonic?: string;
+  fingerprint: string;
+  isActive: boolean;
   createdAt: string;
 }
 
