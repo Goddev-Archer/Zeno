@@ -1,8 +1,12 @@
 // --- ZENO CRYPTOGRAPHIC IDENTITY & AES-256-GCM SERVICE ---
-// Implements Ed25519/ECDSA Key Generation, AIN Derivation (ZENO-XXXX-YYYY-ZZZZ),
-// Auth Signatures, and Local AES-256-GCM Encryption-at-Rest.
+// Powered by Native Rust Backend Core (via Tauri IPC) with WebCrypto fallback.
 
+import { invoke } from "@tauri-apps/api/core";
 import { UserIdentity, EncryptedVaultBlob } from "../types";
+
+export function isTauriEnvironment(): boolean {
+  return typeof window !== "undefined" && ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
+}
 
 // Convert ArrayBuffer to Hex String
 export function bufferToHex(buffer: ArrayBuffer): string {
@@ -26,15 +30,12 @@ export function hexToBuffer(hex: string): Uint8Array {
  * Format: ZENO-XXXX-YYYY-ZZZZ (e.g. ZENO-8F3A-9B21-44E2)
  */
 export function deriveAinFromPublicKey(publicKeyHex: string): { ain: string; fingerprint: string } {
-  // Simple deterministic formatting from public key hex
   const cleanHex = publicKeyHex.replace(/[^0-9A-F]/gi, "").toUpperCase();
   const seg1 = cleanHex.substring(0, 4) || "8F3A";
   const seg2 = cleanHex.substring(4, 8) || "9B21";
   const seg3 = cleanHex.substring(8, 12) || "44E2";
   
   const ain = `ZENO-${seg1}-${seg2}-${seg3}`;
-  
-  // Format SHA256 Fingerprint (e.g. SHA256:8F:3A:9B:21...)
   const pairs = cleanHex.match(/.{1,2}/g) || [];
   const fingerprint = `SHA256:${pairs.slice(0, 8).join(":")}`;
   
@@ -42,14 +43,23 @@ export function deriveAinFromPublicKey(publicKeyHex: string): { ain: string; fin
 }
 
 /**
- * Generates a brand new 256-bit Cryptographic Identity
+ * 1. Generates a brand new 256-bit Cryptographic Identity
+ * Prioritizes Native Rust Backend Core (P-256 with Zeroize).
  */
 export async function generateCryptographicIdentity(): Promise<UserIdentity> {
+  if (isTauriEnvironment()) {
+    try {
+      const rustIdentity = await invoke<UserIdentity>("crypto_generate_identity");
+      console.log("[Zeno Crypto] Identity generated via Rust Backend Core:", rustIdentity.ain);
+      return rustIdentity;
+    } catch (e) {
+      console.warn("[Zeno Crypto] Rust invocation failed, falling back to WebCrypto:", e);
+    }
+  }
+
+  // Fallback to WebCrypto
   const keyPair = await window.crypto.subtle.generateKey(
-    {
-      name: "ECDSA",
-      namedCurve: "P-256",
-    },
+    { name: "ECDSA", namedCurve: "P-256" },
     true,
     ["sign", "verify"]
   );
@@ -60,21 +70,18 @@ export async function generateCryptographicIdentity(): Promise<UserIdentity> {
   const exportedPrivKey = await window.crypto.subtle.exportKey("pkcs8", keyPair.privateKey);
   const privKeyHex = bufferToHex(exportedPrivKey);
 
-  // SHA-256 Hash of Public Key
   const hashBuffer = await window.crypto.subtle.digest("SHA-256", exportedPubKey);
   const hashHex = bufferToHex(hashBuffer);
 
   const { ain, fingerprint } = deriveAinFromPublicKey(hashHex);
 
-  const identity: UserIdentity = {
+  return {
     ain,
     publicKeyHex: pubKeyHex,
-    privateKeyEncryptedHex: privKeyHex, // Stored encrypted locally
+    privateKeyEncryptedHex: privKeyHex,
     fingerprint,
     createdAt: new Date().toISOString()
   };
-
-  return identity;
 }
 
 /**
@@ -96,9 +103,22 @@ export async function getOrRegisterUserIdentity(): Promise<UserIdentity> {
 }
 
 /**
- * Signs a Server Authentication Challenge Nonce
+ * 2. Signs a Server Authentication Challenge Nonce
+ * Prioritizes Native Rust Backend Core.
  */
 export async function signAuthChallenge(nonce: string, privateKeyHex: string): Promise<string> {
+  if (isTauriEnvironment()) {
+    try {
+      const sigHex = await invoke<string>("crypto_sign_challenge", {
+        nonce,
+        privateKeyHex
+      });
+      return sigHex;
+    } catch (e) {
+      console.warn("[Zeno Crypto] Rust sign_challenge failed, falling back to WebCrypto:", e);
+    }
+  }
+
   const enc = new TextEncoder();
   const data = enc.encode(nonce);
   const privKeyBytes = hexToBuffer(privateKeyHex);
@@ -121,13 +141,26 @@ export async function signAuthChallenge(nonce: string, privateKeyHex: string): P
 }
 
 /**
- * Verifies a Server Authentication Signature
+ * 3. Verifies a Server Authentication Signature
+ * Prioritizes Native Rust Backend Core.
  */
 export async function verifyAuthSignature(
   nonce: string,
   signatureHex: string,
   publicKeyHex: string
 ): Promise<boolean> {
+  if (isTauriEnvironment()) {
+    try {
+      return await invoke<boolean>("crypto_verify_signature", {
+        nonce,
+        signatureHex,
+        publicKeyHex
+      });
+    } catch (e) {
+      console.warn("[Zeno Crypto] Rust verify_signature failed, falling back to WebCrypto:", e);
+    }
+  }
+
   try {
     const enc = new TextEncoder();
     const data = enc.encode(nonce);
@@ -155,14 +188,25 @@ export async function verifyAuthSignature(
 }
 
 /**
- * AES-256-GCM Local Data Encryption (Encryption-at-Rest)
+ * 4. AES-256-GCM Local Data Encryption (Encryption-at-Rest)
+ * Prioritizes Native Rust Backend Core.
  */
 export async function encryptLocalVault(plaintext: string, passcode: string): Promise<EncryptedVaultBlob> {
+  if (isTauriEnvironment()) {
+    try {
+      return await invoke<EncryptedVaultBlob>("crypto_encrypt_vault", {
+        plaintext,
+        passcode
+      });
+    } catch (e) {
+      console.warn("[Zeno Crypto] Rust encrypt_vault failed, falling back to WebCrypto:", e);
+    }
+  }
+
   const enc = new TextEncoder();
   const salt = window.crypto.getRandomValues(new Uint8Array(16));
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
 
-  // Key Derivation PBKDF2
   const baseKey = await window.crypto.subtle.importKey(
     "raw",
     enc.encode(passcode),
@@ -199,9 +243,21 @@ export async function encryptLocalVault(plaintext: string, passcode: string): Pr
 }
 
 /**
- * AES-256-GCM Local Data Decryption
+ * 5. AES-256-GCM Local Data Decryption
+ * Prioritizes Native Rust Backend Core.
  */
 export async function decryptLocalVault(vault: EncryptedVaultBlob, passcode: string): Promise<string> {
+  if (isTauriEnvironment()) {
+    try {
+      return await invoke<string>("crypto_decrypt_vault", {
+        vault,
+        passcode
+      });
+    } catch (e) {
+      console.warn("[Zeno Crypto] Rust decrypt_vault failed, falling back to WebCrypto:", e);
+    }
+  }
+
   const enc = new TextEncoder();
   const dec = new TextDecoder();
 

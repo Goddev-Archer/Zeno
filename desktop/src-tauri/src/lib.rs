@@ -4,6 +4,10 @@ use std::path::PathBuf;
 use std::fs;
 use tauri::Manager;
 
+mod crypto;
+mod db;
+mod voice_network;
+
 #[derive(serde::Serialize)]
 struct GitStatus {
     branch: String,
@@ -310,6 +314,135 @@ fn load_settings(app: tauri::AppHandle) -> Result<String, String> {
         .map_err(|e| format!("Fehler beim Laden der Einstellungen: {}", e))
 }
 
+// --- PHASE 1: CRYPTO COMMANDS ---
+#[tauri::command]
+fn crypto_generate_identity() -> Result<crypto::UserIdentity, String> {
+    crypto::generate_identity()
+}
+
+#[tauri::command]
+fn crypto_sign_challenge(nonce: String, private_key_hex: String) -> Result<String, String> {
+    crypto::sign_challenge(&nonce, &private_key_hex)
+}
+
+#[tauri::command]
+fn crypto_verify_signature(nonce: String, signature_hex: String, public_key_hex: String) -> Result<bool, String> {
+    crypto::verify_signature(&nonce, &signature_hex, &public_key_hex)
+}
+
+#[tauri::command]
+fn crypto_encrypt_vault(plaintext: String, passcode: String) -> Result<crypto::EncryptedVaultBlob, String> {
+    crypto::encrypt_vault(&plaintext, &passcode)
+}
+
+#[tauri::command]
+fn crypto_decrypt_vault(vault: crypto::EncryptedVaultBlob, passcode: String) -> Result<String, String> {
+    crypto::decrypt_vault(&vault, &passcode)
+}
+
+// --- PHASE 2: DATABASE COMMANDS ---
+#[tauri::command]
+fn db_save_server(state: tauri::State<db::DbState>, server: db::DbServerRecord) -> Result<(), String> {
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    db::insert_or_update_server(&conn, &server)
+}
+
+#[tauri::command]
+fn db_get_servers(state: tauri::State<db::DbState>) -> Result<Vec<db::DbServerRecord>, String> {
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    db::fetch_all_servers(&conn)
+}
+
+#[tauri::command]
+fn db_delete_server(state: tauri::State<db::DbState>, server_id: String) -> Result<(), String> {
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    db::remove_server(&conn, &server_id)
+}
+
+#[tauri::command]
+fn db_save_message(state: tauri::State<db::DbState>, message: db::DbMessageRecord) -> Result<i64, String> {
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    db::insert_message(&conn, &message)
+}
+
+#[tauri::command]
+fn db_get_channel_messages(
+    state: tauri::State<db::DbState>,
+    channel_id: String,
+    limit: Option<usize>,
+    offset: Option<usize>,
+) -> Result<Vec<db::DbMessageRecord>, String> {
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    db::fetch_channel_messages(&conn, &channel_id, limit.unwrap_or(100), offset.unwrap_or(0))
+}
+
+// --- PHASE 3: VOICE & NETWORK COMMANDS ---
+#[tauri::command]
+fn voice_join(
+    app: tauri::AppHandle,
+    state: tauri::State<voice_network::VoiceNetworkState>,
+    channel_id: String,
+    channel_name: String,
+    user_name: String,
+) -> Result<voice_network::VoiceSessionStatus, String> {
+    voice_network::join_voice_channel(&app, &state, channel_id, channel_name, user_name)
+}
+
+#[tauri::command]
+fn voice_leave(
+    app: tauri::AppHandle,
+    state: tauri::State<voice_network::VoiceNetworkState>,
+) -> Result<voice_network::VoiceSessionStatus, String> {
+    voice_network::leave_voice_channel(&app, &state)
+}
+
+#[tauri::command]
+fn voice_set_mute(
+    app: tauri::AppHandle,
+    state: tauri::State<voice_network::VoiceNetworkState>,
+    muted: bool,
+) -> Result<voice_network::VoiceSessionStatus, String> {
+    voice_network::toggle_mute(&app, &state, muted)
+}
+
+#[tauri::command]
+fn voice_set_deafen(
+    app: tauri::AppHandle,
+    state: tauri::State<voice_network::VoiceNetworkState>,
+    deafened: bool,
+) -> Result<voice_network::VoiceSessionStatus, String> {
+    voice_network::toggle_deafen(&app, &state, deafened)
+}
+
+#[tauri::command]
+fn voice_get_status(
+    state: tauri::State<voice_network::VoiceNetworkState>,
+) -> Result<voice_network::VoiceSessionStatus, String> {
+    voice_network::get_voice_status(&state)
+}
+
+#[tauri::command]
+fn network_broadcast_message(
+    app: tauri::AppHandle,
+    channel_id: String,
+    author: String,
+    text: String,
+    color: String,
+    time: String,
+    code: Option<String>,
+) -> Result<(), String> {
+    let msg = serde_json::json!({
+        "channelId": channel_id,
+        "author": author,
+        "text": text,
+        "color": color,
+        "time": time,
+        "code": code
+    });
+    let _ = tauri::Emitter::emit(&app, "zeno://message_received", &msg);
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -323,9 +456,43 @@ pub fn run() {
             write_workspace_file,
             delete_workspace_file,
             load_settings,
-            save_settings
+            save_settings,
+            // Phase 1 Crypto
+            crypto_generate_identity,
+            crypto_sign_challenge,
+            crypto_verify_signature,
+            crypto_encrypt_vault,
+            crypto_decrypt_vault,
+            // Phase 2 Database
+            db_save_server,
+            db_get_servers,
+            db_delete_server,
+            db_save_message,
+            db_get_channel_messages,
+            // Phase 3 Voice & Network
+            voice_join,
+            voice_leave,
+            voice_set_mute,
+            voice_set_deafen,
+            voice_get_status,
+            network_broadcast_message
         ])
         .setup(|app| {
+            let app_data_dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+            if !app_data_dir.exists() {
+                let _ = fs::create_dir_all(&app_data_dir);
+            }
+            let db_path = app_data_dir.join("zeno.db");
+            match db::DbState::new(&db_path) {
+                Ok(db_state) => {
+                    app.manage(db_state);
+                }
+                Err(e) => {
+                    eprintln!("Warnung: SQLite konnte nicht initialisiert werden: {}", e);
+                }
+            }
+            app.manage(voice_network::VoiceNetworkState::new());
+
             #[cfg(debug_assertions)]
             if let Some(window) = app.get_webview_window("main") {
                 window.open_devtools();

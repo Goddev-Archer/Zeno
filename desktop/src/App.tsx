@@ -21,6 +21,21 @@ import {
 } from "./types";
 import { getOrRegisterUserIdentity, generateCryptographicIdentity } from "./services/cryptoService";
 import { executeZeroKnowledgeAuth, syncEncryptedVaultToServer } from "./services/backendService";
+import {
+  saveServerToDb,
+  loadServersFromDb,
+  saveMessageToDb,
+  loadChannelMessagesFromDb
+} from "./services/dbService";
+import {
+  joinVoiceChannel,
+  leaveVoiceChannel,
+  setVoiceMute,
+  setVoiceDeafen,
+  broadcastNetworkMessage,
+  subscribeToVoiceState,
+  subscribeToIncomingMessages
+} from "./services/voiceNetworkService";
 import { cleanUrl } from "./utils/urlCleaner";
 import {
   initialServers,
@@ -364,6 +379,59 @@ function ZenoMainApp() {
     userCardBgColor, userCardHoverEffect, userLayoutOrder, userAnimationPreset
   ]);
 
+  // --- RUST BACKEND CORE: DATABASE & VOICE/NETWORK EVENT SUBSCRIPTIONS ---
+  useEffect(() => {
+    // 1. Load servers from Rust SQLite DB if available
+    loadServersFromDb().then((dbServers) => {
+      if (dbServers && dbServers.length > 0) {
+        setServers(dbServers);
+      }
+    });
+
+    // 2. Subscribe to Voice State changes from Rust
+    const unlistenVoicePromise = subscribeToVoiceState((status) => {
+      setConnectedVoice(status.isConnected ? status.channelName || null : null);
+      setMuted(status.isMuted);
+      setDeafened(status.isDeafened);
+    });
+
+    // 3. Subscribe to incoming messages from Rust Relay
+    const unlistenMsgPromise = subscribeToIncomingMessages((msg) => {
+      setChatMessages((prev) => ({
+        ...prev,
+        [msg.channelId]: [
+          ...(prev[msg.channelId] || []),
+          {
+            author: msg.author,
+            text: msg.text,
+            time: msg.time,
+            color: msg.color,
+            code: msg.code
+          }
+        ]
+      }));
+    });
+
+    return () => {
+      unlistenVoicePromise.then((unlisten) => unlisten && unlisten());
+      unlistenMsgPromise.then((unlisten) => unlisten && unlisten());
+    };
+  }, []);
+
+  // Load channel messages from Rust SQLite when activeChannel changes
+  useEffect(() => {
+    if (activeChannel?.id) {
+      loadChannelMessagesFromDb(activeChannel.id).then((savedMsgs) => {
+        if (savedMsgs && savedMsgs.length > 0) {
+          setChatMessages((prev) => ({
+            ...prev,
+            [activeChannel.id]: savedMsgs
+          }));
+        }
+      });
+    }
+  }, [activeChannel?.id]);
+
   const handleSaveProfileConfig = () => {
     const config = {
       name: userName,
@@ -447,6 +515,7 @@ function ZenoMainApp() {
 
   const handleServerCreated = (newServer: Server) => {
     setServers((prev: Server[]) => [...prev, newServer]);
+    saveServerToDb(newServer);
     setActiveServerId(newServer.id);
     setActiveServer(newServer);
     if (newServer.categories && newServer.categories[0] && newServer.categories[0].channels[0]) {
@@ -485,6 +554,7 @@ function ZenoMainApp() {
       };
     }
     setServers((prev: Server[]) => [...prev, joinedServer]);
+    saveServerToDb(joinedServer);
     setActiveServerId(joinedServer.id);
     setActiveServer(joinedServer);
     if (joinedServer.categories && joinedServer.categories[0] && joinedServer.categories[0].channels[0]) {
@@ -703,18 +773,30 @@ function ZenoMainApp() {
   };
 
   // Voice actions
-  const handleJoinVoice = (_chId: string, chName: string) => {
+  const handleJoinVoice = (chId: string, chName: string) => {
     setConnectedVoice(chName);
     setVoiceStartTime(Date.now());
     setVoiceDuration(0);
-    showToast(`Sprachkanal "${chName}" beigetreten.`);
+    joinVoiceChannel(chId, chName, userName || "CipherNaut");
+    showToast(`Sprachkanal "${chName}" beigetreten (Rust Voice Session aktiv).`);
   };
 
   const handleDisconnectVoice = () => {
     showToast(`Sprachkanal "${connectedVoice}" verlassen.`);
+    leaveVoiceChannel();
     setConnectedVoice(null);
     setVoiceStartTime(null);
     setVoiceDuration(0);
+  };
+
+  const handleMuteChange = (newMuted: boolean) => {
+    setMuted(newMuted);
+    setVoiceMute(newMuted);
+  };
+
+  const handleDeafenChange = (newDeafened: boolean) => {
+    setDeafened(newDeafened);
+    setVoiceDeafen(newDeafened);
   };
 
   // Send Chat Message
@@ -724,7 +806,7 @@ function ZenoMainApp() {
 
     const time = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     const newMsg: Message = {
-      author: "CipherNaut",
+      author: userName || "CipherNaut",
       text: inputText,
       time,
       color: "purple",
@@ -735,6 +817,10 @@ function ZenoMainApp() {
       ...prev,
       [activeChannel.id]: [...(prev[activeChannel.id] || []), newMsg]
     }));
+
+    // Rust Backend Core: Save to SQLite & Broadcast via Relay
+    saveMessageToDb(activeChannel.id, newMsg);
+    broadcastNetworkMessage(activeChannel.id, newMsg.author, newMsg.text, newMsg.color, newMsg.time, newMsg.code);
 
     setInputText("");
     setPendingAttachment(null);
@@ -1218,8 +1304,8 @@ function ZenoMainApp() {
         handleJoinVoice={handleJoinVoice}
         handleDisconnectVoice={handleDisconnectVoice}
         handleThemeToggle={handleThemeToggle}
-        setMuted={setMuted}
-        setDeafened={setDeafened}
+        setMuted={handleMuteChange}
+        setDeafened={handleDeafenChange}
         setIsSettingsOpen={setIsSettingsOpen}
         setSelectedUserProfile={setSelectedUserProfile}
         showToast={showToast}
