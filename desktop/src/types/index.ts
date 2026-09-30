@@ -13,6 +13,29 @@ export interface Category {
   channels: Channel[];
 }
 
+export interface GitRepositoryConfig {
+  provider: "github" | "gitlab" | "gitea" | "custom_git" | "none";
+  repoUrl?: string;
+  branch?: string;
+  manifestPath?: string;
+  rawManifestUrl?: string;
+}
+
+export interface ZenoServerManifest {
+  version: string;
+  serverId: string;
+  name: string;
+  description?: string;
+  icon?: string;
+  iconLetter?: string;
+  encrypted: boolean;
+  ownerAin?: string;
+  createdAt: string;
+  gitRepo?: GitRepositoryConfig;
+  relays?: string[];
+  categories: Category[];
+}
+
 export interface Server {
   id: string;
   name: string;
@@ -21,7 +44,12 @@ export interface Server {
   description?: string;
   unreadCount?: number;
   categories: Category[];
+  gitRepo?: GitRepositoryConfig;
+  manifestUrl?: string;
+  encrypted?: boolean;
+  ownerAin?: string;
 }
+
 
 export interface MessageAttachment {
   name: string;

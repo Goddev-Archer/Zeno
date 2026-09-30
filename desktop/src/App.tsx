@@ -156,8 +156,28 @@ const lightPresets = [
 ];
 
 function ZenoMainApp() {
-  // Navigation & View State
-  const [servers, setServers] = useState<Server[]>(initialServers);
+  const [servers, setServers] = useState<Server[]>(() => {
+    const saved = localStorage.getItem("zeno_custom_servers");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      } catch (e) {
+        console.error("Failed to parse saved servers", e);
+      }
+    }
+    return initialServers;
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("zeno_custom_servers", JSON.stringify(servers));
+    } catch (e) {
+      console.error("Failed to save servers to localStorage", e);
+    }
+  }, [servers]);
   const [activeServerId, setActiveServerId] = useState<string>("home");
   const [homeTab, setHomeTab] = useState<"dashboard" | "wasm_hub" | "ide">("dashboard");
   const [activeServer, setActiveServer] = useState<Server>(initialServers[0]);
@@ -434,34 +454,40 @@ function ZenoMainApp() {
     }
   };
 
-  const handleServerJoined = (inviteCode: string) => {
-    const joinedServerId = `srv-joined-${Date.now()}`;
-    const joinedServer: Server = {
-      id: joinedServerId,
-      name: `Zeno Server (${inviteCode})`,
-      iconLetter: "🌐",
-      unreadCount: 0,
-      categories: [
-        {
-          name: "TEXTKANÄLE",
-          type: "text",
-          channels: [
-            { id: `c-${Date.now()}-1`, name: "allgemein" }
-          ]
-        },
-        {
-          name: "SPRACHKANÄLE",
-          type: "voice",
-          channels: [
-            { id: `c-${Date.now()}-2`, name: "voice-channel" }
-          ]
-        }
-      ]
-    };
+  const handleServerJoined = (serverOrCode: string | Server) => {
+    let joinedServer: Server;
+    if (typeof serverOrCode === "object" && serverOrCode !== null) {
+      joinedServer = serverOrCode;
+    } else {
+      const inviteCode = serverOrCode;
+      const joinedServerId = `srv-joined-${Date.now()}`;
+      joinedServer = {
+        id: joinedServerId,
+        name: `Zeno Server (${inviteCode.length > 25 ? inviteCode.substring(0, 22) + "..." : inviteCode})`,
+        iconLetter: "🌐",
+        unreadCount: 0,
+        categories: [
+          {
+            name: "TEXTKANÄLE",
+            type: "text",
+            channels: [
+              { id: `c-${Date.now()}-1`, name: "allgemein" }
+            ]
+          },
+          {
+            name: "SPRACHKANÄLE",
+            type: "voice",
+            channels: [
+              { id: `c-${Date.now()}-2`, name: "voice-channel" }
+            ]
+          }
+        ]
+      };
+    }
     setServers((prev: Server[]) => [...prev, joinedServer]);
     setActiveServerId(joinedServer.id);
     setActiveServer(joinedServer);
-    if (joinedServer.categories[0] && joinedServer.categories[0].channels[0]) {
+    if (joinedServer.categories && joinedServer.categories[0] && joinedServer.categories[0].channels[0]) {
       setActiveChannel(joinedServer.categories[0].channels[0]);
     }
   };
@@ -1500,6 +1526,7 @@ function ZenoMainApp() {
         onServerCreated={handleServerCreated}
         onServerJoined={handleServerJoined}
         showToast={showToast}
+        userAin={userIdentity?.ain}
       />
 
       <IdeProjectWizardModal
