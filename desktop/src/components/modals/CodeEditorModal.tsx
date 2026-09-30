@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useState } from "react";
 import { Icon } from "@iconify/react";
 import Editor from "@monaco-editor/react";
 import { RecentFile } from "../../types";
+import { MarkdownReader } from "../common/MarkdownReader";
 
 interface CodeEditorModalProps {
   isEditorOpen: boolean;
@@ -64,6 +65,8 @@ export const CodeEditorModal: React.FC<CodeEditorModalProps> = ({
   handleDeleteCurrentFile,
   showToast
 }) => {
+  const [isMarkdownPreview, setIsMarkdownPreview] = useState<boolean>(false);
+
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !isRenaming) {
@@ -268,6 +271,30 @@ export const CodeEditorModal: React.FC<CodeEditorModalProps> = ({
                   </span>
                 )}
                 <span className="badge language-badge">{editorLanguage.toUpperCase()}</span>
+                {(editorLanguage === "markdown" || editorFilename.toLowerCase().endsWith(".md")) && (
+                  <button
+                    type="button"
+                    onClick={() => setIsMarkdownPreview(!isMarkdownPreview)}
+                    style={{
+                      background: isMarkdownPreview ? "rgba(56, 189, 248, 0.15)" : "#1E222D",
+                      border: isMarkdownPreview ? "1px solid #38BDF8" : "1px solid #2B303C",
+                      color: isMarkdownPreview ? "#38BDF8" : "#94A3B8",
+                      padding: "3px 8px",
+                      borderRadius: "6px",
+                      fontSize: "11px",
+                      fontWeight: "600",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "5px",
+                      marginLeft: "6px"
+                    }}
+                    title="Zwischen Code-Editor und formatierter Markdown-Vorschau umschalten"
+                  >
+                    <Icon icon={isMarkdownPreview ? "mage:code" : "mage:file-records"} />
+                    {isMarkdownPreview ? "Code anzeigen" : "Vorschau (Reader)"}
+                  </button>
+                )}
               </div>
               <button className="editor-close-btn modal-close" onClick={onClose} title="IDE schließen (Esc)">
                 <Icon icon="mage:multiply" />
@@ -275,8 +302,15 @@ export const CodeEditorModal: React.FC<CodeEditorModalProps> = ({
             </header>
 
             <div className="editor-code-area" style={{ minHeight: "400px" }}>
-              <Editor
-                height="100%"
+              {isMarkdownPreview && (editorLanguage === "markdown" || editorFilename.toLowerCase().endsWith(".md")) ? (
+                <MarkdownReader
+                  content={editorCode}
+                  showCopyAll={false}
+                  style={{ height: "100%", border: "none", borderRadius: 0, backgroundColor: "#111214" }}
+                />
+              ) : (
+                <Editor
+                  height="100%"
                 language={editorLanguage}
                 theme={theme === "light" ? "zeno-light-theme" : "zeno-dark-theme"}
                 beforeMount={handleEditorBeforeMount}
@@ -300,7 +334,8 @@ export const CodeEditorModal: React.FC<CodeEditorModalProps> = ({
                   parameterHints: { enabled: true }
                 }}
               />
-            </div>
+            )}
+          </div>
 
             <footer className="editor-modal-toolbar">
               <button className="editor-toolbar-btn primary btn-run" onClick={handleEditorRun} title="Ausführen">

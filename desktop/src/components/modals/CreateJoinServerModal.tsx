@@ -40,6 +40,10 @@ export const CreateJoinServerModal: React.FC<CreateJoinServerModalProps> = ({
   const [showManifestPreview, setShowManifestPreview] = useState(false);
   const [showGitCommands, setShowGitCommands] = useState(false);
 
+  // Relay Architecture State
+  const [relayType, setRelayType] = useState<"nostr" | "onion" | "cloudflare" | "custom">("nostr");
+  const [customRelayUrl, setCustomRelayUrl] = useState("");
+
   // Join Server Form State
   const [inviteInput, setInviteInput] = useState("");
   const [isResolving, setIsResolving] = useState(false);
@@ -70,6 +74,30 @@ export const CreateJoinServerModal: React.FC<CreateJoinServerModalProps> = ({
     }
   ], []);
 
+  // Compute selected relays
+  const selectedRelays = useMemo(() => {
+    switch (relayType) {
+      case "nostr":
+        return [
+          "wss://relay.damus.io",
+          "wss://nos.lol",
+          "wss://relay.snort.social"
+        ];
+      case "onion":
+        return customRelayUrl.trim()
+          ? [customRelayUrl.trim()]
+          : ["ws://zeno3tq7g2kpvf3747ux6d4z7g5m...onion:8080"];
+      case "cloudflare":
+        return customRelayUrl.trim()
+          ? [customRelayUrl.trim()]
+          : ["wss://mein-zeno-relay.workers.dev"];
+      case "custom":
+        return customRelayUrl.trim()
+          ? [customRelayUrl.trim()]
+          : ["wss://relay.meinedomain.de:8080"];
+    }
+  }, [relayType, customRelayUrl]);
+
   // Compute live manifest
   const liveManifest: ZenoServerManifest = useMemo(() => {
     const srvId = `srv-${(serverName || "zeno").toLowerCase().replace(/[^a-z0-9]/g, "-")}-${Date.now().toString().slice(-6)}`;
@@ -89,9 +117,10 @@ export const CreateJoinServerModal: React.FC<CreateJoinServerModalProps> = ({
       isEncrypted,
       defaultCategories,
       gitRepo,
-      userAin
+      userAin,
+      selectedRelays
     );
-  }, [serverName, serverDescription, serverIcon, isEncrypted, gitProvider, repoUrl, repoBranch, defaultCategories, userAin]);
+  }, [serverName, serverDescription, serverIcon, isEncrypted, gitProvider, repoUrl, repoBranch, defaultCategories, userAin, selectedRelays]);
 
   const manifestJsonString = useMemo(() => {
     return JSON.stringify(liveManifest, null, 2);
@@ -535,6 +564,104 @@ export const CreateJoinServerModal: React.FC<CreateJoinServerModalProps> = ({
                         }}
                       />
                     </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Relay Architecture Selection (Nostr / Tor / Cloudflare Worker / Custom) */}
+            <div style={{ backgroundColor: "#0D0E12", border: "1px solid #1E222D", borderRadius: "10px", padding: "14px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                <span style={{ fontSize: "11px", fontWeight: "700", color: "#FFF", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <Icon icon="mage:satellite-dish" style={{ color: "#A855F7" }} />
+                  RELAY-TRANSPORT &amp; ROUTING (CHATKONTROLLE-IMMUN)
+                </span>
+                <span style={{ fontSize: "10px", color: "#A855F7", backgroundColor: "rgba(168,85,247,0.1)", padding: "2px 6px", borderRadius: "4px" }}>
+                  Metadaten-Schutz
+                </span>
+              </div>
+              <p style={{ fontSize: "10px", color: "#94A3B8", margin: "0 0 10px 0", lineHeight: "1.4" }}>
+                Zeno hostet keine zentralen Überwachungsserver. Wähle, über welches dezentrale Relay-Netzwerk deine Community Nachrichten synchronisiert.
+              </p>
+
+              {/* Provider Selection */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px", marginBottom: "10px" }}>
+                {[
+                  { id: "nostr", label: "Nostr Nodes", icon: "mage:globe", desc: "Damus / nos.lol" },
+                  { id: "onion", label: "Tor .onion", icon: "mage:shield", desc: "Darknet Hidden" },
+                  { id: "cloudflare", label: "Cloudflare", icon: "mage:cloud", desc: "Eigener Worker" },
+                  { id: "custom", label: "Eigener WS", icon: "mage:server", desc: "Custom URL" },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setRelayType(item.id as any)}
+                    style={{
+                      padding: "8px 6px",
+                      borderRadius: "6px",
+                      fontSize: "11px",
+                      fontWeight: "600",
+                      border: relayType === item.id ? "1px solid #A855F7" : "1px solid #262933",
+                      backgroundColor: relayType === item.id ? "rgba(168, 85, 247, 0.15)" : "#161922",
+                      color: relayType === item.id ? "#A855F7" : "#94A3B8",
+                      cursor: "pointer",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: "3px"
+                    }}
+                  >
+                    <Icon icon={item.icon} style={{ fontSize: "14px" }} />
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              {relayType === "nostr" && (
+                <div style={{ backgroundColor: "#161922", borderRadius: "6px", padding: "8px 10px", border: "1px solid #262933" }}>
+                  <div style={{ fontSize: "10px", color: "#E2E8F0", marginBottom: "4px", fontWeight: "600" }}>
+                    Standard Nostr-Relays aktiv:
+                  </div>
+                  <div style={{ fontSize: "10px", color: "#94A3B8", fontFamily: "monospace", display: "flex", flexDirection: "column", gap: "2px" }}>
+                    <span>• wss://relay.damus.io</span>
+                    <span>• wss://nos.lol</span>
+                    <span>• wss://relay.snort.social</span>
+                  </div>
+                </div>
+              )}
+
+              {(relayType === "onion" || relayType === "cloudflare" || relayType === "custom") && (
+                <div>
+                  <label style={{ fontSize: "10px", color: "#94A3B8", display: "block", marginBottom: "4px" }}>
+                    {relayType === "onion" && "TOR ONION HIDDEN SERVICE WEBSOCKET-URL"}
+                    {relayType === "cloudflare" && "DEINE CLOUDFLARE WORKER WEBSOCKET-URL (*.workers.dev)"}
+                    {relayType === "custom" && "EIGENE RELAY WEBSOCKET-URL"}
+                  </label>
+                  <input
+                    type="text"
+                    placeholder={
+                      relayType === "onion"
+                        ? "ws://zeno3tq7g2kpvf3747ux6d4z7g5m...onion:8080"
+                        : relayType === "cloudflare"
+                        ? "wss://dein-zeno-relay.workers.dev"
+                        : "wss://relay.deinedomain.de:8080"
+                    }
+                    value={customRelayUrl}
+                    onChange={(e) => setCustomRelayUrl(e.target.value)}
+                    style={{
+                      width: "100%",
+                      backgroundColor: "#161922",
+                      border: "1px solid #262933",
+                      borderRadius: "6px",
+                      padding: "8px 10px",
+                      fontSize: "11px",
+                      color: "#FFF",
+                      fontFamily: "monospace",
+                      outline: "none"
+                    }}
+                  />
+                  <div style={{ fontSize: "9px", color: "#64748B", marginTop: "4px" }}>
+                    Tipp: Anleitungen zur 2-Minuten Bereitstellung findest du in den <strong>Einstellungen &gt; Knowledge Hub &amp; Wiki</strong>!
                   </div>
                 </div>
               )}

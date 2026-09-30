@@ -2,6 +2,8 @@ import React from "react";
 import { Icon } from "@iconify/react";
 import { UserIdentity } from "../../types";
 import { signAuthChallenge, verifyAuthSignature } from "../../services/cryptoService";
+import { ZENO_WIKI_GUIDES } from "../../data/wikiGuides";
+import { MarkdownReader } from "../common/MarkdownReader";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -131,6 +133,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   showToast
 }) => {
   const avatarFileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const [selectedWikiId, setSelectedWikiId] = React.useState<string>("cloudflare-relay-builder");
+  const [wikiSearch, setWikiSearch] = React.useState<string>("");
 
   if (!isOpen) return null;
 
@@ -173,6 +177,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             onClick={() => setActiveSettingsTab("github")}
           >
             GitHub-Integration
+          </button>
+          <button 
+            className={`settings-nav-item ${activeSettingsTab === "wiki" ? "active" : ""}`} 
+            onClick={() => setActiveSettingsTab("wiki")}
+            style={{ display: "flex", alignItems: "center", gap: "8px" }}
+          >
+            <Icon icon="mage:book-open" style={{ color: "#F59E0B" }} />
+            Knowledge Hub & Wiki
           </button>
         </aside>
 
@@ -945,6 +957,199 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <li>Speicherort: Der Token wird ausschließlich in deiner lokalen Desktop-App-Sandbox gespeichert.</li>
                     <li>Minimalberechtigung: Verwende am besten ein feinkörniges (Fine-grained) Token mit Nur-Lese-Rechten auf ausgewählte Repositories.</li>
                   </ul>
+                </div>
+              </div>
+            )}
+
+            {/* Tab: Knowledge Hub & Wiki */}
+            {activeSettingsTab === "wiki" && (
+              <div className="settings-tab-content" id="tab-wiki" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: "16px", color: "#FFF" }}>📖 Zeno Knowledge Hub & Security Wiki</h3>
+                      <p className="settings-help-text" style={{ marginTop: "4px" }}>
+                        Integrierte Architektur- & Sicherheitsleitfäden für dezentrale Relays, Tor, Nostr, Cloudflare und Krypto-Privatsphäre.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Search bar */}
+                  <div style={{ position: "relative", marginTop: "12px", marginBottom: "16px" }}>
+                    <input
+                      type="text"
+                      placeholder="Wiki durchsuchen (z. B. Cloudflare, Nostr, Tor, PGP, Chatkontrolle)..."
+                      value={wikiSearch}
+                      onChange={(e) => setWikiSearch(e.target.value)}
+                      style={{
+                        width: "100%",
+                        backgroundColor: "#0D0E12",
+                        border: "1px solid #1E222D",
+                        borderRadius: "8px",
+                        padding: "10px 14px 10px 36px",
+                        fontSize: "12px",
+                        color: "#FFF",
+                        outline: "none"
+                      }}
+                    />
+                    <Icon
+                      icon="mage:search"
+                      style={{ position: "absolute", left: "12px", top: "12px", color: "#64748B", fontSize: "16px" }}
+                    />
+                  </div>
+                </div>
+
+                {/* 2-Column Layout: Guide Index (Left) & Markdown Reader (Right) */}
+                <div style={{ display: "grid", gridTemplateColumns: "240px 1fr", gap: "16px", minHeight: "520px" }}>
+                  {/* Left Column: Guide Cards List */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px", overflowY: "auto", maxHeight: "600px", paddingRight: "4px" }}>
+                    {ZENO_WIKI_GUIDES.filter((g) =>
+                      g.title.toLowerCase().includes(wikiSearch.toLowerCase()) ||
+                      g.summary.toLowerCase().includes(wikiSearch.toLowerCase()) ||
+                      g.category.toLowerCase().includes(wikiSearch.toLowerCase())
+                    ).map((guide) => (
+                      <button
+                        key={guide.id}
+                        type="button"
+                        onClick={() => setSelectedWikiId(guide.id)}
+                        style={{
+                          textAlign: "left",
+                          padding: "10px 12px",
+                          borderRadius: "10px",
+                          border: selectedWikiId === guide.id ? `1px solid ${guide.badgeColor}` : "1px solid #1E222D",
+                          backgroundColor: selectedWikiId === guide.id ? `${guide.badgeColor}18` : "#141720",
+                          cursor: "pointer",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "4px",
+                          transition: "all 0.15s ease"
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ fontSize: "9px", textTransform: "uppercase", fontWeight: "700", color: "#64748B" }}>
+                            {guide.category}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: "9px",
+                              fontWeight: "600",
+                              padding: "1px 6px",
+                              borderRadius: "10px",
+                              backgroundColor: `${guide.badgeColor}22`,
+                              color: guide.badgeColor
+                            }}
+                          >
+                            {guide.badge}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: "12px", fontWeight: "600", color: selectedWikiId === guide.id ? "#FFF" : "#CBD5E1" }}>
+                          {guide.title}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Right Column: Markdown Reader View */}
+                  <div style={{ overflowY: "auto", maxHeight: "600px" }}>
+                    {(() => {
+                      const activeGuide = ZENO_WIKI_GUIDES.find((g) => g.id === selectedWikiId) || ZENO_WIKI_GUIDES[0];
+                      return (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                          {/* Quick Actions if Cloudflare Builder */}
+                          {activeGuide.id === "cloudflare-relay-builder" && (
+                            <div
+                              style={{
+                                padding: "12px 16px",
+                                backgroundColor: "rgba(245, 158, 11, 0.1)",
+                                border: "1px solid rgba(245, 158, 11, 0.3)",
+                                borderRadius: "10px",
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center"
+                              }}
+                            >
+                              <div>
+                                <div style={{ fontSize: "12px", fontWeight: "700", color: "#F59E0B" }}>
+                                  ⚡ Interaktiver 1-Klick Relay Assistent
+                                </div>
+                                <div style={{ fontSize: "11px", color: "#CBD5E1" }}>
+                                  Kopiere den fertigen Worker-Code oder die Wrangler-Deploy-Befehle direkt in die Zwischenablage.
+                                </div>
+                              </div>
+                              <div style={{ display: "flex", gap: "8px" }}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const workerCode = `export default {
+  async fetch(request, env) {
+    const upgradeHeader = request.headers.get("Upgrade");
+    if (!upgradeHeader || upgradeHeader !== "websocket") {
+      return new Response("⚡ Zeno Blind Relay running. Connect via WebSocket (wss://).", { status: 200 });
+    }
+    const webSocketPair = new WebSocketPair();
+    const [client, server] = Object.values(webSocketPair);
+    server.accept();
+    server.addEventListener("message", (event) => { server.send(event.data); });
+    return new Response(null, { status: 101, webSocket: client });
+  },
+};`;
+                                    navigator.clipboard.writeText(workerCode);
+                                    showToast("Cloudflare Worker Code kopiert! 📋");
+                                  }}
+                                  style={{
+                                    backgroundColor: "#F59E0B",
+                                    color: "#08090C",
+                                    border: "none",
+                                    padding: "6px 12px",
+                                    borderRadius: "6px",
+                                    fontSize: "11px",
+                                    fontWeight: "700",
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "5px"
+                                  }}
+                                >
+                                  <Icon icon="mage:copy" /> Worker-Code kopieren
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const cmd = "npm i -g wrangler && wrangler login && wrangler deploy relay-worker.js --name zeno-relay";
+                                    navigator.clipboard.writeText(cmd);
+                                    showToast("Wrangler CLI Deploy-Befehle kopiert! 💻");
+                                  }}
+                                  style={{
+                                    backgroundColor: "#1E222D",
+                                    color: "#38BDF8",
+                                    border: "1px solid #38BDF844",
+                                    padding: "6px 12px",
+                                    borderRadius: "6px",
+                                    fontSize: "11px",
+                                    fontWeight: "600",
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "5px"
+                                  }}
+                                >
+                                  <Icon icon="mage:terminal" /> CLI-Befehle kopieren
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          <MarkdownReader
+                            content={activeGuide.markdown}
+                            title={activeGuide.title}
+                            badge={activeGuide.badge}
+                            badgeColor={activeGuide.badgeColor}
+                            showCopyAll={true}
+                          />
+                        </div>
+                      );
+                    })()}
+                  </div>
                 </div>
               </div>
             )}

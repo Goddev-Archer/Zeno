@@ -55,7 +55,8 @@ export function createServerManifest(
   encrypted: boolean,
   categories: Category[],
   gitRepo?: GitRepositoryConfig,
-  ownerAin?: string
+  ownerAin?: string,
+  relays?: string[]
 ): ZenoServerManifest {
   return {
     version: "1.0.0",
@@ -68,9 +69,10 @@ export function createServerManifest(
     ownerAin: ownerAin || "ZENO-ANONYMOUS",
     createdAt: new Date().toISOString(),
     gitRepo,
-    relays: [
-      "wss://relay.zeno-chat.org",
-      "wss://backup.zeno-relay.net"
+    relays: relays && relays.length > 0 ? relays : [
+      "wss://relay.damus.io",
+      "wss://nos.lol",
+      "wss://relay.snort.social"
     ],
     categories
   };

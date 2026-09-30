@@ -13,6 +13,27 @@ export interface Category {
   channels: Channel[];
 }
 
+export type RelayType = "cloudflare_worker" | "nostr" | "onion" | "custom_ws";
+
+export interface RelayConfig {
+  type: RelayType;
+  url: string;
+  name?: string;
+  isTor?: boolean;
+  pubKey?: string;
+}
+
+export interface WikiArticle {
+  id: string;
+  title: string;
+  icon: string;
+  badge: string;
+  badgeColor: string;
+  category: "Security & Crypto" | "Relays & Networking" | "Server & Git" | "Recht & Privatsphäre";
+  summary: string;
+  markdown: string;
+}
+
 export interface GitRepositoryConfig {
   provider: "github" | "gitlab" | "gitea" | "custom_git" | "none";
   repoUrl?: string;
