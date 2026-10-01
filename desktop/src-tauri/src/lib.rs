@@ -663,6 +663,24 @@ fn voice_get_status(
 }
 
 #[tauri::command]
+fn voice_update_speaking(
+    app: tauri::AppHandle,
+    state: tauri::State<voice_network::VoiceNetworkState>,
+    is_speaking: bool,
+    input_level: f32,
+) -> Result<voice_network::VoiceSessionStatus, String> {
+    voice_network::update_speaking(&app, &state, is_speaking, input_level)
+}
+
+#[tauri::command]
+fn voice_send_signal(
+    app: tauri::AppHandle,
+    signal: voice_network::VoiceSignalPayload,
+) -> Result<(), String> {
+    voice_network::broadcast_voice_signal(&app, signal)
+}
+
+#[tauri::command]
 fn network_broadcast_message(
     app: tauri::AppHandle,
     channel_id: String,
@@ -727,6 +745,8 @@ pub fn run() {
             voice_leave,
             voice_set_mute,
             voice_set_deafen,
+            voice_update_speaking,
+            voice_send_signal,
             voice_get_status,
             network_broadcast_message
         ])

@@ -40,6 +40,7 @@ import {
   subscribeToVoiceState,
   subscribeToIncomingMessages
 } from "./services/voiceNetworkService";
+import { audioStreamService } from "./services/audioStreamService";
 import { relayClient, RelayNodeStatus } from "./services/relayClientService";
 import { cleanUrl } from "./utils/urlCleaner";
 import {
@@ -228,6 +229,10 @@ function ZenoMainApp() {
   const [voiceDuration, setVoiceDuration] = useState<number>(0);
   const [muted, setMuted] = useState<boolean>(false);
   const [deafened, setDeafened] = useState<boolean>(false);
+  const [isLocalSpeaking, setIsLocalSpeaking] = useState<boolean>(false);
+  const [localAudioLevel, setLocalAudioLevel] = useState<number>(0);
+  const [voicePing, setVoicePing] = useState<number>(14);
+  const [activeVoiceSpeakers, setActiveVoiceSpeakers] = useState<string[]>([]);
 
   // UI Panels & Layout State
   const [isMembersOpen, setIsMembersOpen] = useState<boolean>(true);
@@ -431,6 +436,14 @@ function ZenoMainApp() {
       setConnectedVoice(status.isConnected ? status.channelName || null : null);
       setMuted(status.isMuted);
       setDeafened(status.isDeafened);
+      setActiveVoiceSpeakers(status.activeSpeakers || []);
+      setVoicePing(status.pingMs || 14);
+    });
+
+    // 2b. Subscribe to Live Microphone RMS & VAD Audio Levels
+    const unsubAudioLevel = audioStreamService.onAudioLevel((rms, speaking) => {
+      setLocalAudioLevel(rms);
+      setIsLocalSpeaking(speaking);
     });
 
     // 3. Subscribe to incoming messages from Rust Relay
@@ -465,6 +478,7 @@ function ZenoMainApp() {
     return () => {
       unlistenVoicePromise.then((unlisten) => unlisten && unlisten());
       unlistenMsgPromise.then((unlisten) => unlisten && unlisten());
+      unsubAudioLevel();
       unsubscribeRelayMsgs();
       unsubscribeRelayStatus();
     };
@@ -974,29 +988,40 @@ function ZenoMainApp() {
   };
 
   // Voice actions
-  const handleJoinVoice = (chId: string, chName: string) => {
+  const handleJoinVoice = async (chId: string, chName: string) => {
     setConnectedVoice(chName);
     setVoiceStartTime(Date.now());
     setVoiceDuration(0);
-    joinVoiceChannel(chId, chName, userName || "CipherNaut");
-    showToast(`Sprachkanal "${chName}" beigetreten (Rust Voice Session aktiv).`);
+    // 1. Initialize real microphone capture & Web Audio VAD
+    await audioStreamService.startMicrophone();
+    // 2. Join voice session in native Rust backend
+    await joinVoiceChannel(chId, chName, userName || "CipherNaut");
+    showToast(`Sprachkanal "${chName}" beigetreten (Echtzeit-Audio & Mikrofon aktiv) 🎙️`);
   };
 
   const handleDisconnectVoice = () => {
     showToast(`Sprachkanal "${connectedVoice}" verlassen.`);
+    // 1. Stop audio capture and close WebRTC peer connections
+    audioStreamService.stopMicrophone();
+    audioStreamService.closeAllPeers();
+    // 2. Leave voice session in Rust backend
     leaveVoiceChannel();
     setConnectedVoice(null);
     setVoiceStartTime(null);
     setVoiceDuration(0);
+    setIsLocalSpeaking(false);
+    setLocalAudioLevel(0);
   };
 
   const handleMuteChange = (newMuted: boolean) => {
     setMuted(newMuted);
+    audioStreamService.setMuted(newMuted);
     setVoiceMute(newMuted);
   };
 
   const handleDeafenChange = (newDeafened: boolean) => {
     setDeafened(newDeafened);
+    audioStreamService.setDeafened(newDeafened);
     setVoiceDeafen(newDeafened);
   };
 
@@ -1525,6 +1550,14 @@ function ZenoMainApp() {
         onDeleteChannel={handleDeleteChannel}
         onOpenGitSyncModal={() => setIsGitSyncModalOpen(true)}
         onAddCategoryClick={handleCreateCategory}
+        isLocalSpeaking={isLocalSpeaking}
+        localAudioLevel={localAudioLevel}
+        activeVoiceSpeakers={activeVoiceSpeakers}
+        voicePing={voicePing}
+        onOpenVoiceSettings={() => {
+          setActiveSettingsTab("voice");
+          setIsSettingsOpen(true);
+        }}
       />
 
       {/* 3. MAIN WORKSPACE VIEW */}

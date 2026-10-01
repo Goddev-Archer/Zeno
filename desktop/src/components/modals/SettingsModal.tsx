@@ -4,6 +4,7 @@ import { UserIdentity } from "../../types";
 import { signAuthChallenge, verifyAuthSignature } from "../../services/cryptoService";
 import { ZENO_WIKI_GUIDES } from "../../data/wikiGuides";
 import { MarkdownReader } from "../common/MarkdownReader";
+import { AudioSettingsTab } from "../voice/AudioSettingsTab";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -163,6 +164,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             onClick={() => setActiveSettingsTab("appearance")}
           >
             Erscheinungsbild
+          </button>
+          <button 
+            className={`settings-nav-item ${activeSettingsTab === "voice" ? "active" : ""}`} 
+            onClick={() => setActiveSettingsTab("voice")}
+            style={{ display: "flex", alignItems: "center", gap: "8px" }}
+          >
+            <Icon icon="mage:volume-up" style={{ color: "#38BDF8" }} />
+            Sprache &amp; Audio
           </button>
           <button 
             className={`settings-nav-item ${activeSettingsTab === "byos" ? "active" : ""}`} 
@@ -777,6 +786,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     />
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Tab: Voice & Audio */}
+            {activeSettingsTab === "voice" && (
+              <div className="settings-tab-content" id="tab-voice">
+                <AudioSettingsTab showToast={showToast} />
               </div>
             )}
 

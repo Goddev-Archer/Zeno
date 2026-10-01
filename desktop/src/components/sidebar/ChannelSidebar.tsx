@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Icon } from "@iconify/react";
 import { Server, Channel, Profile } from "../../types";
+import { ZeitschattenVoiceHalo } from "../common/ZeitschattenVoiceHalo";
 
 interface ChannelSidebarProps {
   activeServerId: string;
@@ -33,6 +34,11 @@ interface ChannelSidebarProps {
   onDeleteChannel?: (categoryName: string, channelId: string) => void;
   onOpenGitSyncModal?: () => void;
   onAddCategoryClick?: () => void;
+  isLocalSpeaking?: boolean;
+  localAudioLevel?: number;
+  activeVoiceSpeakers?: string[];
+  voicePing?: number;
+  onOpenVoiceSettings?: () => void;
 }
 
 export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
@@ -65,7 +71,12 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   onAddChannelClick,
   onDeleteChannel,
   onOpenGitSyncModal,
-  onAddCategoryClick
+  onAddCategoryClick,
+  isLocalSpeaking = false,
+  localAudioLevel = 0,
+  activeVoiceSpeakers = [],
+  voicePing = 14,
+  onOpenVoiceSettings
 }) => {
   const [serverMenuOpen, setServerMenuOpen] = useState(false);
   const [hoveredChannelId, setHoveredChannelId] = useState<string | null>(null);
@@ -359,41 +370,79 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                               </button>
                             )}
 
-                            {!isText && (
-                              <ul className="voice-connected-users" style={{ paddingLeft: "24px", marginTop: "4px", display: "flex", flexDirection: "column", gap: "6px" }}>
-                                {(ch.connectedUsers || ["CipherNaut (Du)", "Alex", "Elena"]).map((user, uIdx) => {
-                                  const isSpeaking = uIdx === 0 && !muted && connectedVoice === ch.name;
-                                  return (
-                                    <li key={user} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "11px", color: isSpeaking ? "#00FF87" : "#94A3B8", padding: "2px 6px", borderRadius: "6px", backgroundColor: isSpeaking ? "rgba(0, 255, 135, 0.08)" : "transparent" }}>
-                                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                        <div 
-                                          className={`voice-user-avatar ${isSpeaking ? "user-speaking-ring" : ""}`}
-                                          style={{
-                                            width: "22px",
-                                            height: "22px",
-                                            borderRadius: "50%",
-                                            backgroundColor: "#3574F0",
-                                            color: "#FFF",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                            fontSize: "10px",
-                                            fontWeight: "700",
-                                            border: isSpeaking ? "2px solid #00FF87" : "none",
-                                            boxShadow: isSpeaking ? "0 0 10px rgba(0, 255, 135, 0.6)" : "none"
-                                          }}
-                                        >
-                                          {user[0]}
-                                        </div>
-                                        <span>{user}</span>
+                            {!isText && connectedVoice === ch.name && (
+                              <ul className="voice-connected-users" style={{ paddingLeft: "24px", marginTop: "6px", display: "flex", flexDirection: "column", gap: "6px" }}>
+                                {/* Current Local User with Zeitschatten Halo */}
+                                <li style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "11px", color: isLocalSpeaking ? "#00FF87" : "#94A3B8", padding: "3px 6px", borderRadius: "6px", backgroundColor: isLocalSpeaking ? "rgba(0, 255, 135, 0.08)" : "transparent" }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                    <ZeitschattenVoiceHalo isSpeaking={isLocalSpeaking} audioLevel={localAudioLevel} size={22}>
+                                      <div 
+                                        style={{
+                                          width: "22px",
+                                          height: "22px",
+                                          borderRadius: "50%",
+                                          backgroundColor: "#3574F0",
+                                          color: "#FFF",
+                                          display: "flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                          fontSize: "10px",
+                                          fontWeight: "700"
+                                        }}
+                                      >
+                                        {(userName || "CipherNaut")[0].toUpperCase()}
                                       </div>
-                                      <Icon 
-                                        icon={isSpeaking ? "mage:volume-up" : (uIdx === 1 ? "mage:microphone-mute" : "mage:microphone")} 
-                                        style={{ color: isSpeaking ? "#00FF87" : "#64748B", fontSize: "12px" }} 
-                                      />
-                                    </li>
-                                  );
-                                })}
+                                    </ZeitschattenVoiceHalo>
+                                    <span style={{ fontWeight: isLocalSpeaking ? "700" : "500" }}>{userName || "CipherNaut"} (Du)</span>
+                                  </div>
+                                  <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                                    {deafened ? (
+                                      <span title="Taub gestellt"><Icon icon="mage:volume-mute" style={{ color: "#EF4444", fontSize: "12px" }} /></span>
+                                    ) : muted ? (
+                                      <span title="Stumm geschaltet"><Icon icon="mage:microphone-mute" style={{ color: "#EF4444", fontSize: "12px" }} /></span>
+                                    ) : isLocalSpeaking ? (
+                                      <span title="Spricht"><Icon icon="mage:volume-up" style={{ color: "#00FF87", fontSize: "12px" }} /></span>
+                                    ) : (
+                                      <span title="Mikrofon aktiv"><Icon icon="mage:microphone" style={{ color: "#64748B", fontSize: "12px" }} /></span>
+                                    )}
+                                  </div>
+                                </li>
+
+                                {/* Other Connected Channel Users */}
+                                {(ch.connectedUsers || ["Alex", "Elena"])
+                                  .filter((u) => !u.includes("(Du)") && u !== userName)
+                                  .map((user) => {
+                                    const isRemoteSpeaking = activeVoiceSpeakers.includes(user);
+                                    return (
+                                      <li key={user} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "11px", color: isRemoteSpeaking ? "#00FF87" : "#94A3B8", padding: "3px 6px", borderRadius: "6px", backgroundColor: isRemoteSpeaking ? "rgba(0, 255, 135, 0.08)" : "transparent" }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                          <ZeitschattenVoiceHalo isSpeaking={isRemoteSpeaking} audioLevel={0.6} size={22}>
+                                            <div 
+                                              style={{
+                                                width: "22px",
+                                                height: "22px",
+                                                borderRadius: "50%",
+                                                backgroundColor: "#2B2D30",
+                                                color: "#FFF",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                fontSize: "10px",
+                                                fontWeight: "700"
+                                              }}
+                                            >
+                                              {user[0].toUpperCase()}
+                                            </div>
+                                          </ZeitschattenVoiceHalo>
+                                          <span>{user}</span>
+                                        </div>
+                                        <Icon 
+                                          icon={isRemoteSpeaking ? "mage:volume-up" : "mage:microphone"} 
+                                          style={{ color: isRemoteSpeaking ? "#00FF87" : "#64748B", fontSize: "12px" }} 
+                                        />
+                                      </li>
+                                    );
+                                  })}
                               </ul>
                             )}
                           </li>
@@ -411,18 +460,48 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
       {/* User Info Footer */}
       <footer className="user-panel">
         {connectedVoice && (
-          <div className="voice-indicator">
-            <div className="voice-status">
+          <div className="voice-indicator" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", backgroundColor: "#0D0E12", borderBottom: "1px solid #1E222D" }}>
+            <div className="voice-status" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               <span className="voice-status-icon">
-                <Icon icon="mage:volume-up" className="voice-status-indicator pulse" style={{ color: "var(--accent-success, #59A869)", marginRight: "4px" }} />
+                <Icon icon="mage:volume-up" className="voice-status-indicator pulse" style={{ color: isLocalSpeaking ? "#00FF87" : "#38BDF8" }} />
               </span>
-              <span className="voice-status-text">
-                Verbunden mit <strong>{connectedVoice}</strong> ({formatVoiceTime(voiceDuration)})
-              </span>
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                <span className="voice-status-text" style={{ fontSize: "11px", color: "#FFF" }}>
+                  <strong>{connectedVoice}</strong> ({formatVoiceTime(voiceDuration)})
+                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span style={{ fontSize: "9px", color: "#00FF87", fontFamily: "monospace" }}>
+                    🟢 {voicePing}ms
+                  </span>
+                  {/* Live Mini VU-Meter */}
+                  <div style={{ width: "36px", height: "4px", backgroundColor: "#1E222D", borderRadius: "2px", overflow: "hidden" }}>
+                    <div
+                      style={{
+                        width: `${Math.min(localAudioLevel * 100, 100)}%`,
+                        height: "100%",
+                        backgroundColor: isLocalSpeaking ? "#00FF87" : "#38BDF8",
+                        transition: "width 0.05s ease"
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
-            <button className="voice-disconnect" onClick={handleDisconnectVoice} title="Trennen">
-              <Icon icon="mage:multiply" />
-            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+              {onOpenVoiceSettings && (
+                <button
+                  type="button"
+                  onClick={onOpenVoiceSettings}
+                  title="Sprache &amp; Audio-Einstellungen"
+                  style={{ background: "none", border: "none", color: "#94A3B8", cursor: "pointer", padding: "4px", display: "flex", alignItems: "center" }}
+                >
+                  <Icon icon="mage:settings" style={{ fontSize: "14px" }} />
+                </button>
+              )}
+              <button className="voice-disconnect" onClick={handleDisconnectVoice} title="Trennen">
+                <Icon icon="mage:multiply" />
+              </button>
+            </div>
           </div>
         )}
 

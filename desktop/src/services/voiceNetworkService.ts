@@ -12,8 +12,19 @@ export interface VoiceSessionStatus {
   userName?: string;
   isMuted: boolean;
   isDeafened: boolean;
+  isSpeaking: boolean;
+  inputLevel: number;
+  activeSpeakers: string[];
   connectedUsers: string[];
   pingMs: number;
+}
+
+export interface VoiceSignalPayload {
+  channelId: string;
+  sender: string;
+  target?: string;
+  signalType: "offer" | "answer" | "ice_candidate" | "speaking" | "user_joined" | "user_left";
+  data: string;
 }
 
 export interface NetworkChatMessage {
@@ -90,6 +101,39 @@ export async function setVoiceDeafen(deafened: boolean): Promise<VoiceSessionSta
 }
 
 /**
+ * Updates Speaking state and RMS audio volume in Rust
+ */
+export async function updateVoiceSpeaking(
+  isSpeaking: boolean,
+  inputLevel: number
+): Promise<VoiceSessionStatus | null> {
+  if (!isTauriEnvironment()) return null;
+
+  try {
+    return await invoke<VoiceSessionStatus>("voice_update_speaking", {
+      isSpeaking,
+      inputLevel
+    });
+  } catch (e) {
+    console.error("[Zeno Voice] Fehler beim Aktualisieren des Sprech-Status:", e);
+    return null;
+  }
+}
+
+/**
+ * Sends a WebRTC signaling payload via Rust relay
+ */
+export async function sendVoiceSignal(signal: VoiceSignalPayload): Promise<void> {
+  if (!isTauriEnvironment()) return;
+
+  try {
+    await invoke("voice_send_signal", { signal });
+  } catch (e) {
+    console.error("[Zeno Voice] Fehler beim Senden des Voice-Signals:", e);
+  }
+}
+
+/**
  * Gets the current Voice Session status from Rust
  */
 export async function getVoiceStatus(): Promise<VoiceSessionStatus | null> {
@@ -144,6 +188,24 @@ export async function subscribeToVoiceState(
     });
   } catch (e) {
     console.error("[Zeno Voice] Fehler beim Abonnieren des Voice-Events:", e);
+    return null;
+  }
+}
+
+/**
+ * Subscribes to live WebRTC Voice Signals from other peers
+ */
+export async function subscribeToVoiceSignals(
+  callback: (signal: VoiceSignalPayload) => void
+): Promise<UnlistenFn | null> {
+  if (!isTauriEnvironment()) return null;
+
+  try {
+    return await listen<VoiceSignalPayload>("zeno://voice_signal", (event) => {
+      callback(event.payload);
+    });
+  } catch (e) {
+    console.error("[Zeno Voice] Fehler beim Abonnieren des Voice-Signal-Events:", e);
     return null;
   }
 }
