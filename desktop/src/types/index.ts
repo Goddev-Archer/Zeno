@@ -40,6 +40,32 @@ export interface GitRepositoryConfig {
   branch?: string;
   manifestPath?: string;
   rawManifestUrl?: string;
+  localPath?: string;
+  autoSync?: boolean;
+}
+
+export interface GitSyncResult {
+  success: boolean;
+  commitHash?: string;
+  output: string;
+  pushed: boolean;
+}
+
+export interface GitPullResult {
+  success: boolean;
+  updated: boolean;
+  output: string;
+  manifestContent?: string;
+}
+
+export interface GitServerRepoStatus {
+  repoPath: string;
+  branch: string;
+  isClean: boolean;
+  hasRemote: boolean;
+  remoteUrl?: string;
+  lastCommit?: string;
+  manifestExists: boolean;
 }
 
 export interface ZenoServerManifest {

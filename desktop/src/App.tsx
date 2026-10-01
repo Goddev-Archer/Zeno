@@ -7,6 +7,7 @@ import "./App.css";
 // --- TYPES & UTILS ---
 import {
   Server,
+  Category,
   Channel,
   Message,
   MessageAttachment,
@@ -23,6 +24,7 @@ import {
   getActiveIdentityFromDb
 } from "./services/cryptoService";
 import { executeZeroKnowledgeAuth, syncEncryptedVaultToServer } from "./services/backendService";
+import { commitAndPushServerManifest } from "./services/gitServerSyncService";
 import {
   saveServerToDb,
   loadServersFromDb,
@@ -69,6 +71,8 @@ import { WidgetMarketplaceModal } from "./components/modals/WidgetMarketplaceMod
 import { MarketplaceWidget } from "./data/widgetMarketplaceData";
 import { CustomWasmModal } from "./components/modals/CustomWasmModal";
 import { IdeProjectWizardModal, IdeNewItemModal } from "./components/modals/IdeModals";
+import { CreateChannelModal } from "./components/modals/CreateChannelModal";
+import { GitSyncModal } from "./components/modals/GitSyncModal";
 
 // Configure Monaco Environment to prevent dynamic worker fetch errors in Vite
 if (typeof window !== "undefined") {
@@ -619,6 +623,145 @@ function ZenoMainApp() {
       setActiveChannel(joinedServer.categories[0].channels[0]);
     }
   };
+
+  // Channel & Server Git Sync State
+  const [isCreateChannelModalOpen, setIsCreateChannelModalOpen] = useState<boolean>(false);
+  const [createChannelCategory, setCreateChannelCategory] = useState<string>("");
+  const [isGitSyncModalOpen, setIsGitSyncModalOpen] = useState<boolean>(false);
+
+  const handleChannelCreated = async (categoryName: string, newChannel: Channel, autoCommitGit: boolean) => {
+    if (!activeServer) return;
+
+    const updatedCategories = (activeServer.categories || []).map((cat) => {
+      if (cat.name === categoryName) {
+        return {
+          ...cat,
+          channels: [...cat.channels, newChannel]
+        };
+      }
+      return cat;
+    });
+
+    const updatedServer: Server = {
+      ...activeServer,
+      categories: updatedCategories
+    };
+
+    setActiveServer(updatedServer);
+    setServers((prev: Server[]) => prev.map((s) => (s.id === updatedServer.id ? updatedServer : s)));
+    await saveServerToDb(updatedServer);
+
+    if (autoCommitGit) {
+      showToast(`Kanal #${newChannel.name} erstellt. Sichere in Git... 🌿`);
+      const syncRes = await commitAndPushServerManifest({
+        server: updatedServer,
+        commitMessage: `feat(server): add channel #${newChannel.name} to ${categoryName}`,
+        push: false
+      });
+      if (syncRes.success) {
+        showToast(`In zeno-server.json gesichert! (${syncRes.commitHash || "HEAD"})`);
+      }
+    }
+  };
+
+  const handleDeleteChannel = async (categoryName: string, channelId: string) => {
+    if (!activeServer) return;
+
+    let deletedChannelName = "";
+    const updatedCategories = (activeServer.categories || []).map((cat) => {
+      if (cat.name === categoryName) {
+        const target = cat.channels.find((ch) => ch.id === channelId);
+        if (target) deletedChannelName = target.name;
+        return {
+          ...cat,
+          channels: cat.channels.filter((ch) => ch.id !== channelId)
+        };
+      }
+      return cat;
+    });
+
+    const updatedServer: Server = {
+      ...activeServer,
+      categories: updatedCategories
+    };
+
+    setActiveServer(updatedServer);
+    setServers((prev: Server[]) => prev.map((s) => (s.id === updatedServer.id ? updatedServer : s)));
+
+    if (activeChannel?.id === channelId) {
+      const firstCh = updatedCategories.find((c) => c.channels.length > 0)?.channels[0];
+      if (firstCh) {
+        setActiveChannel(firstCh);
+      }
+    }
+
+    await saveServerToDb(updatedServer);
+    showToast(`Kanal #${deletedChannelName || channelId} gelöscht.`);
+
+    if (activeServer.gitRepo) {
+      commitAndPushServerManifest({
+        server: updatedServer,
+        commitMessage: `fix(server): remove channel #${deletedChannelName || channelId}`,
+        push: false
+      });
+    }
+  };
+
+  const handleCreateCategory = async () => {
+    if (!activeServer) return;
+    const catName = window.prompt("Name der neuen Kategorie (z.B. ENTWICKLUNG oder COMMUNITY):");
+    if (!catName || !catName.trim()) return;
+
+    const cleanName = catName.trim().toUpperCase();
+    if ((activeServer.categories || []).some((c) => c.name.toUpperCase() === cleanName)) {
+      showToast("Eine Kategorie mit diesem Namen existiert bereits!");
+      return;
+    }
+
+    const newCategory: Category = {
+      name: cleanName,
+      type: "text",
+      channels: [
+        {
+          id: `chn-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          name: "allgemein"
+        }
+      ]
+    };
+
+    const updatedServer: Server = {
+      ...activeServer,
+      categories: [...(activeServer.categories || []), newCategory]
+    };
+
+    setActiveServer(updatedServer);
+    setServers((prev: Server[]) => prev.map((s) => (s.id === updatedServer.id ? updatedServer : s)));
+    await saveServerToDb(updatedServer);
+    showToast(`Kategorie "${cleanName}" mit #allgemein erstellt! 📁`);
+
+    if (activeServer.gitRepo) {
+      commitAndPushServerManifest({
+        server: updatedServer,
+        commitMessage: `feat(server): add category ${cleanName}`,
+        push: false
+      });
+    }
+  };
+
+  const handleServerUpdatedFromGit = (updatedServer: Server) => {
+    setActiveServer(updatedServer);
+    setServers((prev: Server[]) => prev.map((s) => (s.id === updatedServer.id ? updatedServer : s)));
+    const channelExists = (updatedServer.categories || []).some((cat) =>
+      cat.channels.some((ch) => ch.id === activeChannel?.id)
+    );
+    if (!channelExists) {
+      const firstCh = updatedServer.categories?.find((c) => c.channels.length > 0)?.channels[0];
+      if (firstCh) {
+        setActiveChannel(firstCh);
+      }
+    }
+  };
+
   const [isIdeProjectWizardOpen, setIsIdeProjectWizardOpen] = useState<boolean>(false);
   const [isIdeNewItemModalOpen, setIsIdeNewItemModalOpen] = useState<boolean>(false);
   const [ideNewItemType, setIdeNewItemType] = useState<"file" | "folder">("file");
@@ -1375,6 +1518,13 @@ function ZenoMainApp() {
           setSovereignModalTab("manage");
           setIsSovereignModalOpen(true);
         }}
+        onAddChannelClick={(catName) => {
+          setCreateChannelCategory(catName);
+          setIsCreateChannelModalOpen(true);
+        }}
+        onDeleteChannel={handleDeleteChannel}
+        onOpenGitSyncModal={() => setIsGitSyncModalOpen(true)}
+        onAddCategoryClick={handleCreateCategory}
       />
 
       {/* 3. MAIN WORKSPACE VIEW */}
@@ -1697,6 +1847,24 @@ function ZenoMainApp() {
         onIdentityChanged={handleIdentityChanged}
         showToast={showToast}
         initialTab={sovereignModalTab}
+      />
+
+      <CreateChannelModal
+        isOpen={isCreateChannelModalOpen}
+        onClose={() => setIsCreateChannelModalOpen(false)}
+        categories={activeServer?.categories || []}
+        initialCategoryName={createChannelCategory}
+        onChannelCreated={handleChannelCreated}
+        showToast={showToast}
+        hasGitRepo={!!activeServer?.gitRepo}
+      />
+
+      <GitSyncModal
+        isOpen={isGitSyncModalOpen}
+        onClose={() => setIsGitSyncModalOpen(false)}
+        server={activeServer}
+        onServerUpdated={handleServerUpdatedFromGit}
+        showToast={showToast}
       />
 
       <IdeProjectWizardModal

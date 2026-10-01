@@ -1,0 +1,193 @@
+// --- ZENO GIT SERVER SYNCHRONIZATION SERVICE ---
+// Bridges Git Repository operations (Commit, Push, Pull, Status) with Server Manifests (zeno-server.json)
+// Powered by the native Rust backend core.
+
+import { invoke } from "@tauri-apps/api/core";
+import {
+  Server,
+  ZenoServerManifest,
+  GitSyncResult,
+  GitPullResult,
+  GitServerRepoStatus
+} from "../types";
+import { isTauriEnvironment } from "./cryptoService";
+import { createServerManifest, manifestToServer } from "../utils/gitManifestHelper";
+import { saveServerToDb } from "./dbService";
+
+/**
+ * Converts a Server object into a compliant ZenoServerManifest
+ */
+export function serverToManifest(server: Server): ZenoServerManifest {
+  return createServerManifest(
+    server.id,
+    server.name,
+    server.description || "",
+    server.icon || server.iconLetter || "🛡️",
+    server.encrypted ?? true,
+    server.categories || [],
+    server.gitRepo,
+    server.ownerAin
+  );
+}
+
+/**
+ * Fetches the live Git repository status for a server repository
+ */
+export async function getServerRepoStatus(repoPath?: string): Promise<GitServerRepoStatus | null> {
+  if (!isTauriEnvironment()) {
+    return {
+      repoPath: repoPath || "c:/dev/Zeno (Web Dev Simulation)",
+      branch: "main",
+      isClean: true,
+      hasRemote: true,
+      remoteUrl: "https://github.com/Goddev-Archer/Zeno.git",
+      lastCommit: "a1b2c3d - Initial Server Manifest (Vor 5 Minuten)",
+      manifestExists: true
+    };
+  }
+
+  try {
+    const status = await invoke<GitServerRepoStatus>("git_server_get_status", {
+      repoPath: repoPath || null
+    });
+    return status;
+  } catch (e) {
+    console.warn("[Git Sync Service] Fehler beim Abrufen des Git-Status:", e);
+    return null;
+  }
+}
+
+/**
+ * Writes the server manifest (zeno-server.json) to the Git repository,
+ * stages it, creates a Git commit, and optionally pushes to the remote origin.
+ */
+export async function commitAndPushServerManifest(options: {
+  server: Server;
+  repoPath?: string;
+  commitMessage?: string;
+  push?: boolean;
+}): Promise<GitSyncResult> {
+  const { server, repoPath, commitMessage, push = false } = options;
+  const manifest = serverToManifest(server);
+  const manifestContent = JSON.stringify(manifest, null, 2);
+
+  // Always persist state to local SQLite database as well
+  await saveServerToDb(server);
+
+  if (!isTauriEnvironment()) {
+    console.log("[Git Sync Simulation] Commit & Push:", { commitMessage, push, manifest });
+    return {
+      success: true,
+      commitHash: "sim-" + Date.now().toString(16).slice(-6),
+      output: push ? "Simulation: Erfolgreich nach Remote gepusht." : "Simulation: Lokal gesichert.",
+      pushed: push
+    };
+  }
+
+  try {
+    const result = await invoke<GitSyncResult>("git_server_commit_and_push", {
+      repoPath: repoPath || server.gitRepo?.localPath || null,
+      manifestContent,
+      commitMessage: commitMessage || `feat(server): update ${server.name} channels and categories`,
+      push
+    });
+
+    console.log(`[Git Sync Service] Manifest gesichert. Commit: ${result.commitHash || "unverändert"}`);
+    return result;
+  } catch (e: any) {
+    const errMsg = typeof e === "string" ? e : (e.message || "Unbekannter Git-Fehler");
+    console.error("[Git Sync Service] Fehler beim Commit & Push:", errMsg);
+    return {
+      success: false,
+      output: errMsg,
+      pushed: false
+    };
+  }
+}
+
+/**
+ * Pulls the latest commits from the Git remote repository,
+ * parses any updated zeno-server.json, and returns the updated server model.
+ */
+export async function pullServerManifest(options: {
+  currentServer: Server;
+  repoPath?: string;
+}): Promise<{
+  result: GitPullResult;
+  updatedServer?: Server;
+}> {
+  const { currentServer, repoPath } = options;
+
+  if (!isTauriEnvironment()) {
+    return {
+      result: {
+        success: true,
+        updated: false,
+        output: "Simulation: Repository ist bereits aktuell.",
+        manifestContent: JSON.stringify(serverToManifest(currentServer), null, 2)
+      },
+      updatedServer: currentServer
+    };
+  }
+
+  try {
+    const result = await invoke<GitPullResult>("git_server_pull", {
+      repoPath: repoPath || currentServer.gitRepo?.localPath || null
+    });
+
+    let updatedServer: Server | undefined = undefined;
+
+    if (result.manifestContent) {
+      try {
+        const parsedManifest: ZenoServerManifest = JSON.parse(result.manifestContent);
+        updatedServer = manifestToServer(
+          parsedManifest,
+          currentServer.manifestUrl || currentServer.gitRepo?.rawManifestUrl
+        );
+
+        // Keep local overrides if applicable
+        if (currentServer.gitRepo?.localPath) {
+          if (!updatedServer.gitRepo) {
+            updatedServer.gitRepo = { provider: "custom_git", localPath: currentServer.gitRepo.localPath };
+          } else {
+            updatedServer.gitRepo.localPath = currentServer.gitRepo.localPath;
+          }
+        }
+
+        // Save updated server to native SQLite DB
+        await saveServerToDb(updatedServer);
+        console.log(`[Git Sync Service] Server "${updatedServer.name}" aus zeno-server.json aktualisiert!`);
+      } catch (err) {
+        console.error("[Git Sync Service] Konnte zeno-server.json nicht parsen:", err);
+      }
+    }
+
+    return { result, updatedServer };
+  } catch (e: any) {
+    const errMsg = typeof e === "string" ? e : (e.message || "Unbekannter Git-Pull-Fehler");
+    return {
+      result: {
+        success: false,
+        updated: false,
+        output: errMsg
+      }
+    };
+  }
+}
+
+/**
+ * Directly reads the local zeno-server.json content
+ */
+export async function readServerManifestFile(repoPath?: string): Promise<string | null> {
+  if (!isTauriEnvironment()) return null;
+
+  try {
+    const content = await invoke<string>("git_server_read_manifest", {
+      repoPath: repoPath || null
+    });
+    return content;
+  } catch (e) {
+    console.warn("[Git Sync Service] Fehler beim Lesen der zeno-server.json:", e);
+    return null;
+  }
+}

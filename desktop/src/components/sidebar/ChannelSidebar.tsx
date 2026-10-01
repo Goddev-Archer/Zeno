@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Icon } from "@iconify/react";
 import { Server, Channel, Profile } from "../../types";
 
@@ -29,6 +29,10 @@ interface ChannelSidebarProps {
   userAin?: string;
   userName?: string;
   onOpenSovereignModal?: () => void;
+  onAddChannelClick?: (categoryName: string) => void;
+  onDeleteChannel?: (categoryName: string, channelId: string) => void;
+  onOpenGitSyncModal?: () => void;
+  onAddCategoryClick?: () => void;
 }
 
 export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
@@ -57,8 +61,15 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   formatVoiceTime,
   userAin,
   userName,
-  onOpenSovereignModal
+  onOpenSovereignModal,
+  onAddChannelClick,
+  onDeleteChannel,
+  onOpenGitSyncModal,
+  onAddCategoryClick
 }) => {
+  const [serverMenuOpen, setServerMenuOpen] = useState(false);
+  const [hoveredChannelId, setHoveredChannelId] = useState<string | null>(null);
+
   if (activeServerId === "home" && homeTab === "ide") return null;
 
   return (
@@ -114,23 +125,185 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
         </>
       ) : (
         <>
-          <header className="server-header">
-            <h1 className="server-name">{activeServer?.name || "Server"}</h1>
-            <button className="server-dropdown-toggle" onClick={() => showToast("Server-Menü geöffnet")}>
-              <Icon icon="mage:chevron-down" />
+          <header className="server-header" style={{ position: "relative" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", overflow: "hidden" }}>
+              <h1 className="server-name" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {activeServer?.name || "Server"}
+              </h1>
+              <button
+                className="git-sync-header-badge"
+                onClick={onOpenGitSyncModal}
+                title="Git Server Manifest Synchronisation"
+                style={{
+                  background: "rgba(53, 116, 240, 0.15)",
+                  border: "1px solid rgba(53, 116, 240, 0.35)",
+                  borderRadius: "10px",
+                  color: "#3574F0",
+                  fontSize: "11px",
+                  fontWeight: "600",
+                  padding: "2px 6px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  cursor: "pointer",
+                  flexShrink: 0
+                }}
+              >
+                <Icon icon="octicon:git-branch-16" />
+                <span>Git</span>
+              </button>
+            </div>
+            <button
+              className="server-dropdown-toggle"
+              onClick={() => setServerMenuOpen(!serverMenuOpen)}
+              title="Server-Menü"
+            >
+              <Icon icon={serverMenuOpen ? "mage:chevron-up" : "mage:chevron-down"} />
             </button>
+
+            {/* Server Dropdown Popover */}
+            {serverMenuOpen && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "100%",
+                  left: "12px",
+                  right: "12px",
+                  backgroundColor: "#18191B",
+                  border: "1px solid #3574F0",
+                  borderRadius: "10px",
+                  boxShadow: "0 10px 30px rgba(0, 0, 0, 0.6)",
+                  zIndex: 100,
+                  display: "flex",
+                  flexDirection: "column",
+                  padding: "6px",
+                  gap: "2px"
+                }}
+              >
+                <button
+                  onClick={() => {
+                    setServerMenuOpen(false);
+                    onAddChannelClick && onAddChannelClick(activeServer?.categories?.[0]?.name || "");
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "8px 10px",
+                    backgroundColor: "transparent",
+                    border: "none",
+                    borderRadius: "6px",
+                    color: "#E3E4E8",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                    textAlign: "left"
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(53, 116, 240, 0.15)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                >
+                  <Icon icon="mage:plus" style={{ color: "#3574F0" }} />
+                  Kanal erstellen
+                </button>
+                <button
+                  onClick={() => {
+                    setServerMenuOpen(false);
+                    onAddCategoryClick && onAddCategoryClick();
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "8px 10px",
+                    backgroundColor: "transparent",
+                    border: "none",
+                    borderRadius: "6px",
+                    color: "#E3E4E8",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                    textAlign: "left"
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(53, 116, 240, 0.15)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                >
+                  <Icon icon="mage:folder-plus" style={{ color: "#F2C94C" }} />
+                  Kategorie erstellen
+                </button>
+                <button
+                  onClick={() => {
+                    setServerMenuOpen(false);
+                    onOpenGitSyncModal && onOpenGitSyncModal();
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "8px 10px",
+                    backgroundColor: "transparent",
+                    border: "none",
+                    borderRadius: "6px",
+                    color: "#E3E4E8",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                    textAlign: "left"
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(53, 116, 240, 0.15)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                >
+                  <Icon icon="octicon:git-branch-16" style={{ color: "#00FF87" }} />
+                  Git-Manifest synchronisieren
+                </button>
+              </div>
+            )}
           </header>
           <div className="channel-list" key={activeServer?.id || "server"}>
             {(activeServer?.categories || []).map((cat) => {
               const isCollapsed = collapsedCategories[cat.name];
               return (
                 <section key={cat.name} className="channel-category">
-                  <button className="category-header" onClick={() => toggleCategory(cat.name)}>
-                    <span className={`category-arrow ${isCollapsed ? "collapsed" : ""}`}>
-                      <Icon icon="mage:chevron-down" />
-                    </span>
-                    <span className="category-name">{cat.name.toUpperCase()}</span>
-                  </button>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      paddingRight: "8px"
+                    }}
+                  >
+                    <button
+                      className="category-header"
+                      onClick={() => toggleCategory(cat.name)}
+                      style={{ flex: 1, paddingRight: "4px" }}
+                    >
+                      <span className={`category-arrow ${isCollapsed ? "collapsed" : ""}`}>
+                        <Icon icon="mage:chevron-down" />
+                      </span>
+                      <span className="category-name">{cat.name.toUpperCase()}</span>
+                    </button>
+                    <button
+                      title={`Kanal in "${cat.name}" hinzufügen`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAddChannelClick && onAddChannelClick(cat.name);
+                      }}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "#64748B",
+                        cursor: "pointer",
+                        padding: "2px 4px",
+                        fontSize: "14px",
+                        display: "flex",
+                        alignItems: "center",
+                        borderRadius: "4px"
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.color = "#FFF")}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = "#64748B")}
+                    >
+                      <Icon icon="mage:plus" />
+                    </button>
+                  </div>
                   
                   {!isCollapsed && (
                     <ul className="category-channels">
@@ -139,17 +312,52 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                         const isChannelActive = activeChannel?.id === ch.id;
                         
                         return (
-                          <li key={ch.id}>
+                          <li
+                            key={ch.id}
+                            style={{ position: "relative", display: "flex", alignItems: "center" }}
+                            onMouseEnter={() => setHoveredChannelId(ch.id)}
+                            onMouseLeave={() => setHoveredChannelId(null)}
+                          >
                             <button
                               className={`channel-item channel-item-animate ${isChannelActive ? "active" : ""} ${!isText ? "voice-channel" : ""}`}
                               onClick={() => isText ? setActiveChannel(ch) : handleJoinVoice(ch.id, ch.name)}
-                              style={{ "--idx": Math.min(idx, 6) } as React.CSSProperties}
+                              style={{ flex: 1, paddingRight: "26px", "--idx": Math.min(idx, 6) } as React.CSSProperties}
                             >
                               <span className="channel-icon">
                                 <Icon icon={isText ? "mage:hashtag" : "mage:volume-up"} />
                               </span>
                               <span className="channel-name">{ch.name}</span>
                             </button>
+
+                            {hoveredChannelId === ch.id && (
+                              <button
+                                title={`Kanal "${ch.name}" löschen`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (window.confirm(`Möchtest du den Kanal "${ch.name}" wirklich löschen?`)) {
+                                    onDeleteChannel && onDeleteChannel(cat.name, ch.id);
+                                  }
+                                }}
+                                style={{
+                                  position: "absolute",
+                                  right: "6px",
+                                  background: "none",
+                                  border: "none",
+                                  color: "#64748B",
+                                  fontSize: "13px",
+                                  cursor: "pointer",
+                                  padding: "3px",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  borderRadius: "4px"
+                                }}
+                                onMouseEnter={(e) => (e.currentTarget.style.color = "#EB5757")}
+                                onMouseLeave={(e) => (e.currentTarget.style.color = "#64748B")}
+                              >
+                                <Icon icon="mage:trash" />
+                              </button>
+                            )}
 
                             {!isText && (
                               <ul className="voice-connected-users" style={{ paddingLeft: "24px", marginTop: "4px", display: "flex", flexDirection: "column", gap: "6px" }}>

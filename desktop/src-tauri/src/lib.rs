@@ -38,61 +38,54 @@ fn find_git_root() -> Option<PathBuf> {
     None
 }
 
-fn run_git_command(args: &[&str]) -> Result<String, String> {
-    let repo_path = find_git_root().ok_or_else(|| "Kein Git-Repository gefunden.".to_string())?;
+fn get_git_executable() -> PathBuf {
+    let paths = [
+        "C:\\Program Files\\Git\\cmd\\git.exe",
+        "C:\\Program Files (x86)\\Git\\cmd\\git.exe",
+    ];
+    for p in &paths {
+        if PathBuf::from(p).exists() {
+            return PathBuf::from(p);
+        }
+    }
     
-    let mut cmd = Command::new("git");
-    cmd.args(args).current_dir(&repo_path);
+    if let Some(appdata) = std::env::var_os("LOCALAPPDATA") {
+        let user_git = PathBuf::from(appdata)
+            .join("Programs")
+            .join("Git")
+            .join("cmd")
+            .join("git.exe");
+        if user_git.exists() {
+            return user_git;
+        }
+    }
+    
+    if let Some(userprofile) = std::env::var_os("USERPROFILE") {
+        let user_git = PathBuf::from(userprofile)
+            .join("AppData")
+            .join("Local")
+            .join("Programs")
+            .join("Git")
+            .join("cmd")
+            .join("git.exe");
+        if user_git.exists() {
+            return user_git;
+        }
+    }
+    PathBuf::from("git")
+}
+
+fn run_git_in_dir(repo_path: &std::path::Path, args: &[&str]) -> Result<String, String> {
+    let git_exe = get_git_executable();
+    let mut cmd = Command::new(&git_exe);
+    cmd.args(args).current_dir(repo_path);
     
     let output = match cmd.output() {
         Ok(out) => out,
         Err(_) => {
-            let mut git_exe = PathBuf::from("git");
-            let paths = [
-                "C:\\Program Files\\Git\\cmd\\git.exe",
-                "C:\\Program Files (x86)\\Git\\cmd\\git.exe",
-            ];
-            let mut found = false;
-            for p in &paths {
-                if PathBuf::from(p).exists() {
-                    git_exe = PathBuf::from(p);
-                    found = true;
-                    break;
-                }
-            }
-            
-            if !found {
-                if let Some(appdata) = std::env::var_os("LOCALAPPDATA") {
-                    let user_git = PathBuf::from(appdata)
-                        .join("Programs")
-                        .join("Git")
-                        .join("cmd")
-                        .join("git.exe");
-                    if user_git.exists() {
-                        git_exe = user_git;
-                        found = true;
-                    }
-                }
-            }
-            
-            if !found {
-                if let Some(userprofile) = std::env::var_os("USERPROFILE") {
-                    let user_git = PathBuf::from(userprofile)
-                        .join("AppData")
-                        .join("Local")
-                        .join("Programs")
-                        .join("Git")
-                        .join("cmd")
-                        .join("git.exe");
-                    if user_git.exists() {
-                        git_exe = user_git;
-                    }
-                }
-            }
-            
-            let mut cmd = Command::new(git_exe);
-            cmd.args(args).current_dir(&repo_path);
-            cmd.output().map_err(|e| format!("Git-Befehl konnte nicht gestartet werden: {}", e))?
+            let mut fallback_cmd = Command::new("git");
+            fallback_cmd.args(args).current_dir(repo_path);
+            fallback_cmd.output().map_err(|e| format!("Git-Befehl konnte nicht gestartet werden: {}", e))?
         }
     };
     
@@ -101,6 +94,11 @@ fn run_git_command(args: &[&str]) -> Result<String, String> {
         return Err(if err.is_empty() { "Git-Befehl fehlgeschlagen.".to_string() } else { err });
     }
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
+fn run_git_command(args: &[&str]) -> Result<String, String> {
+    let repo_path = find_git_root().ok_or_else(|| "Kein Git-Repository gefunden.".to_string())?;
+    run_git_in_dir(&repo_path, args)
 }
 
 #[tauri::command]
@@ -155,6 +153,185 @@ fn get_git_log() -> Result<Vec<GitCommit>, String> {
         }
     }
     Ok(commits)
+}
+
+// --- GIT SERVER MANIFEST SYNCHRONIZATION ---
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct GitSyncResult {
+    pub success: bool,
+    pub commit_hash: Option<String>,
+    pub output: String,
+    pub pushed: bool,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct GitPullResult {
+    pub success: bool,
+    pub updated: bool,
+    pub output: String,
+    pub manifest_content: Option<String>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct GitServerRepoStatus {
+    pub repo_path: String,
+    pub branch: String,
+    pub is_clean: bool,
+    pub has_remote: bool,
+    pub remote_url: Option<String>,
+    pub last_commit: Option<String>,
+    pub manifest_exists: bool,
+}
+
+fn resolve_repo_path(custom_path: Option<String>) -> Result<PathBuf, String> {
+    if let Some(path_str) = custom_path {
+        let trimmed = path_str.trim();
+        if !trimmed.is_empty() {
+            let path = PathBuf::from(trimmed);
+            if path.exists() && path.is_dir() {
+                return Ok(path);
+            } else {
+                return Err(format!("Repository-Pfad '{}' existiert nicht oder ist kein Verzeichnis.", trimmed));
+            }
+        }
+    }
+    find_git_root().ok_or_else(|| "Kein Git-Repository im aktuellen Workspace gefunden.".to_string())
+}
+
+#[tauri::command]
+fn git_server_get_status(repo_path: Option<String>) -> Result<GitServerRepoStatus, String> {
+    let dir = resolve_repo_path(repo_path)?;
+    let branch = run_git_in_dir(&dir, &["rev-parse", "--abbrev-ref", "HEAD"])
+        .unwrap_or_else(|_| "main".to_string());
+    
+    let status_raw = run_git_in_dir(&dir, &["status", "--porcelain"])
+        .unwrap_or_default();
+    let is_clean = status_raw.trim().is_empty();
+
+    let remote_res = run_git_in_dir(&dir, &["remote", "get-url", "origin"]);
+    let (has_remote, remote_url) = match remote_res {
+        Ok(url) if !url.trim().is_empty() => (true, Some(url.trim().to_string())),
+        _ => (false, None),
+    };
+
+    let last_commit = run_git_in_dir(&dir, &["log", "-1", "--pretty=format:%h - %s (%cr)"]).ok();
+    let manifest_exists = dir.join("zeno-server.json").exists();
+
+    Ok(GitServerRepoStatus {
+        repo_path: dir.to_string_lossy().to_string(),
+        branch,
+        is_clean,
+        has_remote,
+        remote_url,
+        last_commit,
+        manifest_exists,
+    })
+}
+
+#[tauri::command]
+fn git_server_commit_and_push(
+    repo_path: Option<String>,
+    manifest_content: String,
+    commit_message: Option<String>,
+    push: bool,
+) -> Result<GitSyncResult, String> {
+    let dir = resolve_repo_path(repo_path)?;
+    let manifest_path = dir.join("zeno-server.json");
+
+    // 1. Write the manifest content
+    fs::write(&manifest_path, &manifest_content)
+        .map_err(|e| format!("Fehler beim Schreiben von zeno-server.json: {}", e))?;
+
+    // 2. Git add
+    run_git_in_dir(&dir, &["add", "zeno-server.json"])
+        .map_err(|e| format!("git add fehlgeschlagen: {}", e))?;
+
+    // 3. Commit if changed
+    let status = run_git_in_dir(&dir, &["status", "--porcelain", "zeno-server.json"])
+        .unwrap_or_default();
+
+    let msg = commit_message.unwrap_or_else(|| "feat(server): update zeno-server.json manifest".to_string());
+
+    if !status.trim().is_empty() {
+        run_git_in_dir(&dir, &["commit", "-m", &msg])
+            .map_err(|e| format!("git commit fehlgeschlagen: {}", e))?;
+    }
+
+    let commit_hash = run_git_in_dir(&dir, &["rev-parse", "--short", "HEAD"]).ok();
+
+    // 4. Git push if requested
+    let (pushed, push_output) = if push {
+        let branch = run_git_in_dir(&dir, &["rev-parse", "--abbrev-ref", "HEAD"]).unwrap_or_else(|_| "main".to_string());
+        match run_git_in_dir(&dir, &["push", "origin", &branch]) {
+            Ok(out) => (true, if out.is_empty() { "Erfolgreich nach origin gepusht.".to_string() } else { out }),
+            Err(e1) => {
+                match run_git_in_dir(&dir, &["push"]) {
+                    Ok(out) => (true, if out.is_empty() { "Erfolgreich gepusht.".to_string() } else { out }),
+                    Err(_) => (false, format!("Lokal committet ({}), aber Remote-Push fehlgeschlagen: {}", commit_hash.as_deref().unwrap_or("?"), e1))
+                }
+            }
+        }
+    } else {
+        (false, "Lokal in Git gesichert (kein Remote-Push angefordert).".to_string())
+    };
+
+    Ok(GitSyncResult {
+        success: true,
+        commit_hash,
+        output: push_output,
+        pushed,
+    })
+}
+
+#[tauri::command]
+fn git_server_pull(repo_path: Option<String>) -> Result<GitPullResult, String> {
+    let dir = resolve_repo_path(repo_path)?;
+    let pull_res = run_git_in_dir(&dir, &["pull"]);
+    let manifest_path = dir.join("zeno-server.json");
+
+    let manifest_content = if manifest_path.exists() {
+        fs::read_to_string(&manifest_path).ok()
+    } else {
+        None
+    };
+
+    match pull_res {
+        Ok(out) => {
+            let updated = !out.contains("Already up to date") && !out.contains("Bereits aktuell");
+            Ok(GitPullResult {
+                success: true,
+                updated,
+                output: out,
+                manifest_content,
+            })
+        }
+        Err(err) => {
+            if manifest_content.is_some() {
+                Ok(GitPullResult {
+                    success: false,
+                    updated: false,
+                    output: format!("Git pull fehlgeschlagen ({}), lokales zeno-server.json Manifest wurde geladen.", err),
+                    manifest_content,
+                })
+            } else {
+                Err(format!("Git pull fehlgeschlagen und kein lokales Manifest vorhanden: {}", err))
+            }
+        }
+    }
+}
+
+#[tauri::command]
+fn git_server_read_manifest(repo_path: Option<String>) -> Result<String, String> {
+    let dir = resolve_repo_path(repo_path)?;
+    let manifest_path = dir.join("zeno-server.json");
+    if !manifest_path.exists() {
+        return Err("Keine zeno-server.json im Repository-Ordner gefunden.".to_string());
+    }
+    fs::read_to_string(manifest_path)
+        .map_err(|e| format!("Fehler beim Lesen der zeno-server.json: {}", e))
 }
 
 #[tauri::command]
@@ -490,6 +667,10 @@ pub fn run() {
             greet,
             get_git_status,
             get_git_log,
+            git_server_get_status,
+            git_server_commit_and_push,
+            git_server_pull,
+            git_server_read_manifest,
             list_workspace_files,
             read_workspace_file,
             write_workspace_file,
