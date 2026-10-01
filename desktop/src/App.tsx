@@ -20,7 +20,6 @@ import {
   UserIdentity
 } from "./types";
 import {
-  getOrRegisterUserIdentity,
   getActiveIdentityFromDb
 } from "./services/cryptoService";
 import { executeZeroKnowledgeAuth, syncEncryptedVaultToServer } from "./services/backendService";
@@ -284,13 +283,15 @@ function ZenoMainApp() {
         if (mockProfiles.CipherNaut) {
           mockProfiles.CipherNaut.fingerprint = activeIdn.fingerprint;
         }
+        // If the active identity does NOT have a 12-word seed phrase (legacy mock key), launch the Sovereign Onboarding Wizard!
+        if (!activeIdn.mnemonic) {
+          setSovereignModalTab("create");
+          setIsSovereignModalOpen(true);
+        }
       } else {
-        getOrRegisterUserIdentity().then((identity) => {
-          setUserIdentity(identity);
-          if (mockProfiles.CipherNaut) {
-            mockProfiles.CipherNaut.fingerprint = identity.fingerprint;
-          }
-        });
+        // No identity in DB/Storage: launch the Sovereign Onboarding Wizard!
+        setSovereignModalTab("create");
+        setIsSovereignModalOpen(true);
       }
     });
   }, []);
@@ -1600,6 +1601,10 @@ function ZenoMainApp() {
         sessionToken={sessionToken}
         onAuthBackend={handleAuthenticateWithBackend}
         onSyncVaultBackend={handleSyncVaultBackend}
+        onOpenSovereignModal={(tab) => {
+          setSovereignModalTab(tab || "manage");
+          setIsSovereignModalOpen(true);
+        }}
         showToast={showToast}
       />
 

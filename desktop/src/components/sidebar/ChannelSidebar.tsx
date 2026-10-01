@@ -247,6 +247,14 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
           </div>
         </div>
         <div className="user-controls">
+          <button 
+            className="user-control-btn" 
+            onClick={() => onOpenSovereignModal && onOpenSovereignModal()} 
+            title="Souveränes Konto & 12-Wort-Phrase verwalten"
+            style={{ color: "#00FF87" }}
+          >
+            <Icon icon="mage:shield" />
+          </button>
           <button className="user-control-btn" onClick={handleThemeToggle} title="Design umschalten">
             <Icon icon={theme === "light" ? "mage:moon" : "mage:sun"} />
           </button>

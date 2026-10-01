@@ -66,6 +66,7 @@ interface SettingsModalProps {
   onRegenerateIdentity?: () => void;
   onAuthBackend?: () => void;
   onSyncVaultBackend?: () => void;
+  onOpenSovereignModal?: (tab?: "create" | "restore" | "manage") => void;
   showToast: (msg: string) => void;
 }
 
@@ -130,6 +131,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onRegenerateIdentity,
   onAuthBackend,
   onSyncVaultBackend,
+  onOpenSovereignModal,
   showToast
 }) => {
   const avatarFileInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -147,6 +149,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             onClick={() => setActiveSettingsTab("profile")}
           >
             Kryptografisches Profil
+          </button>
+          <button 
+            className={`settings-nav-item ${activeSettingsTab === "identity" ? "active" : ""}`} 
+            onClick={() => setActiveSettingsTab("identity")}
+            style={{ display: "flex", alignItems: "center", gap: "8px" }}
+          >
+            <Icon icon="mage:shield" style={{ color: "#00FF87" }} />
+            Souveränes Konto &amp; 12 Wörter
           </button>
           <button 
             className={`settings-nav-item ${activeSettingsTab === "appearance" ? "active" : ""}`} 
@@ -797,14 +807,161 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             )}
 
+            {/* Tab: Sovereign Identity & 12 Words */}
+            {activeSettingsTab === "identity" && (
+              <div className="settings-tab-content" id="tab-identity">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                  <div>
+                    <h3 style={{ margin: 0 }}>Souveräne Identität &amp; 12-Wort-Schlüssel (BIP-39)</h3>
+                    <p className="settings-help-text" style={{ marginTop: "4px" }}>
+                      Zeno verwendet dezentrale, kryptografische Schlüssel (ECDSA P-256) anstelle von E-Mail-Adressen oder Passwörtern.
+                    </p>
+                  </div>
+                  <span style={{ fontSize: "11px", backgroundColor: "rgba(0,255,135,0.15)", color: "#00FF87", padding: "4px 8px", borderRadius: "6px", fontWeight: "700" }}>
+                    ECDSA P-256 (Rust Core)
+                  </span>
+                </div>
+
+                {/* Identity Status Card */}
+                <div style={{ backgroundColor: "#0D0E12", border: "1px solid #1E222D", borderRadius: "12px", padding: "16px", marginBottom: "16px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <div style={{ width: "42px", height: "42px", borderRadius: "10px", backgroundColor: "#00FF87", color: "#08090C", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "800", fontSize: "18px" }}>
+                        {(userName || "C").charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: "14px", fontWeight: "700", color: "#FFF" }}>{userName || "CipherNaut"}</div>
+                        <div style={{ fontSize: "11px", color: "#94A3B8", fontFamily: "monospace" }}>
+                          AIN: {userIdentity?.ain || "ZENO-8F3A-9B21-44E2"}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(userIdentity?.ain || "");
+                        showToast("AIN kopiert! 📋");
+                      }}
+                      style={{ background: "#161922", border: "1px solid #262933", color: "#E2E8F0", padding: "6px 10px", borderRadius: "6px", fontSize: "11px", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px" }}
+                    >
+                      <Icon icon="mage:copy" /> AIN kopieren
+                    </button>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", fontSize: "11px", backgroundColor: "#161922", padding: "10px", borderRadius: "8px", border: "1px solid #262933" }}>
+                    <div>
+                      <span style={{ color: "#64748B", display: "block" }}>SHA-256 FINGERPRINT:</span>
+                      <span style={{ color: "#E2E8F0", fontFamily: "monospace" }}>{userIdentity?.fingerprint || "SHA256:8F:3A:9B:21:44:E2:7C:10"}</span>
+                    </div>
+                    <div>
+                      <span style={{ color: "#64748B", display: "block" }}>12-WORT BACKUP STATUS:</span>
+                      {userIdentity?.mnemonic ? (
+                        <span style={{ color: "#00FF87", fontWeight: "600" }}>✅ BIP-39 Seedphrase aktiv</span>
+                      ) : (
+                        <span style={{ color: "#F59E0B", fontWeight: "600" }}>⚠️ Veraltetes Profil (Kein 12-Wort-Seed)</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Warning if no 12-word seed */}
+                {!userIdentity?.mnemonic && (
+                  <div style={{ backgroundColor: "rgba(245, 158, 11, 0.1)", border: "1px solid rgba(245, 158, 11, 0.3)", borderRadius: "10px", padding: "14px", marginBottom: "16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <Icon icon="mage:alert" style={{ color: "#F59E0B", fontSize: "24px" }} />
+                      <div>
+                        <div style={{ fontSize: "12px", fontWeight: "700", color: "#F59E0B" }}>Konto noch nicht gesichert!</div>
+                        <div style={{ fontSize: "11px", color: "#CBD5E1" }}>
+                          Du nutzt ein temporäres Profil ohne 12-Wort-Wiederherstellungsphrase. Erstelle jetzt deine unzerstörbare Identität.
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onOpenSovereignModal && onOpenSovereignModal("create")}
+                      style={{ backgroundColor: "#00FF87", color: "#08090C", border: "none", borderRadius: "6px", padding: "8px 12px", fontWeight: "700", fontSize: "12px", cursor: "pointer", whiteSpace: "nowrap" }}
+                    >
+                      ⚡ 12 Wörter generieren
+                    </button>
+                  </div>
+                )}
+
+                {/* Primary Actions */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
+                  <div style={{ backgroundColor: "#0D0E12", border: "1px solid #1E222D", borderRadius: "10px", padding: "14px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                    <div>
+                      <div style={{ fontSize: "13px", fontWeight: "700", color: "#FFF", marginBottom: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
+                        <Icon icon="mage:user-plus" style={{ color: "#00FF87" }} />
+                        Neues Souveränes Konto erstellen
+                      </div>
+                      <p style={{ fontSize: "11px", color: "#94A3B8", margin: "0 0 12px 0", lineHeight: "1.4" }}>
+                        Generiert ein brandneues ECDSA P-256 Schlüsselpaar mit 12 BIP-39 Wörtern und speichert es in SQLite.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="settings-btn"
+                      onClick={() => onOpenSovereignModal && onOpenSovereignModal("create")}
+                      style={{ backgroundColor: "#00FF87", color: "#08090C", fontWeight: "700" }}
+                    >
+                      Assistent öffnen
+                    </button>
+                  </div>
+
+                  <div style={{ backgroundColor: "#0D0E12", border: "1px solid #1E222D", borderRadius: "10px", padding: "14px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                    <div>
+                      <div style={{ fontSize: "13px", fontWeight: "700", color: "#FFF", marginBottom: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
+                        <Icon icon="mage:refresh" style={{ color: "#38BDF8" }} />
+                        Konto wiederherstellen (12 Wörter)
+                      </div>
+                      <p style={{ fontSize: "11px", color: "#94A3B8", margin: "0 0 12px 0", lineHeight: "1.4" }}>
+                        Stelle eine bestehende AIN auf diesem Gerät mathematisch exakt wieder her.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="settings-btn"
+                      onClick={() => onOpenSovereignModal && onOpenSovereignModal("restore")}
+                      style={{ backgroundColor: "#161922", border: "1px solid #38BDF8", color: "#38BDF8", fontWeight: "700" }}
+                    >
+                      12 Wörter eingeben
+                    </button>
+                  </div>
+                </div>
+
+                {/* Manage All Identities */}
+                <div style={{ backgroundColor: "#0D0E12", border: "1px solid #1E222D", borderRadius: "10px", padding: "14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: "12px", fontWeight: "700", color: "#FFF" }}>Lokale Identitäten verwalten (Multi-Identity)</div>
+                    <div style={{ fontSize: "11px", color: "#94A3B8" }}>Wechsle zwischen Profilen, sichere Paper-Backups oder exportiere Keys.</div>
+                  </div>
+                  <button
+                    type="button"
+                    className="settings-btn"
+                    onClick={() => onOpenSovereignModal && onOpenSovereignModal("manage")}
+                    style={{ backgroundColor: "#161922", border: "1px solid #262933", color: "#E2E8F0" }}
+                  >
+                    Identitäten anzeigen
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Tab: Security */}
             {activeSettingsTab === "security" && (
               <div className="settings-tab-content" id="tab-security">
-                <h3>Sicherheit & Recovery</h3>
+                <h3>Sicherheit &amp; Recovery</h3>
                 <div className="settings-form-group">
-                  <label>Backup-Key (Seed Phrase)</label>
+                  <label>Backup-Key (12-Wort Seed Phrase)</label>
                   <p className="settings-help-text">Sichere deine 12-Wort-Seed-Phrase, um deine Identität auf neuen Geräten wiederherzustellen.</p>
-                  <button className="settings-btn" onClick={() => showToast("Seed Phrase: apple banana cherry ...")}>Backup-Key anzeigen</button>
+                  <button
+                    className="settings-btn"
+                    onClick={() => onOpenSovereignModal ? onOpenSovereignModal("manage") : showToast("Souveränes Konto öffnen")}
+                    style={{ backgroundColor: "#00FF87", color: "#08090C", fontWeight: "700" }}
+                  >
+                    <Icon icon="mage:shield" style={{ marginRight: "6px" }} />
+                    Souveräne Identität &amp; Backup-Keys verwalten
+                  </button>
                 </div>
                 <div className="settings-form-group">
                   <label>Social Recovery (Treuhänder)</label>
