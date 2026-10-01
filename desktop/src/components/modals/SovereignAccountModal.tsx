@@ -44,7 +44,68 @@ export const SovereignAccountModal: React.FC<SovereignAccountModalProps> = ({
 
   // Manage State
   const [savedIdentities, setSavedIdentities] = useState<DbIdentityRecord[]>([]);
-  const [showSeedAin, setShowSeedAin] = useState<string | null>(null);
+
+  // Seed Security, Passcode & Auto-Lock State
+  const [passcodePromptAin, setPasscodePromptAin] = useState<string | null>(null);
+  const [passcodeInput, setPasscodeInput] = useState<string>("");
+  const [passcodeError, setPasscodeError] = useState<string | null>(null);
+  const [unlockedSeedAin, setUnlockedSeedAin] = useState<string | null>(null);
+  const [isSeedBlurred, setIsSeedBlurred] = useState<boolean>(true);
+  const [autoLockSeconds, setAutoLockSeconds] = useState<number>(15);
+
+  const hasStoredPasscode = Boolean(localStorage.getItem("zeno_vault_device_passcode"));
+
+  // Auto-lock countdown timer
+  useEffect(() => {
+    if (!unlockedSeedAin) return;
+
+    const timer = setInterval(() => {
+      setAutoLockSeconds((prev) => {
+        if (prev <= 1) {
+          setUnlockedSeedAin(null);
+          setIsSeedBlurred(true);
+          showToast("Master-Seed aus Sicherheitsgründen wieder gesperrt 🔒");
+          return 15;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [unlockedSeedAin, showToast]);
+
+  const hashPasscode = async (passcode: string): Promise<string> => {
+    const enc = new TextEncoder();
+    const hashBuf = await window.crypto.subtle.digest("SHA-256", enc.encode(passcode));
+    return Array.from(new Uint8Array(hashBuf))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  };
+
+  const handleVerifyPasscode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = passcodeInput.trim();
+    if (!clean) return;
+
+    const storedHash = localStorage.getItem("zeno_vault_device_passcode");
+    const inputHash = await hashPasscode(clean);
+
+    if (!storedHash) {
+      localStorage.setItem("zeno_vault_device_passcode", inputHash);
+      showToast("Sicherheits-PIN erfolgreich festgelegt! 🛡️");
+    } else if (storedHash !== inputHash) {
+      setPasscodeError("Falsche PIN / Passcode! Zugriff auf den Seed verweigert.");
+      return;
+    }
+
+    setUnlockedSeedAin(passcodePromptAin);
+    setPasscodePromptAin(null);
+    setPasscodeInput("");
+    setPasscodeError(null);
+    setIsSeedBlurred(true);
+    setAutoLockSeconds(15);
+    showToast("Master-Seed entsperrt. Klicke zum Aufdecken 👁️ (Sperrt in 15s)");
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -54,6 +115,9 @@ export const SovereignAccountModal: React.FC<SovereignAccountModalProps> = ({
       setCreateStep(1);
       setGeneratedIdentity(null);
       setHasConfirmedBackup(false);
+      setUnlockedSeedAin(null);
+      setPasscodePromptAin(null);
+      setIsSeedBlurred(true);
       loadIdentities();
     }
   }, [isOpen, initialTab]);
@@ -777,10 +841,19 @@ SICHERHEITSHINWEISE:
                         {idn.mnemonic && (
                           <button
                             type="button"
-                            onClick={() => setShowSeedAin(showSeedAin === idn.ain ? null : idn.ain)}
+                            onClick={() => {
+                              if (unlockedSeedAin === idn.ain) {
+                                setUnlockedSeedAin(null);
+                                setIsSeedBlurred(true);
+                              } else {
+                                setPasscodePromptAin(idn.ain);
+                                setPasscodeInput("");
+                                setPasscodeError(null);
+                              }
+                            }}
                             style={{
-                              backgroundColor: "#161922",
-                              border: "1px solid #262933",
+                              backgroundColor: unlockedSeedAin === idn.ain ? "rgba(245, 158, 11, 0.2)" : "#161922",
+                              border: unlockedSeedAin === idn.ain ? "1px solid #F59E0B" : "1px solid #262933",
                               color: "#F59E0B",
                               borderRadius: "6px",
                               padding: "4px 8px",
@@ -790,9 +863,10 @@ SICHERHEITSHINWEISE:
                               alignItems: "center",
                               gap: "4px"
                             }}
-                            title="12 Wörter anzeigen"
+                            title={unlockedSeedAin === idn.ain ? "Master-Seed sofort sperren" : "Master-Seed mit PIN entsperren"}
                           >
-                            <Icon icon="mage:key" /> Seed
+                            <Icon icon={unlockedSeedAin === idn.ain ? "mage:lock" : "mage:key"} />
+                            {unlockedSeedAin === idn.ain ? "Sperren" : "Seed"}
                           </button>
                         )}
                         {!isActive && (
@@ -816,29 +890,201 @@ SICHERHEITSHINWEISE:
                       </div>
                     </div>
 
-                    {/* Revealer for Seed Phrase */}
-                    {showSeedAin === idn.ain && idn.mnemonic && (
-                      <div style={{ backgroundColor: "#090A0D", border: "1px solid #F59E0B", borderRadius: "6px", padding: "8px", marginTop: "4px" }}>
-                        <div style={{ fontSize: "10px", color: "#F59E0B", fontWeight: "600", marginBottom: "4px" }}>
-                          12-Wort Wiederherstellungsphrase:
+                    {/* Protected Revealer for Seed Phrase */}
+                    {unlockedSeedAin === idn.ain && idn.mnemonic && (
+                      <div
+                        style={{
+                          backgroundColor: "#0B0C10",
+                          border: "1px solid #F59E0B",
+                          borderRadius: "8px",
+                          padding: "12px",
+                          marginTop: "6px",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "10px"
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", color: "#F59E0B", fontWeight: "700" }}>
+                            <Icon icon="mage:shield-exclamation" /> MASTER-SEED ENTSPERRT
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <span
+                              style={{
+                                fontSize: "11px",
+                                fontFamily: "monospace",
+                                color: autoLockSeconds <= 5 ? "#EF4444" : "#F59E0B",
+                                backgroundColor: "rgba(245, 158, 11, 0.15)",
+                                padding: "2px 6px",
+                                borderRadius: "4px",
+                                fontWeight: "700"
+                              }}
+                            >
+                              ⏱️ {autoLockSeconds}s
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setUnlockedSeedAin(null);
+                                setIsSeedBlurred(true);
+                              }}
+                              style={{
+                                background: "#161922",
+                                border: "1px solid #262933",
+                                color: "#94A3B8",
+                                padding: "2px 6px",
+                                borderRadius: "4px",
+                                fontSize: "10px",
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px"
+                              }}
+                            >
+                              <Icon icon="mage:lock" /> Sperren
+                            </button>
+                          </div>
                         </div>
-                        <div style={{ fontSize: "11px", color: "#FFF", fontFamily: "monospace", wordBreak: "break-word" }}>
-                          {idn.mnemonic}
+
+                        {/* Streamer Warning */}
+                        <div style={{ fontSize: "10px", color: "#94A3B8", backgroundColor: "#12141A", padding: "6px 8px", borderRadius: "6px", border: "1px dashed #262933" }}>
+                          🛡️ <strong>Schutz aktiv:</strong> Die Wörter sind standardmäßig weichgezeichnet (Blur), um Leaks in Streams, Discord oder vor Schulterblicken zu verhindern.
                         </div>
-                        <div style={{ display: "flex", gap: "6px", marginTop: "6px" }}>
+
+                        {/* Words Tile Container with Blur */}
+                        <div
+                          onClick={() => setIsSeedBlurred(!isSeedBlurred)}
+                          style={{
+                            position: "relative",
+                            cursor: "pointer",
+                            borderRadius: "6px",
+                            overflow: "hidden",
+                            backgroundColor: "#060709",
+                            padding: "10px",
+                            border: "1px solid #1E222D"
+                          }}
+                          title={isSeedBlurred ? "Klicken zum Enthüllen" : "Klicken zum Verdecken"}
+                        >
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "repeat(3, 1fr)",
+                              gap: "6px",
+                              filter: isSeedBlurred ? "blur(9px)" : "none",
+                              userSelect: isSeedBlurred ? "none" : "text",
+                              transition: "filter 0.2s ease"
+                            }}
+                          >
+                            {idn.mnemonic.split(" ").map((w, i) => (
+                              <div
+                                key={i}
+                                style={{
+                                  backgroundColor: "#12141C",
+                                  border: "1px solid #1F2430",
+                                  borderRadius: "4px",
+                                  padding: "4px 6px",
+                                  fontSize: "11px",
+                                  fontFamily: "monospace",
+                                  display: "flex",
+                                  gap: "6px"
+                                }}
+                              >
+                                <span style={{ color: "#64748B", fontSize: "10px" }}>{i + 1}.</span>
+                                <span style={{ color: "#00FF87", fontWeight: "600" }}>{w}</span>
+                              </div>
+                            ))}
+                          </div>
+
+                          {isSeedBlurred && (
+                            <div
+                              style={{
+                                position: "absolute",
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                backgroundColor: "rgba(11, 12, 16, 0.7)",
+                                backdropFilter: "blur(2px)",
+                                gap: "4px"
+                              }}
+                            >
+                              <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#F59E0B", fontWeight: "700", fontSize: "12px" }}>
+                                <Icon icon="mage:eye" /> KLICKEN ZUM ENTHÜLLEN
+                              </div>
+                              <span style={{ fontSize: "10px", color: "#94A3B8" }}>Klicke hier, um den Seed sichtbar zu machen</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Action buttons */}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "6px" }}>
+                          <div style={{ display: "flex", gap: "6px" }}>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCopyMnemonic(idn.mnemonic!);
+                              }}
+                              style={{
+                                background: "#161922",
+                                border: "1px solid #262933",
+                                color: "#E2E8F0",
+                                padding: "4px 8px",
+                                borderRadius: "4px",
+                                fontSize: "11px",
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px"
+                              }}
+                            >
+                              <Icon icon="mage:copy" /> Kopieren
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDownloadBackup(idn.mnemonic!, idn.ain);
+                              }}
+                              style={{
+                                background: "#161922",
+                                border: "1px solid #262933",
+                                color: "#38BDF8",
+                                padding: "4px 8px",
+                                borderRadius: "4px",
+                                fontSize: "11px",
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px"
+                              }}
+                            >
+                              <Icon icon="mage:download" /> Paper-Backup (Downloads)
+                            </button>
+                          </div>
                           <button
                             type="button"
-                            onClick={() => handleCopyMnemonic(idn.mnemonic!)}
-                            style={{ background: "#161922", border: "1px solid #262933", color: "#E2E8F0", padding: "2px 6px", borderRadius: "4px", fontSize: "10px", cursor: "pointer" }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsSeedBlurred(!isSeedBlurred);
+                            }}
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              color: "#94A3B8",
+                              fontSize: "11px",
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px"
+                            }}
                           >
-                            Kopieren
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDownloadBackup(idn.mnemonic!, idn.ain)}
-                            style={{ background: "#161922", border: "1px solid #262933", color: "#38BDF8", padding: "2px 6px", borderRadius: "4px", fontSize: "10px", cursor: "pointer" }}
-                          >
-                            Als Datei sichern
+                            <Icon icon={isSeedBlurred ? "mage:eye" : "mage:eye-off"} />
+                            {isSeedBlurred ? "Aufdecken" : "Verdecken"}
                           </button>
                         </div>
                       </div>
@@ -847,6 +1093,142 @@ SICHERHEITSHINWEISE:
                 );
               })
             )}
+          </div>
+        )}
+
+        {/* Passcode Verification Popup Modal */}
+        {passcodePromptAin && (
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(0, 0, 0, 0.75)",
+              backdropFilter: "blur(4px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 1100
+            }}
+            onClick={() => {
+              setPasscodePromptAin(null);
+              setPasscodeInput("");
+              setPasscodeError(null);
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                backgroundColor: "#12141A",
+                border: "1px solid #F59E0B",
+                borderRadius: "12px",
+                width: "90%",
+                maxWidth: "420px",
+                padding: "20px",
+                boxShadow: "0 10px 30px rgba(0,0,0,0.8)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "14px"
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", color: "#F59E0B" }}>
+                <Icon icon="mage:shield-exclamation" style={{ fontSize: "24px" }} />
+                <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "700", color: "#FFF" }}>
+                  {hasStoredPasscode ? "Sicherheits-PIN erforderlich" : "Geräte-Passcode einrichten"}
+                </h4>
+              </div>
+
+              <div
+                style={{
+                  backgroundColor: "rgba(239, 68, 68, 0.12)",
+                  border: "1px solid rgba(239, 68, 68, 0.35)",
+                  borderRadius: "8px",
+                  padding: "10px",
+                  fontSize: "11px",
+                  color: "#FCA5A5",
+                  lineHeight: "1.4"
+                }}
+              >
+                <strong>⚠️ WARNUNG:</strong> Stelle sicher, dass kein Bildschirminhalt geteilt wird (Discord, Twitch, Zoom, OBS) und niemand über deine Schulter blickt!
+              </div>
+
+              <p style={{ margin: 0, fontSize: "12px", color: "#94A3B8", lineHeight: "1.4" }}>
+                {hasStoredPasscode
+                  ? "Gib deine lokale Zeno-PIN ein, um den 12-Wort Master-Seed kurzzeitig zu entsperren:"
+                  : "Lege eine lokale PIN / ein Passwort fest. Diese schützt deinen kryptografischen Schlüssel auf diesem Computer vor unbefugtem Auslesen:"}
+              </p>
+
+              <form onSubmit={handleVerifyPasscode} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                <input
+                  type="password"
+                  autoFocus
+                  value={passcodeInput}
+                  onChange={(e) => {
+                    setPasscodeInput(e.target.value);
+                    setPasscodeError(null);
+                  }}
+                  placeholder="Passcode / PIN eingeben..."
+                  style={{
+                    backgroundColor: "#090A0D",
+                    border: passcodeError ? "1px solid #EF4444" : "1px solid #262933",
+                    borderRadius: "8px",
+                    padding: "10px 12px",
+                    color: "#FFF",
+                    fontSize: "14px",
+                    fontFamily: "monospace",
+                    outline: "none"
+                  }}
+                />
+
+                {passcodeError && (
+                  <div style={{ color: "#EF4444", fontSize: "11px", display: "flex", alignItems: "center", gap: "4px" }}>
+                    <Icon icon="mage:alert-circle" /> {passcodeError}
+                  </div>
+                )}
+
+                <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", marginTop: "4px" }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPasscodePromptAin(null);
+                      setPasscodeInput("");
+                      setPasscodeError(null);
+                    }}
+                    style={{
+                      backgroundColor: "#161922",
+                      border: "1px solid #262933",
+                      color: "#94A3B8",
+                      padding: "8px 14px",
+                      borderRadius: "6px",
+                      fontSize: "12px",
+                      cursor: "pointer"
+                    }}
+                  >
+                    Abbrechen
+                  </button>
+                  <button
+                    type="submit"
+                    style={{
+                      backgroundColor: "#F59E0B",
+                      border: "none",
+                      color: "#08090C",
+                      fontWeight: "700",
+                      padding: "8px 16px",
+                      borderRadius: "6px",
+                      fontSize: "12px",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px"
+                    }}
+                  >
+                    <Icon icon="mage:lock-open" /> {hasStoredPasscode ? "Entsperren" : "PIN speichern & anzeigen"}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
       </div>
