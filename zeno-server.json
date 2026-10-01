@@ -1,0 +1,53 @@
+{
+  "version": "1.0.0",
+  "serverId": "srv-firsttestserver-620073",
+  "name": "FirstTestServer",
+  "description": "Der erste testserver, der in Zeno jemals erstellt wurde.",
+  "icon": "🌐",
+  "iconLetter": "🌐",
+  "encrypted": true,
+  "ownerAin": "ZENO-D432-EAA1-8B01",
+  "createdAt": "2026-10-01T10:47:17.588Z",
+  "gitRepo": {
+    "provider": "github",
+    "repoUrl": "https://github.com/Goddev-Archer/FirstTestServer",
+    "branch": "main",
+    "manifestPath": "zeno-server.json",
+    "rawManifestUrl": "https://raw.githubusercontent.com/Goddev-Archer/FirstTestServer/main/zeno-server.json"
+  },
+  "relays": [
+    "wss://relay.damus.io",
+    "wss://nos.lol",
+    "wss://relay.snort.social"
+  ],
+  "categories": [
+    {
+      "name": "TEXTKANÄLE",
+      "type": "text",
+      "channels": [
+        {
+          "id": "chn-1790848688234-1",
+          "name": "allgemein"
+        },
+        {
+          "id": "chn-1790848688234-2",
+          "name": "dev-lounge"
+        },
+        {
+          "id": "chn-1790848688234-3",
+          "name": "git-updates"
+        }
+      ]
+    },
+    {
+      "name": "SPRACHKANÄLE",
+      "type": "voice",
+      "channels": [
+        {
+          "id": "chn-1790848688234-4",
+          "name": "Sprachkanal Alpha"
+        }
+      ]
+    }
+  ]
+}
