@@ -7,7 +7,7 @@
   "iconLetter": "🌐",
   "encrypted": true,
   "ownerAin": "ZENO-D432-EAA1-8B01",
-  "createdAt": "2026-10-01T10:47:17.588Z",
+  "createdAt": "2026-10-01T10:47:24.959Z",
   "gitRepo": {
     "provider": "github",
     "repoUrl": "https://github.com/Goddev-Archer/FirstTestServer",
@@ -42,12 +42,7 @@
     {
       "name": "SPRACHKANÄLE",
       "type": "voice",
-      "channels": [
-        {
-          "id": "chn-1790848688234-4",
-          "name": "Sprachkanal Alpha"
-        }
-      ]
+      "channels": []
     }
   ]
 }
