@@ -47,9 +47,15 @@ export const SovereignAccountModal: React.FC<SovereignAccountModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      if (initialTab) {
+        setActiveTab(initialTab);
+      }
+      setCreateStep(1);
+      setGeneratedIdentity(null);
+      setHasConfirmedBackup(false);
       loadIdentities();
     }
-  }, [isOpen]);
+  }, [isOpen, initialTab]);
 
   const loadIdentities = async () => {
     try {
@@ -223,7 +229,7 @@ SICHERHEITSHINWEISE:
 
   return (
     <div
-      className="modal-overlay"
+      className="modal-overlay open"
       onClick={onClose}
       style={{
         position: "fixed",
@@ -231,12 +237,15 @@ SICHERHEITSHINWEISE:
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.8)",
+        backgroundColor: "rgba(0, 0, 0, 0.85)",
         backdropFilter: "blur(12px)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        zIndex: 1100
+        zIndex: 1200,
+        opacity: 1,
+        visibility: "visible",
+        pointerEvents: "auto"
       }}
     >
       <div

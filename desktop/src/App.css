@@ -1085,15 +1085,15 @@ pre.code-block {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(2px);
+  background-color: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
+  z-index: 1100;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
   transition: opacity 0.2s ease, visibility 0.2s ease;
 }
 

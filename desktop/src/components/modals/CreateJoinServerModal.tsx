@@ -242,7 +242,7 @@ export const CreateJoinServerModal: React.FC<CreateJoinServerModalProps> = ({
 
   return (
     <div
-      className="modal-overlay"
+      className="modal-overlay open"
       onClick={onClose}
       style={{
         position: "fixed",
@@ -250,12 +250,15 @@ export const CreateJoinServerModal: React.FC<CreateJoinServerModalProps> = ({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.78)",
+        backgroundColor: "rgba(0, 0, 0, 0.8)",
         backdropFilter: "blur(10px)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        zIndex: 1000
+        zIndex: 1100,
+        opacity: 1,
+        visibility: "visible",
+        pointerEvents: "auto"
       }}
     >
       <div

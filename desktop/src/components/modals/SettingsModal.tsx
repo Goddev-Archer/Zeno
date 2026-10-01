@@ -878,7 +878,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
                     <button
                       type="button"
-                      onClick={() => onOpenSovereignModal && onOpenSovereignModal("create")}
+                      onClick={() => {
+                        showToast("Öffne Assistenten zur Kontoerstellung... 🛡️");
+                        onOpenSovereignModal && onOpenSovereignModal("create");
+                      }}
                       style={{ backgroundColor: "#00FF87", color: "#08090C", border: "none", borderRadius: "6px", padding: "8px 12px", fontWeight: "700", fontSize: "12px", cursor: "pointer", whiteSpace: "nowrap" }}
                     >
                       ⚡ 12 Wörter generieren
@@ -901,7 +904,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <button
                       type="button"
                       className="settings-btn"
-                      onClick={() => onOpenSovereignModal && onOpenSovereignModal("create")}
+                      onClick={() => {
+                        showToast("Öffne Konto-Assistenten... 🛡️");
+                        onOpenSovereignModal && onOpenSovereignModal("create");
+                      }}
                       style={{ backgroundColor: "#00FF87", color: "#08090C", fontWeight: "700" }}
                     >
                       Assistent öffnen
@@ -921,7 +927,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <button
                       type="button"
                       className="settings-btn"
-                      onClick={() => onOpenSovereignModal && onOpenSovereignModal("restore")}
+                      onClick={() => {
+                        showToast("Öffne Kontowiederherstellung... 🔑");
+                        onOpenSovereignModal && onOpenSovereignModal("restore");
+                      }}
                       style={{ backgroundColor: "#161922", border: "1px solid #38BDF8", color: "#38BDF8", fontWeight: "700" }}
                     >
                       12 Wörter eingeben
@@ -938,7 +947,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <button
                     type="button"
                     className="settings-btn"
-                    onClick={() => onOpenSovereignModal && onOpenSovereignModal("manage")}
+                    onClick={() => {
+                      showToast("Öffne Identitätsverwaltung... 🪪");
+                      onOpenSovereignModal && onOpenSovereignModal("manage");
+                    }}
                     style={{ backgroundColor: "#161922", border: "1px solid #262933", color: "#E2E8F0" }}
                   >
                     Identitäten anzeigen
