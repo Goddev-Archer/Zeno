@@ -7,7 +7,8 @@ import {
   saveIdentityToDb,
   getAllIdentitiesFromDb,
   setActiveIdentityInDb,
-  deleteIdentityFromDb
+  deleteIdentityFromDb,
+  exportNativeTextFile
 } from "../../services/cryptoService";
 
 interface SovereignAccountModalProps {
@@ -195,7 +196,7 @@ export const SovereignAccountModal: React.FC<SovereignAccountModalProps> = ({
   };
 
   // Download Seed Backup File
-  const handleDownloadBackup = (words: string, ain: string) => {
+  const handleDownloadBackup = async (words: string, ain: string) => {
     const text = `=====================================================
 ZENO SOUVERÄNER ACCOUNT-SCHLÜSSEL (BIP-39 BACKUP)
 =====================================================
@@ -213,16 +214,14 @@ SICHERHEITSHINWEISE:
 - Immun gegen EU-Client-Side-Scanning: Deine Schlüssel verlassen
   niemals dein lokales Gerät.
 =====================================================`;
-    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `zeno-backup-${ain.toLowerCase()}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    showToast("Paper-Backup erfolgreich heruntergeladen! 💾");
+    const filename = `zeno-backup-${ain.toLowerCase()}.txt`;
+    try {
+      const savedPath = await exportNativeTextFile(filename, text);
+      showToast(`Paper-Backup in Downloads gesichert! 💾 (${filename})`);
+      console.log(`[Backup] Gespeichert unter: ${savedPath}`);
+    } catch (e: any) {
+      showToast(`Fehler beim Speichern: ${e.message || e}`);
+    }
   };
 
   if (!isOpen) return null;

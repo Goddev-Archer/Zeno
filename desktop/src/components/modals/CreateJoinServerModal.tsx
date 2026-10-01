@@ -7,6 +7,7 @@ import {
   manifestToServer,
   generateGitCommands
 } from "../../utils/gitManifestHelper";
+import { exportNativeTextFile } from "../../services/cryptoService";
 
 interface CreateJoinServerModalProps {
   isOpen: boolean;
@@ -157,17 +158,13 @@ export const CreateJoinServerModal: React.FC<CreateJoinServerModalProps> = ({
   };
 
   // Handle Download Manifest JSON
-  const handleDownloadManifest = () => {
-    const blob = new Blob([manifestJsonString], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "zeno-server.json";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    showToast("zeno-server.json erfolgreich heruntergeladen! 💾");
+  const handleDownloadManifest = async () => {
+    try {
+      await exportNativeTextFile("zeno-server.json", manifestJsonString);
+      showToast("zeno-server.json in Downloads gespeichert! 💾");
+    } catch (e: any) {
+      showToast(`Fehler beim Herunterladen: ${e.message || e}`);
+    }
   };
 
   // Handle Create Server Submission

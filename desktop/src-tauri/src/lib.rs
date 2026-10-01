@@ -491,6 +491,31 @@ fn load_settings(app: tauri::AppHandle) -> Result<String, String> {
         .map_err(|e| format!("Fehler beim Laden der Einstellungen: {}", e))
 }
 
+#[tauri::command]
+fn export_text_file(app: tauri::AppHandle, filename: String, content: String) -> Result<String, String> {
+    let target_dir = app.path().download_dir()
+        .or_else(|_| app.path().desktop_dir())
+        .unwrap_or_else(|_| PathBuf::from("."));
+
+    if !target_dir.exists() {
+        let _ = fs::create_dir_all(&target_dir);
+    }
+
+    let target_path = target_dir.join(&filename);
+    fs::write(&target_path, &content)
+        .map_err(|e| format!("Fehler beim Schreiben der Datei '{}': {}", filename, e))?;
+
+    // On Windows, reveal the newly created file in Windows Explorer so the user immediately sees it!
+    #[cfg(target_os = "windows")]
+    {
+        let _ = Command::new("explorer")
+            .args(["/select,", &target_path.to_string_lossy()])
+            .spawn();
+    }
+
+    Ok(target_path.to_string_lossy().to_string())
+}
+
 // --- PHASE 1: CRYPTO COMMANDS ---
 #[tauri::command]
 fn crypto_generate_identity() -> Result<crypto::UserIdentity, String> {
@@ -677,6 +702,7 @@ pub fn run() {
             delete_workspace_file,
             load_settings,
             save_settings,
+            export_text_file,
             // Phase 1 Crypto
             crypto_generate_identity,
             crypto_generate_sovereign_identity,

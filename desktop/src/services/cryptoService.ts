@@ -413,3 +413,31 @@ export async function deleteIdentityFromDb(ain: string): Promise<void> {
     }
   }
 }
+
+/**
+ * Saves a text file directly to the user's Downloads or Desktop directory
+ * via native Rust Tauri IPC, and reveals it in the File Explorer.
+ * Falls back to standard HTML5 download in browser environments.
+ */
+export async function exportNativeTextFile(filename: string, content: string): Promise<string> {
+  if (isTauriEnvironment()) {
+    try {
+      const savedPath = await invoke<string>("export_text_file", { filename, content });
+      return savedPath;
+    } catch (e) {
+      console.warn("[Export] Nativer Export fehlgeschlagen, nutze Fallback:", e);
+    }
+  }
+
+  // Fallback for Web/Browser
+  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  return filename;
+}

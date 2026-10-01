@@ -7,6 +7,7 @@ import {
   pullServerManifest,
   serverToManifest
 } from "../../services/gitServerSyncService";
+import { exportNativeTextFile } from "../../services/cryptoService";
 
 interface GitSyncModalProps {
   isOpen: boolean;
@@ -133,17 +134,13 @@ export const GitSyncModal: React.FC<GitSyncModalProps> = ({
   };
 
   // Download Manifest
-  const handleDownloadManifest = () => {
-    const blob = new Blob([manifestJsonString], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "zeno-server.json";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    showToast("zeno-server.json heruntergeladen! 💾");
+  const handleDownloadManifest = async () => {
+    try {
+      await exportNativeTextFile("zeno-server.json", manifestJsonString);
+      showToast("zeno-server.json in Downloads gespeichert! 💾");
+    } catch (e: any) {
+      showToast(`Fehler beim Herunterladen: ${e.message || e}`);
+    }
   };
 
   return (
