@@ -30,6 +30,9 @@ interface ChatAreaProps {
   setIsEditorOpen: (open: boolean) => void;
   detectLanguage: (code: string) => string;
   showToast: (msg: string) => void;
+  connectedRelaysCount?: number;
+  relayTooltip?: string;
+  onShowRelayDetails?: () => void;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -58,7 +61,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   setEditorWorkflowStep,
   setIsEditorOpen,
   detectLanguage,
-  showToast
+  showToast,
+  connectedRelaysCount = 0,
+  relayTooltip = "Multi-Relay Transport Status",
+  onShowRelayDetails
 }) => {
   return (
     <main className="chat-area">
@@ -68,6 +74,37 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           <h2 className="chat-header-channel">{activeChannel?.name || "allgemein"}</h2>
           <span className="chat-header-divider" />
           <p className="chat-header-description">Kanal für {activeChannel?.name || "allgemein"} in {activeServer?.name || "Server"}</p>
+
+          {/* Live Multi-Relay Status Badge */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "2px 8px",
+              borderRadius: "12px",
+              backgroundColor: connectedRelaysCount > 0 ? "rgba(0, 255, 135, 0.12)" : "rgba(239, 68, 68, 0.12)",
+              border: `1px solid ${connectedRelaysCount > 0 ? "rgba(0, 255, 135, 0.3)" : "rgba(239, 68, 68, 0.3)"}`,
+              fontSize: "10px",
+              fontWeight: "600",
+              color: connectedRelaysCount > 0 ? "#00FF87" : "#EF4444",
+              marginLeft: "10px",
+              cursor: onShowRelayDetails ? "pointer" : "default"
+            }}
+            onClick={onShowRelayDetails}
+            title={relayTooltip}
+          >
+            <span
+              style={{
+                width: "6px",
+                height: "6px",
+                borderRadius: "50%",
+                backgroundColor: connectedRelaysCount > 0 ? "#00FF87" : "#EF4444",
+                boxShadow: connectedRelaysCount > 0 ? "0 0 6px #00FF87" : "none"
+              }}
+            />
+            <span>{connectedRelaysCount > 0 ? `${connectedRelaysCount} Relays aktiv` : "Relay verbindet..."}</span>
+          </div>
         </div>
         <div className="chat-header-actions">
           <button 

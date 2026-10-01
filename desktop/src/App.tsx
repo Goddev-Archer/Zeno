@@ -39,6 +39,7 @@ import {
   subscribeToVoiceState,
   subscribeToIncomingMessages
 } from "./services/voiceNetworkService";
+import { relayClient, RelayNodeStatus } from "./services/relayClientService";
 import { cleanUrl } from "./utils/urlCleaner";
 import {
   initialServers,
@@ -311,6 +312,7 @@ function ZenoMainApp() {
 
   // Zero-Knowledge Backend Auth & Sync State
   const [sessionToken, setSessionToken] = useState<string>("");
+  const [relayStatuses, setRelayStatuses] = useState<RelayNodeStatus[]>([]);
 
   const handleAuthenticateWithBackend = async () => {
     if (!userIdentity) {
@@ -443,11 +445,35 @@ function ZenoMainApp() {
       }));
     });
 
+    // 4. Subscribe to live incoming messages from Multi-Relay Transport
+    const unsubscribeRelayMsgs = relayClient.subscribeToMessages((channelId, msg) => {
+      setChatMessages((prev) => ({
+        ...prev,
+        [channelId]: [...(prev[channelId] || []), msg]
+      }));
+    });
+
+    const unsubscribeRelayStatus = relayClient.subscribeToRelayStatus((statuses) => {
+      setRelayStatuses(statuses);
+    });
+
     return () => {
       unlistenVoicePromise.then((unlisten) => unlisten && unlisten());
       unlistenMsgPromise.then((unlisten) => unlisten && unlisten());
+      unsubscribeRelayMsgs();
+      unsubscribeRelayStatus();
     };
   }, []);
+
+  // Connect to server-specific relays (or Nostr mesh defaults)
+  useEffect(() => {
+    if (activeServer) {
+      const serverRelays = (activeServer as any).relays && (activeServer as any).relays.length > 0
+        ? (activeServer as any).relays
+        : ["wss://relay.damus.io", "wss://nos.lol", "wss://relay.snort.social"];
+      relayClient.connectToRelays(serverRelays, activeServer.id, activeChannel?.id);
+    }
+  }, [activeServer?.id, activeChannel?.id]);
 
   // Load channel messages from Rust SQLite when activeChannel changes
   useEffect(() => {
@@ -849,9 +875,10 @@ function ZenoMainApp() {
       [activeChannel.id]: [...(prev[activeChannel.id] || []), newMsg]
     }));
 
-    // Rust Backend Core: Save to SQLite & Broadcast via Relay
+    // Rust Backend Core: Save to SQLite & Broadcast via Multi-Relay Transport
     saveMessageToDb(activeChannel.id, newMsg);
     broadcastNetworkMessage(activeChannel.id, newMsg.author, newMsg.text, newMsg.color, newMsg.time, newMsg.code);
+    relayClient.publishMessage(activeServer.id, activeChannel.id, newMsg.author, newMsg.text, userIdentity);
 
     setInputText("");
     setPendingAttachment(null);
@@ -1484,6 +1511,12 @@ function ZenoMainApp() {
           setIsEditorOpen={setIsEditorOpen}
           detectLanguage={detectLanguage}
           showToast={showToast}
+          connectedRelaysCount={relayStatuses.filter((r) => r.status === "connected").length}
+          relayTooltip={`Multi-Relay Transport Status:\n${relayStatuses.map((r) => `• ${r.url}: ${r.status}${r.pingMs ? ` (${r.pingMs}ms)` : ""}`).join("\n") || "Verbinde mit Standard-Relays..."}`}
+          onShowRelayDetails={() => {
+            const connected = relayStatuses.filter((r) => r.status === "connected");
+            showToast(`🛰️ ${connected.length}/${relayStatuses.length} Relays verbunden (${connected.map((r) => r.url.replace("wss://", "")).join(", ") || "Keine aktiv"})`);
+          }}
         />
       )}
 
