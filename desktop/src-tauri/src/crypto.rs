@@ -249,3 +249,63 @@ fn chrono_like_now() -> String {
     let duration = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default();
     format!("{}Z", duration.as_secs())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sovereign_identity_generation_format() {
+        let identity = generate_sovereign_identity().expect("Generation should succeed");
+        assert!(identity.ain.starts_with("ZENO-"));
+        assert!(identity.fingerprint.starts_with("SHA256:"));
+        let mnemonic = identity.mnemonic.expect("Mnemonic must be present");
+        let words: Vec<&str> = mnemonic.split_whitespace().collect();
+        assert_eq!(words.len(), 12, "Must be exactly 12 words");
+    }
+
+    #[test]
+    fn test_sovereign_identity_import_deterministic() {
+        let original = generate_sovereign_identity().expect("Generation should succeed");
+        let words = original.mnemonic.as_ref().unwrap();
+        
+        let restored = import_sovereign_identity(words).expect("Import should succeed");
+        assert_eq!(original.ain, restored.ain);
+        assert_eq!(original.public_key_hex, restored.public_key_hex);
+        assert_eq!(original.fingerprint, restored.fingerprint);
+    }
+
+    #[test]
+    fn test_signature_sign_and_verify() {
+        let identity = generate_sovereign_identity().expect("Generation should succeed");
+        let priv_hex = identity.private_key_encrypted_hex.as_ref().unwrap();
+        let pub_hex = &identity.public_key_hex;
+
+        let challenge = "Zeno-Auth-Challenge-Test-Payload-12345";
+        let sig_hex = sign_challenge(challenge, priv_hex).expect("Signing must succeed");
+
+        let is_valid = verify_signature(challenge, &sig_hex, pub_hex).expect("Verification must not error");
+        assert!(is_valid, "Valid signature must pass verification");
+
+        let tampered_challenge = "Zeno-Auth-Challenge-Tampered";
+        let is_valid_tampered = verify_signature(tampered_challenge, &sig_hex, pub_hex).expect("Verification must not error");
+        assert!(!is_valid_tampered, "Tampered challenge must fail verification");
+    }
+
+    #[test]
+    fn test_vault_encryption_and_decryption_roundtrip() {
+        let secret = "Ultra-Sensitive-Server-Secret-Mnemonic-Key";
+        let passcode = "CorrectHorseBatteryStaple#2026";
+
+        let vault = encrypt_vault(secret, passcode).expect("Encryption must succeed");
+        assert_eq!(vault.salt_hex.len(), 32); // 16 bytes = 32 hex chars
+        assert_eq!(vault.iv_hex.len(), 24);   // 12 bytes = 24 hex chars
+
+        let decrypted = decrypt_vault(&vault, passcode).expect("Decryption must succeed");
+        assert_eq!(decrypted, secret);
+
+        let wrong_passcode = "WrongPassword!";
+        let failed_decrypt = decrypt_vault(&vault, wrong_passcode);
+        assert!(failed_decrypt.is_err(), "Decryption with wrong password must fail");
+    }
+}

@@ -376,3 +376,100 @@ pub fn remove_identity(conn: &Connection, ain: &str) -> Result<(), String> {
         .map_err(|e| format!("SQLite Delete Error: {}", e))?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn setup_test_db() -> Connection {
+        let conn = Connection::open_in_memory().expect("In-memory SQLite DB open must succeed");
+        init_schema(&conn).expect("Table initialization must succeed");
+        conn
+    }
+
+    #[test]
+    fn test_identity_storage_and_active_switch() {
+        let conn = setup_test_db();
+
+        let id1 = DbIdentityRecord {
+            ain: "ZENO-1111-2222-3333".to_string(),
+            username: "Alice".to_string(),
+            public_key_hex: "PUB1".to_string(),
+            private_key_encrypted_hex: Some("PRIV1".to_string()),
+            mnemonic: Some("word one two three four five six seven eight nine ten eleven".to_string()),
+            fingerprint: "SHA256:11:22".to_string(),
+            is_active: true,
+            created_at: "2026-10-01Z".to_string(),
+        };
+
+        let id2 = DbIdentityRecord {
+            ain: "ZENO-4444-5555-6666".to_string(),
+            username: "Bob".to_string(),
+            public_key_hex: "PUB2".to_string(),
+            private_key_encrypted_hex: Some("PRIV2".to_string()),
+            mnemonic: Some("word apple banana cherry dog elephant fox grape horse igloo jaguar kangaroo".to_string()),
+            fingerprint: "SHA256:44:55".to_string(),
+            is_active: false,
+            created_at: "2026-10-01Z".to_string(),
+        };
+
+        insert_or_update_identity(&conn, &id1).expect("Insert Alice must succeed");
+        insert_or_update_identity(&conn, &id2).expect("Insert Bob must succeed");
+
+        let active = fetch_active_identity(&conn).expect("Fetch active must succeed");
+        assert!(active.is_some());
+        assert_eq!(active.unwrap().username, "Alice");
+
+        // Switch active to Bob
+        set_active_identity(&conn, &id2.ain).expect("Switch active identity must succeed");
+        let active_bob = fetch_active_identity(&conn).expect("Fetch active must succeed").unwrap();
+        assert_eq!(active_bob.username, "Bob");
+        assert_eq!(active_bob.ain, id2.ain);
+
+        let all = fetch_all_identities(&conn).expect("Fetch all must succeed");
+        assert_eq!(all.len(), 2);
+    }
+
+    #[test]
+    fn test_server_and_message_persistence() {
+        let conn = setup_test_db();
+
+        let srv = DbServerRecord {
+            id: "srv-alpha".to_string(),
+            name: "Zeno Core Alpha".to_string(),
+            icon_letter: "Z".to_string(),
+            icon: None,
+            description: Some("Decentralized Test Node".to_string()),
+            encrypted: true,
+            owner_ain: Some("ZENO-1111-2222-3333".to_string()),
+            manifest_url: None,
+            git_repo_json: None,
+            categories_json: "[]".to_string(),
+            created_at: "2026-10-01Z".to_string(),
+        };
+
+        insert_or_update_server(&conn, &srv).expect("Insert server must succeed");
+        let servers = fetch_all_servers(&conn).expect("Fetch servers must succeed");
+        assert_eq!(servers.len(), 1);
+        assert_eq!(servers[0].name, "Zeno Core Alpha");
+
+        let msg = DbMessageRecord {
+            id: None,
+            channel_id: "ch-general".to_string(),
+            author: "CipherNaut".to_string(),
+            text: "Hello Zeno Decentralized Mesh!".to_string(),
+            time: "14:00".to_string(),
+            color: "purple".to_string(),
+            code: None,
+            attachment_json: None,
+            created_at: "2026-10-01Z".to_string(),
+        };
+
+        let msg_id = insert_message(&conn, &msg).expect("Insert message must succeed");
+        assert!(msg_id > 0);
+
+        let fetched_msgs = fetch_channel_messages(&conn, "ch-general", 10, 0).expect("Fetch messages must succeed");
+        assert_eq!(fetched_msgs.len(), 1);
+        assert_eq!(fetched_msgs[0].text, "Hello Zeno Decentralized Mesh!");
+    }
+}
