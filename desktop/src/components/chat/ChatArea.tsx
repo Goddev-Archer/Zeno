@@ -69,7 +69,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   return (
     <main className="chat-area">
       <header className="chat-header">
-        <div className="chat-header-info">
+        <div className="chat-header-left chat-header-info">
           <span className="chat-header-icon"><Icon icon="mage:hashtag" /></span>
           <h2 className="chat-header-channel">{activeChannel?.name || "allgemein"}</h2>
           <span className="chat-header-divider" />
@@ -78,7 +78,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           {/* Live Multi-Relay Status Badge */}
           <div
             style={{
-              display: "flex",
+              display: "inline-flex",
               alignItems: "center",
               gap: "6px",
               padding: "2px 8px",
@@ -89,6 +89,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               fontWeight: "600",
               color: connectedRelaysCount > 0 ? "#00FF87" : "#EF4444",
               marginLeft: "10px",
+              flexShrink: 0,
               cursor: onShowRelayDetails ? "pointer" : "default"
             }}
             onClick={onShowRelayDetails}
