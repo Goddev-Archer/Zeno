@@ -95,6 +95,11 @@ export interface Server {
   manifestUrl?: string;
   encrypted?: boolean;
   ownerAin?: string;
+  relays?: string[];
+  bannerGradient?: string;
+  memberCount?: number;
+  isOfficial?: boolean;
+  tags?: string[];
 }
 
 
@@ -106,6 +111,7 @@ export interface MessageAttachment {
 }
 
 export interface Message {
+  id?: string;
   author: string;
   text: string;
   time: string;

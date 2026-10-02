@@ -1,4 +1,5 @@
 import React from "react";
+import { Icon } from "@iconify/react";
 import { Server } from "../../types";
 
 interface ServerSidebarProps {
@@ -9,6 +10,7 @@ interface ServerSidebarProps {
   onSelectServer: (server: Server) => void;
   onGoHome: () => void;
   onAddServerClick: () => void;
+  onOpenInstanceBrowser: () => void;
 }
 
 export const ServerSidebar: React.FC<ServerSidebarProps> = ({
@@ -18,7 +20,8 @@ export const ServerSidebar: React.FC<ServerSidebarProps> = ({
   animatingServerId,
   onSelectServer,
   onGoHome,
-  onAddServerClick
+  onAddServerClick,
+  onOpenInstanceBrowser
 }) => {
   return (
     <aside className="server-sidebar">
@@ -47,9 +50,17 @@ export const ServerSidebar: React.FC<ServerSidebarProps> = ({
           className="server-icon" 
           id="btn-add-server" 
           onClick={onAddServerClick} 
-          title="Server hinzufügen"
+          title="Server erstellen oder beitreten"
         >
           <span className="server-icon-letter">+</span>
+        </button>
+        <button 
+          className="server-icon" 
+          id="btn-discover-servers" 
+          onClick={onOpenInstanceBrowser} 
+          title="Instanzen-Browser / Öffentliche Server entdecken"
+        >
+          <Icon icon="mage:compass" style={{ fontSize: "20px" }} />
         </button>
       </nav>
     </aside>

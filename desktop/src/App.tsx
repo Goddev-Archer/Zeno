@@ -74,6 +74,7 @@ import { CustomWasmModal } from "./components/modals/CustomWasmModal";
 import { IdeProjectWizardModal, IdeNewItemModal } from "./components/modals/IdeModals";
 import { CreateChannelModal } from "./components/modals/CreateChannelModal";
 import { GitSyncModal } from "./components/modals/GitSyncModal";
+import { InstanceBrowserModal } from "./components/modals/InstanceBrowserModal";
 
 // Configure Monaco Environment to prevent dynamic worker fetch errors in Vite
 if (typeof window !== "undefined") {
@@ -216,6 +217,33 @@ function ZenoMainApp() {
   const [pendingAttachment, setPendingAttachment] = useState<MessageAttachment | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const chatAttachmentInputRef = useRef<HTMLInputElement | null>(null);
+  const [profiles, setProfiles] = useState<Record<string, Profile>>(() => ({ ...mockProfiles }));
+  const [isInstanceBrowserOpen, setIsInstanceBrowserOpen] = useState<boolean>(false);
+
+  // Deduplicating chat message appender to prevent reflection / echo loops
+  const appendUniqueChatMessage = (channelId: string, msg: Message) => {
+    setChatMessages((prev) => {
+      const channelMsgs = prev[channelId] || [];
+      // 1. Deduplicate by unique message ID
+      if (msg.id && channelMsgs.some((m) => m.id === msg.id)) {
+        return prev;
+      }
+      // 2. Content fingerprint deduplication (author + text + time) within recent window
+      const isDuplicate = channelMsgs.slice(-20).some((m) => {
+        const sameAuthor = m.author === msg.author;
+        const sameText = (m.text || "").trim() === (msg.text || "").trim();
+        const sameTime = m.time === msg.time;
+        return sameAuthor && sameText && sameTime;
+      });
+      if (isDuplicate) {
+        return prev;
+      }
+      return {
+        ...prev,
+        [channelId]: [...channelMsgs, msg]
+      };
+    });
+  };
 
   // Appearance & Design Tokens State
   const [theme, setTheme] = useState<"dark" | "light">("dark");
@@ -398,8 +426,9 @@ function ZenoMainApp() {
   }, []);
 
   useEffect(() => {
+    const currentName = userName || "CipherNaut";
     if (mockProfiles.CipherNaut) {
-      mockProfiles.CipherNaut.name = userName;
+      mockProfiles.CipherNaut.name = currentName;
       mockProfiles.CipherNaut.themePreset = userProfilePreset;
       mockProfiles.CipherNaut.customCss = userCustomCss;
       mockProfiles.CipherNaut.badge = userBadge;
@@ -416,10 +445,40 @@ function ZenoMainApp() {
       mockProfiles.CipherNaut.layoutOrder = userLayoutOrder;
       mockProfiles.CipherNaut.animationPreset = userAnimationPreset;
     }
+
+    setProfiles((prev) => ({
+      ...prev,
+      [currentName]: {
+        ...(prev[currentName] || {
+          name: currentName,
+          avatar: currentName[0].toUpperCase(),
+          avatarColor: "purple",
+          role: "Souveräner Nutzer",
+          fingerprint: userIdentity?.fingerprint || "ANON-0000"
+        }),
+        name: currentName,
+        themePreset: userProfilePreset,
+        customCss: userCustomCss,
+        badge: userBadge,
+        badgePosition: userBadgePosition,
+        status: `"${userStatusQuote}"`,
+        bannerGradient: userBannerGradient,
+        avatarImage: userAvatarImage,
+        avatarHoverEffect: userAvatarHoverEffect,
+        avatarEffectFrame: userAvatarEffectFrame,
+        badgeBgColor: userBadgeBgColor,
+        badgeTextColor: userBadgeTextColor,
+        cardBgColor: userCardBgColor,
+        cardHoverEffect: userCardHoverEffect,
+        layoutOrder: userLayoutOrder,
+        animationPreset: userAnimationPreset,
+        fingerprint: userIdentity?.fingerprint || (prev[currentName]?.fingerprint || "ANON-0000")
+      }
+    }));
   }, [
     userName, userProfilePreset, userCustomCss, userBadge, userBadgePosition, userStatusQuote, userBannerGradient,
     userAvatarImage, userAvatarHoverEffect, userAvatarEffectFrame, userBadgeBgColor, userBadgeTextColor,
-    userCardBgColor, userCardHoverEffect, userLayoutOrder, userAnimationPreset
+    userCardBgColor, userCardHoverEffect, userLayoutOrder, userAnimationPreset, userIdentity?.fingerprint
   ]);
 
   // --- RUST BACKEND CORE: DATABASE & VOICE/NETWORK EVENT SUBSCRIPTIONS ---
@@ -448,26 +507,35 @@ function ZenoMainApp() {
 
     // 3. Subscribe to incoming messages from Rust Relay
     const unlistenMsgPromise = subscribeToIncomingMessages((msg) => {
-      setChatMessages((prev) => ({
-        ...prev,
-        [msg.channelId]: [
-          ...(prev[msg.channelId] || []),
-          {
-            author: msg.author,
-            text: msg.text,
-            time: msg.time,
-            color: msg.color,
-            code: msg.code
-          }
-        ]
-      }));
+      // Discard our own broadcast echo
+      if (msg.author === (userName || "CipherNaut")) return;
+      appendUniqueChatMessage(msg.channelId, {
+        id: (msg as any).id,
+        author: msg.author,
+        text: msg.text,
+        time: msg.time,
+        color: msg.color,
+        code: msg.code
+      });
     });
 
     // 4. Subscribe to live incoming messages from Multi-Relay Transport
     const unsubscribeRelayMsgs = relayClient.subscribeToMessages((channelId, msg) => {
-      setChatMessages((prev) => ({
+      // Discard our own relay echo
+      if (msg.author === (userName || "CipherNaut")) return;
+      appendUniqueChatMessage(channelId, msg);
+    });
+
+    // 5. Subscribe to peer profile design updates from Multi-Relay Transport
+    const unsubscribeProfiles = relayClient.subscribeToProfiles((peerProfile) => {
+      if (!peerProfile || !peerProfile.name) return;
+      if (peerProfile.name === (userName || "CipherNaut")) return;
+      setProfiles((prev) => ({
         ...prev,
-        [channelId]: [...(prev[channelId] || []), msg]
+        [peerProfile.name]: {
+          ...(prev[peerProfile.name] || {}),
+          ...peerProfile
+        }
       }));
     });
 
@@ -480,9 +548,10 @@ function ZenoMainApp() {
       unlistenMsgPromise.then((unlisten) => unlisten && unlisten());
       unsubAudioLevel();
       unsubscribeRelayMsgs();
+      unsubscribeProfiles();
       unsubscribeRelayStatus();
     };
-  }, []);
+  }, [userName]);
 
   // Connect to server-specific relays (or Nostr mesh defaults)
   useEffect(() => {
@@ -528,7 +597,33 @@ function ZenoMainApp() {
       animationPreset: userAnimationPreset
     };
     localStorage.setItem("zeno_user_profile", JSON.stringify(config));
-    showToast("💾 Profil-Design & Custom-CSS dauerhaft gespeichert!");
+
+    // Broadcast updated profile across connected relays
+    const currentFullProfile: Profile = {
+      name: userName || "CipherNaut",
+      avatar: (userName || "CipherNaut")[0].toUpperCase(),
+      avatarColor: "purple",
+      role: "Souveräner Nutzer",
+      themePreset: userProfilePreset,
+      customCss: userCustomCss,
+      badge: userBadge,
+      badgePosition: userBadgePosition,
+      status: `"${userStatusQuote}"`,
+      bannerGradient: userBannerGradient,
+      avatarImage: userAvatarImage,
+      avatarHoverEffect: userAvatarHoverEffect,
+      avatarEffectFrame: userAvatarEffectFrame,
+      badgeBgColor: userBadgeBgColor,
+      badgeTextColor: userBadgeTextColor,
+      cardBgColor: userCardBgColor,
+      cardHoverEffect: userCardHoverEffect,
+      layoutOrder: userLayoutOrder,
+      animationPreset: userAnimationPreset,
+      fingerprint: userIdentity?.fingerprint || "ANON-0000"
+    };
+    relayClient.publishProfile(currentFullProfile, userIdentity);
+
+    showToast("💾 Profil-Design dauerhaft gespeichert & im Zeno-Netzwerk synchronisiert!");
   };
 
   // Code Editor Modal State
@@ -952,6 +1047,9 @@ function ZenoMainApp() {
         setIsCustomWasmModalOpen(false);
         setIsIdeProjectWizardOpen(false);
         setIsIdeNewItemModalOpen(false);
+        setIsCreateJoinServerModalOpen(false);
+        setIsInstanceBrowserOpen(false);
+        setIsMarketplaceOpen(false);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -1031,7 +1129,9 @@ function ZenoMainApp() {
     if (!inputText.trim() && !pendingAttachment) return;
 
     const time = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const msgId = `zeno-msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
     const newMsg: Message = {
+      id: msgId,
       author: userName || "CipherNaut",
       text: inputText,
       time,
@@ -1039,15 +1139,32 @@ function ZenoMainApp() {
       attachment: pendingAttachment || undefined
     };
 
-    setChatMessages((prev) => ({
-      ...prev,
-      [activeChannel.id]: [...(prev[activeChannel.id] || []), newMsg]
-    }));
+    appendUniqueChatMessage(activeChannel.id, newMsg);
+
+    // Profile metadata for peers to update in real-time
+    const myProfileData: Partial<Profile> = {
+      name: userName || "CipherNaut",
+      themePreset: userProfilePreset,
+      customCss: userCustomCss,
+      badge: userBadge,
+      badgePosition: userBadgePosition,
+      status: `"${userStatusQuote}"`,
+      bannerGradient: userBannerGradient,
+      avatarImage: userAvatarImage,
+      avatarHoverEffect: userAvatarHoverEffect,
+      avatarEffectFrame: userAvatarEffectFrame,
+      badgeBgColor: userBadgeBgColor,
+      badgeTextColor: userBadgeTextColor,
+      cardBgColor: userCardBgColor,
+      cardHoverEffect: userCardHoverEffect,
+      layoutOrder: userLayoutOrder,
+      animationPreset: userAnimationPreset
+    };
 
     // Rust Backend Core: Save to SQLite & Broadcast via Multi-Relay Transport
     saveMessageToDb(activeChannel.id, newMsg);
     broadcastNetworkMessage(activeChannel.id, newMsg.author, newMsg.text, newMsg.color, newMsg.time, newMsg.code);
-    relayClient.publishMessage(activeServer.id, activeChannel.id, newMsg.author, newMsg.text, userIdentity);
+    relayClient.publishMessage(activeServer.id, activeChannel.id, newMsg.author, newMsg.text, userIdentity, myProfileData, msgId);
 
     setInputText("");
     setPendingAttachment(null);
@@ -1510,6 +1627,7 @@ function ZenoMainApp() {
         onSelectServer={handleServerSelect}
         onGoHome={() => setActiveServerId("home")}
         onAddServerClick={() => setIsCreateJoinServerModalOpen(true)}
+        onOpenInstanceBrowser={() => setIsInstanceBrowserOpen(true)}
       />
 
       {/* 2. CHANNEL SIDEBAR */}
@@ -1524,7 +1642,7 @@ function ZenoMainApp() {
         theme={theme}
         muted={muted}
         deafened={deafened}
-        mockProfiles={mockProfiles}
+        mockProfiles={profiles}
         setHomeTab={setHomeTab}
         toggleCategory={toggleCategory}
         setActiveChannel={setActiveChannel}
@@ -1672,7 +1790,7 @@ function ZenoMainApp() {
           activeServer={activeServer}
           activeChannel={activeChannel}
           chatMessages={chatMessages}
-          mockProfiles={mockProfiles}
+          mockProfiles={profiles}
           isMembersOpen={isMembersOpen}
           inputText={inputText}
           showCommandSuggestions={showCommandSuggestions}
@@ -1708,7 +1826,7 @@ function ZenoMainApp() {
       <MembersSidebar
         activeServerId={activeServerId}
         isMembersOpen={isMembersOpen}
-        mockProfiles={mockProfiles}
+        mockProfiles={profiles}
         onSelectProfile={setSelectedUserProfile}
       />
 
@@ -1871,6 +1989,14 @@ function ZenoMainApp() {
         onServerJoined={handleServerJoined}
         showToast={showToast}
         userAin={userIdentity?.ain}
+      />
+
+      <InstanceBrowserModal
+        isOpen={isInstanceBrowserOpen}
+        onClose={() => setIsInstanceBrowserOpen(false)}
+        servers={servers}
+        onJoinServer={handleServerJoined}
+        showToast={showToast}
       />
 
       <SovereignAccountModal

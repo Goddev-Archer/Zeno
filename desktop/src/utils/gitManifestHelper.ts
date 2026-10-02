@@ -93,6 +93,7 @@ export function manifestToServer(manifest: ZenoServerManifest, rawManifestUrl?: 
     ownerAin: manifest.ownerAin,
     manifestUrl: rawManifestUrl,
     gitRepo: manifest.gitRepo,
+    relays: manifest.relays,
     categories: manifest.categories && manifest.categories.length > 0 ? manifest.categories : [
       {
         name: "TEXTKANÄLE",

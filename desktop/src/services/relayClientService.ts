@@ -1,8 +1,9 @@
 // --- ZENO LIVE RELAY CLIENT & E2EE TRANSPORT ENGINE ---
 // Resilient multi-relay WebSocket client supporting Nostr nodes (NIP-01),
-// Cloudflare Workers, and Tor .onion endpoints with zero-knowledge AES-256-GCM encryption.
+// Cloudflare Workers, and Tor .onion endpoints with zero-knowledge AES-256-GCM encryption,
+// message deduplication, and peer profile design synchronization.
 
-import { UserIdentity, Message } from "../types";
+import { UserIdentity, Message, Profile } from "../types";
 import { signAuthChallenge } from "./cryptoService";
 import { saveMessageToDb } from "./dbService";
 
@@ -25,10 +26,12 @@ export interface EncryptedRelayEnvelope {
   ciphertext: string;
   signature: string;
   publicKeyHex?: string;
+  profile?: Partial<Profile>;
 }
 
 type MessageListener = (channelId: string, msg: Message) => void;
 type StatusListener = (relays: RelayNodeStatus[]) => void;
+type ProfileListener = (profile: Profile) => void;
 
 class ZenoRelayClient {
   private sockets: Map<string, WebSocket> = new Map();
@@ -36,6 +39,7 @@ class ZenoRelayClient {
   private processedMessageIds: Set<string> = new Set();
   private messageListeners: Set<MessageListener> = new Set();
   private statusListeners: Set<StatusListener> = new Set();
+  private profileListeners: Set<ProfileListener> = new Set();
   private activeServerId: string | null = null;
   private activeChannelId: string | null = null;
   private reconnectTimers: Map<string, any> = new Map();
@@ -149,18 +153,18 @@ class ZenoRelayClient {
   }
 
   /**
-   * Nostr NIP-01 Subscription filter for ephemeral chat events
+   * Nostr NIP-01 Subscription filter for ephemeral chat & profile events
    */
   private subscribeNostrRelay(ws: WebSocket, url: string): void {
     if (ws.readyState !== WebSocket.OPEN) return;
     try {
       const subId = `zeno-sub-${Date.now()}`;
-      // NIP-01 REQ for kind 20000 (Ephemeral events)
+      // NIP-01 REQ for kind 20000 (Ephemeral events), kind 42 (Channel messages), kind 0 (Metadata/Profile)
       const reqMessage = JSON.stringify([
         "REQ",
         subId,
         {
-          kinds: [20000, 42],
+          kinds: [0, 20000, 42],
           limit: 50
         }
       ]);
@@ -187,6 +191,18 @@ class ZenoRelayClient {
       // 1. Nostr Protocol Handling: ["EVENT", subId, eventObject]
       if (Array.isArray(parsed) && parsed[0] === "EVENT" && parsed[2]) {
         const nostrEvent = parsed[2];
+
+        // Kind 0: Profile Metadata
+        if (nostrEvent.kind === 0) {
+          try {
+            const prof = JSON.parse(nostrEvent.content);
+            if (prof.name) {
+              this.dispatchProfile(prof);
+            }
+          } catch {}
+          return;
+        }
+
         const contentStr = nostrEvent.content;
         try {
           const envelope = JSON.parse(contentStr) as EncryptedRelayEnvelope;
@@ -203,9 +219,20 @@ class ZenoRelayClient {
         return;
       }
 
+      // 3. Profile Sync Event
+      if (parsed.type === "zeno_profile_sync" && parsed.profile) {
+        this.dispatchProfile(parsed.profile);
+        return;
+      }
+
       if (parsed.channelId && parsed.text) {
         // Direct unencrypted / test message
+        const directId = parsed.id || `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        if (this.processedMessageIds.has(directId)) return;
+        this.processedMessageIds.add(directId);
+
         this.dispatchMessage(parsed.channelId, {
+          id: directId,
           author: parsed.author || "RelayUser",
           text: parsed.text,
           time: parsed.time || new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -224,15 +251,27 @@ class ZenoRelayClient {
     this.processedMessageIds.add(envelope.id);
 
     // Keep deduplication set bounded
-    if (this.processedMessageIds.size > 2000) {
-      const firstEntries = Array.from(this.processedMessageIds).slice(0, 500);
+    if (this.processedMessageIds.size > 3000) {
+      const firstEntries = Array.from(this.processedMessageIds).slice(0, 1000);
       for (const id of firstEntries) this.processedMessageIds.delete(id);
     }
 
-    // In a full E2EE flow with AES-256-GCM, the ciphertext is decrypted locally:
+    // Process profile metadata if attached to envelope
+    if (envelope.profile) {
+      const fullProfile: Profile = {
+        name: envelope.author,
+        avatar: envelope.author.slice(0, 1).toUpperCase(),
+        avatarColor: "purple",
+        role: "Souveräner Nutzer",
+        fingerprint: envelope.authorAin,
+        ...envelope.profile
+      };
+      this.dispatchProfile(fullProfile);
+    }
+
+    // Unpack message ciphertext
     let plainText = envelope.ciphertext;
     try {
-      // If ciphertext is a JSON blob with { text }, unpack it
       const decryptedObj = JSON.parse(envelope.ciphertext);
       plainText = decryptedObj.text || envelope.ciphertext;
     } catch {
@@ -240,6 +279,7 @@ class ZenoRelayClient {
     }
 
     const msg: Message = {
+      id: envelope.id,
       author: envelope.author || "RelayUser",
       text: plainText,
       time: envelope.timestamp || new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -262,18 +302,20 @@ class ZenoRelayClient {
   }
 
   /**
-   * Broadcasts a message to all connected relays
+   * Broadcasts a message to all connected relays with optional profile card metadata
    */
   public async publishMessage(
     serverId?: string,
     channelId?: string,
     author: string = "RelayUser",
     text: string = "",
-    identity: UserIdentity | null = null
+    identity: UserIdentity | null = null,
+    profile?: Partial<Profile>,
+    msgIdOverride?: string
   ): Promise<boolean> {
     const targetServerId = serverId || this.activeServerId || "zeno-network";
     const targetChannelId = channelId || this.activeChannelId || "allgemein";
-    const msgId = `zeno-msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const msgId = msgIdOverride || `zeno-msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
     const time = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
     // Mark our own message as processed to prevent local echo duplicate
@@ -289,7 +331,8 @@ class ZenoRelayClient {
       timestamp: time,
       ciphertext: text,
       signature: "",
-      publicKeyHex: identity?.publicKeyHex
+      publicKeyHex: identity?.publicKeyHex,
+      profile
     };
 
     // Sign with user's private key if available
@@ -307,7 +350,6 @@ class ZenoRelayClient {
     for (const [url, ws] of this.sockets.entries()) {
       if (ws.readyState === WebSocket.OPEN) {
         try {
-          // If it's Damus / nos.lol / Nostr node:
           if (url.includes("nostr") || url.includes("damus") || url.includes("nos.lol") || url.includes("snort")) {
             const nostrEvent = [
               "EVENT",
@@ -322,7 +364,6 @@ class ZenoRelayClient {
             ];
             ws.send(JSON.stringify(nostrEvent));
           } else {
-            // Generic WebSocket or Cloudflare Worker format
             const payload = JSON.stringify({
               type: "zeno_message",
               envelope
@@ -343,9 +384,57 @@ class ZenoRelayClient {
     return successCount > 0;
   }
 
+  /**
+   * Broadcasts the user's customized profile design (colors, badge, banner, customCss)
+   */
+  public async publishProfile(
+    profile: Profile,
+    identity: UserIdentity | null = null
+  ): Promise<boolean> {
+    const payload = JSON.stringify({
+      type: "zeno_profile_sync",
+      profile,
+      authorAin: identity?.ain || profile.fingerprint,
+      timestamp: new Date().toISOString()
+    });
+
+    let successCount = 0;
+    for (const [url, ws] of this.sockets.entries()) {
+      if (ws.readyState === WebSocket.OPEN) {
+        try {
+          if (url.includes("nostr") || url.includes("damus") || url.includes("nos.lol") || url.includes("snort")) {
+            const nostrEvent = [
+              "EVENT",
+              {
+                id: `zeno-prof-${Date.now()}`,
+                pubkey: identity?.ain || "zeno-user",
+                created_at: Math.floor(Date.now() / 1000),
+                kind: 0, // Kind 0 = User Metadata
+                tags: [],
+                content: JSON.stringify(profile)
+              }
+            ];
+            ws.send(JSON.stringify(nostrEvent));
+          } else {
+            ws.send(payload);
+          }
+          successCount++;
+        } catch (e) {
+          console.warn("[Zeno Relay] Fehler beim Senden des Profils:", e);
+        }
+      }
+    }
+    return successCount > 0;
+  }
+
   public subscribeToMessages(listener: MessageListener): () => void {
     this.messageListeners.add(listener);
     return () => this.messageListeners.delete(listener);
+  }
+
+  public subscribeToProfiles(listener: ProfileListener): () => void {
+    this.profileListeners.add(listener);
+    return () => this.profileListeners.delete(listener);
   }
 
   public subscribeToRelayStatus(listener: StatusListener): () => void {
@@ -364,6 +453,16 @@ class ZenoRelayClient {
         listener(channelId, msg);
       } catch (e) {
         console.error("[Zeno Relay] Fehler im Message-Listener:", e);
+      }
+    }
+  }
+
+  private dispatchProfile(profile: Profile): void {
+    for (const listener of this.profileListeners) {
+      try {
+        listener(profile);
+      } catch (e) {
+        console.error("[Zeno Relay] Fehler im Profile-Listener:", e);
       }
     }
   }

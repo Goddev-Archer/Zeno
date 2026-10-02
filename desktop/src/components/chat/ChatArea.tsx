@@ -144,7 +144,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               className="message message-animate"
               style={{ "--idx": Math.min(i, 6) } as React.CSSProperties}
             >
-              <div className={`message-avatar ${msg.color}`}>{msg.author[0]}</div>
+              <div 
+                className={`message-avatar ${msg.color}`}
+                onClick={() => setSelectedUserProfile(mockProfiles[msg.author] || null)}
+                style={{ cursor: "pointer" }}
+                title={`Profil von ${msg.author} anzeigen`}
+              >
+                {msg.author[0]}
+              </div>
               <div className="message-body">
                 <header className="message-header">
                   <span className={`message-author ${msg.color}`} onClick={() => setSelectedUserProfile(mockProfiles[msg.author] || null)} style={{ cursor: "pointer" }}>
