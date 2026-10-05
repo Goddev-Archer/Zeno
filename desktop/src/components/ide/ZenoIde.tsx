@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { Icon } from "@iconify/react";
 import Editor from "@monaco-editor/react";
-import { IdeFile } from "../../types";
+import { IdeFile, SystemCompilersStatus } from "../../types";
+import { getSystemCompilers, writeWorkspaceFile } from "../../services/ideBackendService";
 
 interface ZenoIdeProps {
-  ideSidebarTab: "explorer" | "git" | "extensions" | "gitlens";
+  ideSidebarTab: "explorer" | "git" | "extensions" | "compilers" | "gitlens";
   ideFiles: IdeFile[];
   ideOpenTabs: string[];
   ideActiveFilePath: string;
@@ -16,7 +17,7 @@ interface ZenoIdeProps {
   ideConsoleOutput: string;
   theme: "dark" | "light";
   activeIdeFile: IdeFile | undefined;
-  setIdeSidebarTab: (tab: "explorer" | "git" | "extensions" | "gitlens") => void;
+  setIdeSidebarTab: (tab: "explorer" | "git" | "extensions" | "compilers" | "gitlens") => void;
   setIsSettingsOpen: (open: boolean) => void;
   setIdeNewItemType: (type: "file" | "folder") => void;
   setIdeNewItemParentPath: (path: string) => void;
@@ -70,348 +71,680 @@ export const ZenoIde: React.FC<ZenoIdeProps> = ({
   handleIdeCodeChange,
   setupZenoIntelliSense,
   setIsIdeConsoleExpanded,
-  setIdeConsoleOutput: _setIdeConsoleOutput,
+  setIdeConsoleOutput,
   onReturnToDashboard,
   showToast
 }) => {
-  const [commandPaletteQuery, setCommandPaletteQuery] = useState("");
-  const [activeBottomTab, setActiveBottomTab] = useState<"terminal" | "problems" | "output">("terminal");
-  const [serverActive, setServerActive] = useState<boolean>(false);
+  const [activeBottomTab, setActiveBottomTab] = useState<"terminal" | "compilers" | "problems">("terminal");
+  const [compilersStatus, setCompilersStatus] = useState<SystemCompilersStatus | null>(null);
+  const [isLoadingCompilers, setIsLoadingCompilers] = useState<boolean>(false);
+  const [externalPortMode, setExternalPortMode] = useState<boolean>(false);
+  const [externalIdeUrl, setExternalIdeUrl] = useState<string>("http://localhost:3050");
+  const [customPortInput, setCustomPortInput] = useState<string>("http://localhost:3050");
+  const [isExternalServerAlive, setIsExternalServerAlive] = useState<boolean>(false);
 
+  // Fetch host compilers & runtimes via Rust backend
   useEffect(() => {
-    const checkHealth = async () => {
+    let isMounted = true;
+    const fetchCompilers = async () => {
+      setIsLoadingCompilers(true);
       try {
-        const res = await fetch("http://localhost:3050/health");
-        if (res.ok) {
-          setServerActive(true);
-        }
+        const status = await getSystemCompilers();
+        if (isMounted) setCompilersStatus(status);
       } catch (e) {
-        setServerActive(false);
+        console.warn("Fehler beim Abrufen der System-Compiler:", e);
+      } finally {
+        if (isMounted) setIsLoadingCompilers(false);
       }
     };
-    checkHealth();
-    const interval = setInterval(checkHealth, 3000);
+    fetchCompilers();
+    return () => { isMounted = false; };
+  }, []);
+
+  // Check health of external ported IDE server
+  useEffect(() => {
+    const checkExternalServer = async () => {
+      try {
+        const res = await fetch("http://localhost:3050/health");
+        setIsExternalServerAlive(res.ok);
+      } catch (e) {
+        setIsExternalServerAlive(false);
+      }
+    };
+    checkExternalServer();
+    const interval = setInterval(checkExternalServer, 5000);
     return () => clearInterval(interval);
   }, []);
 
+  // Quick save via Ctrl+S
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        if (activeIdeFile) {
+          writeWorkspaceFile(activeIdeFile.path, activeIdeFile.code);
+          showToast(`✓ "${activeIdeFile.name}" lokal via Rust gesichert.`);
+        }
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault();
+        handleIdeRun();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeIdeFile, handleIdeRun, showToast]);
+
   const handleEditorBeforeMount = (monaco: any) => {
-    monaco.editor.defineTheme("code-oss-island-dark", {
+    // Register Zeno JetBrains-aligned themes
+    monaco.editor.defineTheme("zeno-ide-dark", {
       base: "vs-dark",
       inherit: true,
       rules: [
-        { token: "comment", foreground: "6B7280", fontStyle: "italic" },
-        { token: "keyword", foreground: "38BDF8", fontStyle: "bold" },
-        { token: "string", foreground: "34D399" },
-        { token: "number", foreground: "F472B6" }
+        { token: "comment", foreground: "6C707E", fontStyle: "italic" },
+        { token: "keyword", foreground: "CF8E6D", fontStyle: "bold" },
+        { token: "string", foreground: "6A8759" },
+        { token: "number", foreground: "2AACB8" },
+        { token: "type", foreground: "56A8F5" },
+        { token: "function", foreground: "57B6C2" },
+        { token: "variable", foreground: "BCBEC4" }
       ],
       colors: {
-        "editor.background": "#0D0E12",
-        "editor.foreground": "#E2E8F0",
-        "editorGutter.background": "#0D0E12",
-        "editor.lineHighlightBackground": "#181A20",
-        "editor.lineHighlightBorder": "#262933",
-        "editorCursor.foreground": "#00FF87"
+        "editor.background": "#1E1F22",
+        "editor.foreground": "#BCBEC4",
+        "editorGutter.background": "#1E1F22",
+        "editor.lineHighlightBackground": "#26282E",
+        "editor.lineHighlightBorder": "#2E3136",
+        "editorCursor.foreground": "#3574F0",
+        "editorLineNumber.foreground": "#4E5157",
+        "editorLineNumber.activeForeground": "#BCBEC4",
+        "editor.selectionBackground": "#214283"
+      }
+    });
+
+    monaco.editor.defineTheme("zeno-ide-light", {
+      base: "vs",
+      inherit: true,
+      rules: [
+        { token: "comment", foreground: "8C9099", fontStyle: "italic" },
+        { token: "keyword", foreground: "0033B3", fontStyle: "bold" },
+        { token: "string", foreground: "067D17" },
+        { token: "number", foreground: "1750EB" },
+        { token: "function", foreground: "00627A" }
+      ],
+      colors: {
+        "editor.background": "#FFFFFF",
+        "editor.foreground": "#1E1F22",
+        "editorGutter.background": "#FFFFFF",
+        "editor.lineHighlightBackground": "#F0F2F5",
+        "editorCursor.foreground": "#0066CC",
+        "editorLineNumber.foreground": "#ADADAD",
+        "editorLineNumber.activeForeground": "#1E1F22"
       }
     });
   };
 
-  const handleLaunchExternalCodeOssApp = () => {
-    showToast("🚀 Zeno Code-OSS Desktop Repository Fork gestartet!");
+  const getFileIcon = (lang: string, name: string) => {
+    if (name.endsWith(".rs")) return "vscode-icons:file-type-rust";
+    if (name.endsWith(".py")) return "vscode-icons:file-type-python";
+    if (name.endsWith(".js") || name.endsWith(".jsx")) return "vscode-icons:file-type-js";
+    if (name.endsWith(".ts") || name.endsWith(".tsx")) return "vscode-icons:file-type-typescript-official";
+    if (name.endsWith(".json")) return "vscode-icons:file-type-json";
+    if (name.endsWith(".md")) return "vscode-icons:file-type-markdown";
+    if (name.endsWith(".css")) return "vscode-icons:file-type-css";
+    if (name.endsWith(".html")) return "vscode-icons:file-type-html";
+    if (name.endsWith(".toml")) return "vscode-icons:file-type-toml";
+    if (lang === "rust") return "vscode-icons:file-type-rust";
+    if (lang === "python") return "vscode-icons:file-type-python";
+    return "mage:file-records";
   };
 
   return (
-    <div className="code-oss-island-workspace" style={{ display: "flex", flexDirection: "column", height: "100%", backgroundColor: "#08090C", padding: "12px", gap: "12px", boxSizing: "border-box", color: "#E2E8F0" }}>
+    <div className="zeno-ide-workspace" style={{ display: "flex", flexDirection: "column", height: "100%", backgroundColor: "var(--bg-primary)", color: "var(--text-primary)", overflow: "hidden" }}>
       
-      {/* 1. FLOATING HEADER ISLAND */}
-      <header className="code-oss-header-island" style={{ height: "46px", backgroundColor: "#111319", borderRadius: "12px", border: "1px solid #1E222D", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 16px", boxShadow: "0 4px 20px rgba(0,0,0,0.4)" }}>
-        {/* Left Branding & Back Button */}
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+      {/* 1. JETBRAINS-ALIGNED TOP WORKBENCH HEADER */}
+      <header className="zeno-ide-header" style={{ height: "42px", backgroundColor: "var(--bg-secondary)", borderBottom: "1px solid var(--border-color)", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 12px", flexShrink: 0, zIndex: 10 }}>
+        {/* Left: Dashboard Return & Breadcrumbs */}
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
           {onReturnToDashboard && (
             <button
               onClick={onReturnToDashboard}
-              style={{ background: "rgba(0, 255, 135, 0.12)", border: "1px solid rgba(0, 255, 135, 0.3)", color: "#00FF87", padding: "5px 12px", borderRadius: "8px", fontSize: "11px", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}
-              title="Dashboard & Chat-Server öffnen"
+              className="settings-btn"
+              style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", padding: "4px 10px", height: "28px" }}
+              title="Zurück zum Zeno Dashboard & Chat-Kanälen"
             >
-              <Icon icon="mage:arrow-left" /> Dashboard
+              <Icon icon="mage:arrow-left" /> Zurück
             </button>
           )}
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ fontSize: "12px", fontWeight: "800", background: "linear-gradient(135deg, #00FF87, #60EFFF)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-              ZENO CODE-OSS
+
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", borderLeft: "1px solid var(--border-color)", paddingLeft: "10px" }}>
+            <span style={{ fontSize: "12px", fontWeight: "700", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "5px" }}>
+              <Icon icon="mage:code" style={{ color: "var(--accent-color)" }} /> ZENO IDE
             </span>
-            <span style={{ fontSize: "10px", backgroundColor: serverActive ? "rgba(0, 255, 135, 0.15)" : "#1E222D", color: serverActive ? "#00FF87" : "#38BDF8", padding: "2px 8px", borderRadius: "4px", fontWeight: "600" }}>
-              {serverActive ? "● Echte VS Code Web Engine Aktiv (Port 3050)" : "Offline (Standard Editor)"}
+            <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>/</span>
+            <span style={{ fontSize: "11px", color: "var(--text-secondary)", fontFamily: "var(--font-mono)", maxWidth: "260px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {activeIdeFile ? activeIdeFile.path : "Keine Datei geöffnet"}
             </span>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "4px", backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-sm)", padding: "2px 8px", fontSize: "10px", color: "var(--text-muted)" }}>
+            <Icon icon="mage:git-branch" style={{ color: "var(--accent-color)" }} />
+            <span>main</span>
           </div>
         </div>
 
-        {/* Center Command Palette Search */}
-        <div style={{ position: "relative", width: "360px" }}>
-          <input
-            type="text"
-            placeholder="🔍 Command Palette & Suche (Ctrl + Shift + P)"
-            value={commandPaletteQuery}
-            onChange={(e) => setCommandPaletteQuery(e.target.value)}
-            style={{ width: "100%", height: "28px", backgroundColor: "#0D0E12", border: "1px solid #262933", borderRadius: "8px", padding: "0 12px", fontSize: "11px", color: "#E2E8F0", outline: "none" }}
-          />
+        {/* Center: Status & Porting Notice */}
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          {externalPortMode ? (
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", backgroundColor: "rgba(56, 189, 248, 0.12)", border: "1px solid rgba(56, 189, 248, 0.3)", borderRadius: "var(--radius-sm)", padding: "2px 10px", fontSize: "11px", color: "#38BDF8" }}>
+              <Icon icon="mage:link" />
+              <span>Externer IDE-Port aktiv: <strong>{externalIdeUrl}</strong></span>
+              <button
+                onClick={() => setExternalPortMode(false)}
+                style={{ background: "none", border: "none", color: "#38BDF8", cursor: "pointer", fontWeight: "700", marginLeft: "4px" }}
+                title="Zurück zur nativen Zeno IDE"
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", color: "var(--text-muted)" }}>
+              <span style={{ width: "7px", height: "7px", borderRadius: "50%", backgroundColor: "#00FF87", display: "inline-block" }} />
+              <span>Rust Core Backend Aktiv (100% Native Execution)</span>
+            </div>
+          )}
         </div>
 
-        {/* Right Action Controls */}
+        {/* Right: Actions */}
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          {/* External IDE Port Toggle */}
           <button
-            onClick={handleLaunchExternalCodeOssApp}
-            style={{ backgroundColor: "#38BDF8", color: "#08090C", border: "none", padding: "5px 12px", borderRadius: "8px", fontSize: "11px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}
-            title="Startet die native Zeno Code-OSS Desktop-Anwendung"
+            onClick={() => setExternalPortMode(!externalPortMode)}
+            className={`settings-btn ${externalPortMode ? "primary" : ""}`}
+            style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", padding: "4px 10px", height: "28px" }}
+            title="Eigene IDE über Porting (z. B. localhost:3050 oder Code-OSS) einbinden"
           >
-            <Icon icon="mage:terminal" /> Code-OSS App starten
+            <Icon icon="mage:terminal" />
+            {externalPortMode ? "Native Zeno IDE" : "Eigene IDE / Port"}
           </button>
 
+          {/* Native Rust Run Button */}
           <button
             onClick={handleIdeRun}
-            style={{ backgroundColor: "#00FF87", color: "#08090C", border: "none", padding: "5px 14px", borderRadius: "8px", fontSize: "11px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}
-            title="Code in der Sandbox ausführen"
+            className="settings-btn primary"
+            style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", padding: "4px 14px", height: "28px", backgroundColor: "#00FF87", color: "#08090C", fontWeight: "700" }}
+            title="Code über das Rust-Backend nativ ausführen (Ctrl+Enter)"
           >
-            <Icon icon="mage:play" /> Run
+            <Icon icon="mage:play" /> Ausführen (Rust)
           </button>
         </div>
       </header>
 
-      {/* 2. MAIN WORKSPACE BODY */}
-      <div style={{ flex: 1, display: "flex", gap: "12px", minHeight: 0 }}>
-        {serverActive ? (
-          /* 100% PURE NATIVE VS CODE (CODE-OSS) WORKBENCH FRAME */
-          <div style={{ flex: 1, backgroundColor: "#1e1e1e", borderRadius: "12px", border: "1px solid #1E222D", overflow: "hidden" }}>
-            <iframe
-              src="http://localhost:3050"
-              title="Native Code-OSS Workbench Engine"
-              style={{ width: "100%", height: "100%", border: "none" }}
-            />
-          </div>
-        ) : (
-          <>
-            {/* Activity Bar Island */}
-            <nav className="code-oss-activity-island" style={{ width: "48px", backgroundColor: "#111319", borderRadius: "12px", border: "1px solid #1E222D", display: "flex", flexDirection: "column", alignItems: "center", padding: "12px 0", gap: "14px", boxShadow: "0 4px 20px rgba(0,0,0,0.3)" }}>
-          <button
-            onClick={() => setIdeSidebarTab("explorer")}
-            style={{ background: ideSidebarTab === "explorer" ? "rgba(56, 189, 248, 0.15)" : "transparent", border: "none", color: ideSidebarTab === "explorer" ? "#38BDF8" : "#64748B", width: "36px", height: "36px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", cursor: "pointer" }}
-            title="Explorer (Dateibaum)"
-          >
-            <Icon icon="mage:file-records" />
-          </button>
-
-          <button
-            onClick={() => setIdeSidebarTab("git")}
-            style={{ background: ideSidebarTab === "git" ? "rgba(56, 189, 248, 0.15)" : "transparent", border: "none", color: ideSidebarTab === "git" ? "#38BDF8" : "#64748B", width: "36px", height: "36px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", cursor: "pointer", position: "relative" }}
-            title="Source Control (Git)"
-          >
-            <Icon icon="mage:git-branch" />
-            {ideGitChanges.length > 0 && (
-              <span style={{ position: "absolute", top: "4px", right: "4px", width: "8px", height: "8px", backgroundColor: "#00FF87", borderRadius: "50%" }} />
-            )}
-          </button>
-
-          <button
-            onClick={() => setIdeSidebarTab("extensions")}
-            style={{ background: ideSidebarTab === "extensions" ? "rgba(56, 189, 248, 0.15)" : "transparent", border: "none", color: ideSidebarTab === "extensions" ? "#38BDF8" : "#64748B", width: "36px", height: "36px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", cursor: "pointer" }}
-            title="Extensions Marketplace"
-          >
-            <Icon icon="mage:box-3d" />
-          </button>
-        </nav>
-
-        {/* Sidebar Island */}
-        <aside className="code-oss-sidebar-island" style={{ width: "260px", backgroundColor: "#111319", borderRadius: "12px", border: "1px solid #1E222D", display: "flex", flexDirection: "column", padding: "16px", boxSizing: "border-box", overflow: "hidden" }}>
-          {ideSidebarTab === "explorer" && (
-            <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", borderBottom: "1px solid #1E222D", paddingBottom: "8px" }}>
-                <span style={{ fontSize: "11px", fontWeight: "700", color: "#94A3B8", letterSpacing: "0.5px" }}>EXPLORER</span>
-                <div style={{ display: "flex", gap: "6px" }}>
-                  <button onClick={() => { setIdeNewItemType("file"); setIsIdeNewItemModalOpen(true); }} style={{ background: "none", border: "none", color: "#94A3B8", cursor: "pointer" }} title="Neue Datei">
-                    <Icon icon="mage:plus" />
-                  </button>
-                  <button onClick={() => setIsIdeProjectWizardOpen(true)} style={{ background: "none", border: "none", color: "#94A3B8", cursor: "pointer" }} title="Neues Projekt Wizard">
-                    <Icon icon="mage:folder-open" />
-                  </button>
-                </div>
-              </div>
-
-              <div style={{ flex: 1, overflowY: "auto" }}>
-                {renderIdeFileTree()}
-              </div>
-            </div>
-          )}
-
-          {ideSidebarTab === "git" && (
-            <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-              <span style={{ fontSize: "11px", fontWeight: "700", color: "#94A3B8", marginBottom: "12px" }}>SOURCE CONTROL (GIT)</span>
-              <textarea
-                placeholder="Commit-Nachricht eingeben..."
-                value={ideGitMessage}
-                onChange={(e) => setIdeGitMessage(e.target.value)}
-                style={{ width: "100%", height: "60px", backgroundColor: "#0D0E12", border: "1px solid #262933", borderRadius: "8px", padding: "8px", fontSize: "11px", color: "#E2E8F0", outline: "none", marginBottom: "8px", resize: "none" }}
-              />
-              <button
-                onClick={handleIdeGitCommit}
-                style={{ width: "100%", backgroundColor: "#38BDF8", color: "#08090C", border: "none", padding: "6px", borderRadius: "8px", fontSize: "11px", fontWeight: "700", cursor: "pointer", marginBottom: "16px" }}
-              >
-                Commit & Push
-              </button>
-
-              <div style={{ fontSize: "10px", color: "#94A3B8", fontWeight: "700", marginBottom: "6px" }}>ÄNDERUNGEN ({ideGitChanges.length})</div>
-              <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "4px" }}>
-                {ideGitChanges.map((change, idx) => (
-                  <div key={idx} style={{ fontSize: "11px", color: "#34D399", padding: "4px 8px", backgroundColor: "#0D0E12", borderRadius: "4px" }}>
-                    M {change}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {ideSidebarTab === "extensions" && (
-            <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-                <span style={{ fontSize: "11px", fontWeight: "700", color: "#94A3B8" }}>OPEN VSX EXTENSIONS</span>
-                <span style={{ fontSize: "10px", color: "#00FF87", backgroundColor: "rgba(0,255,135,0.1)", padding: "2px 6px", borderRadius: "4px" }}>
-                  {ideExtensions.filter(e => e.installed).length} Aktiv
-                </span>
-              </div>
-              <input
-                type="text"
-                placeholder="Erweiterungen suchen..."
-                value={ideExtensionsSearchQuery}
-                onChange={(e) => setIdeExtensionsSearchQuery(e.target.value)}
-                style={{ width: "100%", backgroundColor: "#0D0E12", border: "1px solid #262933", borderRadius: "8px", padding: "6px 10px", fontSize: "11px", color: "#E2E8F0", outline: "none", marginBottom: "12px" }}
-              />
-              <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px" }}>
-                {ideExtensions
-                  .filter(ext => 
-                    ext.name.toLowerCase().includes(ideExtensionsSearchQuery.toLowerCase()) ||
-                    ext.description.toLowerCase().includes(ideExtensionsSearchQuery.toLowerCase())
-                  )
-                  .map((ext) => (
-                    <div key={ext.id} style={{ backgroundColor: "#0D0E12", border: "1px solid #1E222D", padding: "10px", borderRadius: "8px" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "4px" }}>
-                        <div style={{ fontSize: "12px", fontWeight: "700", color: "#E2E8F0", display: "flex", alignItems: "center", gap: "6px" }}>
-                          <Icon icon={ext.icon || "mage:box-3d"} style={{ color: "#38BDF8", fontSize: "14px" }} />
-                          <span>{ext.name}</span>
-                        </div>
-                        <span style={{ fontSize: "9px", color: "#64748B" }}>⬇ {ext.downloads}</span>
-                      </div>
-                      <div style={{ fontSize: "10px", color: "#94A3B8", margin: "2px 0 8px 0", lineHeight: "1.3" }}>{ext.description}</div>
-                      <button
-                        onClick={() => ext.installed ? handleExtensionUninstall(ext.id) : handleExtensionInstall(ext.id)}
-                        style={{ fontSize: "10px", fontWeight: "700", padding: "4px 10px", borderRadius: "6px", border: "none", backgroundColor: ext.installed ? "rgba(239, 68, 68, 0.15)" : "#00FF87", color: ext.installed ? "#EF4444" : "#08090C", cursor: "pointer" }}
-                      >
-                        {ext.installed ? "Deinstallieren" : "Installieren"}
-                      </button>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
-        </aside>
-
-        {/* Editor Workspace Island */}
-        <main className="code-oss-editor-island" style={{ flex: 1, backgroundColor: "#111319", borderRadius: "12px", border: "1px solid #1E222D", display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
-          
-          {/* Floating Pill Tabs */}
-          <div style={{ height: "36px", backgroundColor: "#0D0E12", borderBottom: "1px solid #1E222D", display: "flex", alignItems: "center", padding: "0 8px", gap: "4px", overflowX: "auto" }}>
-            {ideOpenTabs.map((tabPath) => {
-              const isActive = tabPath === ideActiveFilePath;
-              const fileName = tabPath.split("/").pop() || tabPath;
-              return (
-                <div
-                  key={tabPath}
-                  onClick={() => handleIdeFileSelect(tabPath)}
-                  style={{ height: "26px", padding: "0 10px", borderRadius: "6px", backgroundColor: isActive ? "#111319" : "transparent", border: isActive ? "1px solid #262933" : "none", color: isActive ? "#00FF87" : "#94A3B8", fontSize: "11px", display: "flex", alignItems: "center", gap: "6px", cursor: "pointer" }}
+      {/* 2. MAIN WORKBENCH LAYOUT */}
+      <div style={{ flex: 1, display: "flex", minHeight: 0, overflow: "hidden" }}>
+        {externalPortMode ? (
+          /* PORTED / EXTERNAL IDE FRAME */
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%", backgroundColor: "var(--bg-primary)" }}>
+            <div style={{ padding: "8px 14px", backgroundColor: "var(--bg-secondary)", borderBottom: "1px solid var(--border-color)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: 1 }}>
+                <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>Server-URL / Port:</span>
+                <input
+                  type="text"
+                  value={customPortInput}
+                  onChange={(e) => setCustomPortInput(e.target.value)}
+                  style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-sm)", color: "var(--text-primary)", padding: "3px 8px", fontSize: "11px", width: "240px", fontFamily: "var(--font-mono)" }}
+                />
+                <button
+                  onClick={() => setExternalIdeUrl(customPortInput)}
+                  className="settings-btn"
+                  style={{ fontSize: "10px", padding: "3px 8px" }}
                 >
-                  <Icon icon="mage:file-records" style={{ fontSize: "12px" }} />
-                  <span>{fileName}</span>
-                  <button
-                    onClick={(e) => handleIdeFileClose(tabPath, e)}
-                    style={{ background: "none", border: "none", color: "#64748B", cursor: "pointer", padding: 0 }}
-                  >
-                    <Icon icon="mage:multiply" style={{ fontSize: "10px" }} />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Monaco / Code-OSS Web Workbench Container */}
-          <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
-            {serverActive ? (
+                  Verbinden
+                </button>
+              </div>
+              <span style={{ fontSize: "10px", color: isExternalServerAlive ? "#00FF87" : "var(--text-muted)" }}>
+                {isExternalServerAlive ? "● Port 3050 erreichbar" : "○ Warten auf externen Server..."}
+              </span>
+            </div>
+            <div style={{ flex: 1, position: "relative" }}>
               <iframe
-                src="http://localhost:3050"
-                title="Zeno Code-OSS Unblocked Engine"
+                src={externalIdeUrl}
+                title="External Ported IDE"
                 style={{ width: "100%", height: "100%", border: "none" }}
               />
-            ) : activeIdeFile && !activeIdeFile.isFolder ? (
-              <Editor
-                height="100%"
-                language={activeIdeFile.language}
-                theme={theme === "light" ? "vs" : "code-oss-island-dark"}
-                beforeMount={handleEditorBeforeMount}
-                value={activeIdeFile.code}
-                onChange={handleIdeCodeChange}
-                onMount={(_, monaco) => setupZenoIntelliSense(monaco)}
-                options={{
-                  minimap: { enabled: false },
-                  fontSize: 13,
-                  fontFamily: "var(--font-mono)",
-                  automaticLayout: true,
-                  renderLineHighlight: "all",
-                  cursorBlinking: "smooth"
-                }}
-              />
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "#64748B" }}>
-                <Icon icon="mage:box-3d" style={{ fontSize: "48px", marginBottom: "12px", opacity: 0.3 }} />
-                <p style={{ fontSize: "13px" }}>Wähle eine Datei aus oder starte die native Zeno Code-OSS Desktop-App.</p>
-              </div>
-            )}
-          </div>
-
-          {/* FLOATING TERMINAL & CONSOLE ISLAND */}
-          <div style={{ borderTop: "1px solid #1E222D", backgroundColor: "#0D0E12", display: "flex", flexDirection: "column" }}>
-            <div style={{ height: "28px", padding: "0 12px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: isIdeConsoleExpanded ? "1px solid #1E222D" : "none" }}>
-              <div style={{ display: "flex", gap: "16px", fontSize: "11px", fontWeight: "600" }}>
-                <span
-                  onClick={() => { setActiveBottomTab("terminal"); setIsIdeConsoleExpanded(true); }}
-                  style={{ color: activeBottomTab === "terminal" ? "#38BDF8" : "#64748B", cursor: "pointer" }}
-                >
-                  TERMINAL
-                </span>
-                <span
-                  onClick={() => { setActiveBottomTab("problems"); setIsIdeConsoleExpanded(true); }}
-                  style={{ color: activeBottomTab === "problems" ? "#38BDF8" : "#64748B", cursor: "pointer" }}
-                >
-                  PROBLEME (0)
-                </span>
-                <span
-                  onClick={() => { setActiveBottomTab("output"); setIsIdeConsoleExpanded(true); }}
-                  style={{ color: activeBottomTab === "output" ? "#38BDF8" : "#64748B", cursor: "pointer" }}
-                >
-                  AUSGABE
-                </span>
-              </div>
-              <button
-                onClick={() => setIsIdeConsoleExpanded(!isIdeConsoleExpanded)}
-                style={{ background: "none", border: "none", color: "#64748B", cursor: "pointer", fontSize: "12px" }}
-              >
-                <Icon icon={isIdeConsoleExpanded ? "mage:chevron-down" : "mage:chevron-up"} />
-              </button>
             </div>
-
-            {isIdeConsoleExpanded && (
-              <div style={{ height: "120px", padding: "10px", overflowY: "auto", fontFamily: "var(--font-mono)", fontSize: "11px", color: "#00FF87" }}>
-                <pre style={{ margin: 0 }}><code>{ideConsoleOutput || "$ cargo check\n   Compiling zeno_sandbox v0.1.0\n    Finished dev [unoptimized + debuginfo] target(s) in 0.42s"}</code></pre>
-              </div>
-            )}
           </div>
+        ) : (
+          /* NATIVE DOCKED ZENO IDE WORKBENCH */
+          <>
+            {/* Activity Bar */}
+            <nav className="ide-activity-bar" style={{ width: "48px", backgroundColor: "var(--bg-secondary)", borderRight: "1px solid var(--border-color)", display: "flex", flexDirection: "column", justifyContent: "space-between", alignItems: "center", padding: "8px 0", flexShrink: 0 }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", width: "100%" }}>
+                <button
+                  className={`ide-activity-btn ${ideSidebarTab === "explorer" ? "active" : ""}`}
+                  onClick={() => setIdeSidebarTab("explorer")}
+                  title="Explorer (Dateibaum)"
+                  style={{ width: "36px", height: "36px", borderRadius: "var(--radius-sm)", display: "flex", alignItems: "center", justifyContent: "center", border: "none", cursor: "pointer", background: ideSidebarTab === "explorer" ? "rgba(53, 116, 240, 0.15)" : "transparent", color: ideSidebarTab === "explorer" ? "var(--accent-color)" : "var(--text-muted)" }}
+                >
+                  <Icon icon="mage:file-records" style={{ fontSize: "18px" }} />
+                </button>
 
-        </main>
+                <button
+                  className={`ide-activity-btn ${ideSidebarTab === "git" ? "active" : ""}`}
+                  onClick={() => setIdeSidebarTab("git")}
+                  title="Source Control (Git)"
+                  style={{ width: "36px", height: "36px", borderRadius: "var(--radius-sm)", display: "flex", alignItems: "center", justifyContent: "center", border: "none", cursor: "pointer", position: "relative", background: ideSidebarTab === "git" ? "rgba(53, 116, 240, 0.15)" : "transparent", color: ideSidebarTab === "git" ? "var(--accent-color)" : "var(--text-muted)" }}
+                >
+                  <Icon icon="mage:git-branch" style={{ fontSize: "18px" }} />
+                  {ideGitChanges.length > 0 && (
+                    <span style={{ position: "absolute", top: "4px", right: "4px", width: "7px", height: "7px", backgroundColor: "var(--accent-color)", borderRadius: "50%" }} />
+                  )}
+                </button>
+
+                <button
+                  className={`ide-activity-btn ${ideSidebarTab === "compilers" ? "active" : ""}`}
+                  onClick={() => setIdeSidebarTab("compilers")}
+                  title="System & Compiler (Rust, Python, Node)"
+                  style={{ width: "36px", height: "36px", borderRadius: "var(--radius-sm)", display: "flex", alignItems: "center", justifyContent: "center", border: "none", cursor: "pointer", background: ideSidebarTab === "compilers" ? "rgba(53, 116, 240, 0.15)" : "transparent", color: ideSidebarTab === "compilers" ? "var(--accent-color)" : "var(--text-muted)" }}
+                >
+                  <Icon icon="mage:cpu" style={{ fontSize: "18px" }} />
+                </button>
+
+                <button
+                  className={`ide-activity-btn ${ideSidebarTab === "extensions" ? "active" : ""}`}
+                  onClick={() => setIdeSidebarTab("extensions")}
+                  title="Open VSX Extensions Marketplace"
+                  style={{ width: "36px", height: "36px", borderRadius: "var(--radius-sm)", display: "flex", alignItems: "center", justifyContent: "center", border: "none", cursor: "pointer", background: ideSidebarTab === "extensions" ? "rgba(53, 116, 240, 0.15)" : "transparent", color: ideSidebarTab === "extensions" ? "var(--accent-color)" : "var(--text-muted)" }}
+                >
+                  <Icon icon="mage:box-3d" style={{ fontSize: "18px" }} />
+                </button>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
+                <button
+                  onClick={() => showToast("Zeno IDE Theme wird automatisch über die Zeno Design-Tokens gesteuert.")}
+                  title="Theme & Style Information"
+                  style={{ width: "36px", height: "36px", display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer" }}
+                >
+                  <Icon icon="mage:palette" style={{ fontSize: "16px" }} />
+                </button>
+              </div>
+            </nav>
+
+            {/* Sidebar Tool Window */}
+            <aside className="ide-sidebar" style={{ width: "260px", backgroundColor: "var(--bg-secondary)", borderRight: "1px solid var(--border-color)", display: "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden" }}>
+              
+              {/* TAB 1: EXPLORER */}
+              {ideSidebarTab === "explorer" && (
+                <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+                  <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--border-color)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--text-muted)" }}>
+                      EXPLORER
+                    </span>
+                    <div style={{ display: "flex", gap: "4px" }}>
+                      <button
+                        onClick={() => { setIdeNewItemType("file"); setIsIdeNewItemModalOpen(true); }}
+                        className="ide-sidebar-btn"
+                        title="Neue Datei erstellen"
+                      >
+                        <Icon icon="mage:file-plus" />
+                      </button>
+                      <button
+                        onClick={() => { setIdeNewItemType("folder"); setIsIdeNewItemModalOpen(true); }}
+                        className="ide-sidebar-btn"
+                        title="Neuen Ordner erstellen"
+                      >
+                        <Icon icon="mage:folder-plus" />
+                      </button>
+                      <button
+                        onClick={() => setIsIdeProjectWizardOpen(true)}
+                        className="ide-sidebar-btn"
+                        title="Projektvorlage Wizard"
+                      >
+                        <Icon icon="mage:sparkles" style={{ color: "var(--accent-color)" }} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="ide-tree-container" style={{ flex: 1, overflowY: "auto", padding: "6px 0" }}>
+                    {renderIdeFileTree()}
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: GIT SOURCE CONTROL */}
+              {ideSidebarTab === "git" && (
+                <div style={{ display: "flex", flexDirection: "column", height: "100%", padding: "14px" }}>
+                  <span style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--text-muted)", marginBottom: "10px" }}>
+                    SOURCE CONTROL (GIT)
+                  </span>
+                  <textarea
+                    placeholder="Commit-Nachricht eingeben..."
+                    value={ideGitMessage}
+                    onChange={(e) => setIdeGitMessage(e.target.value)}
+                    style={{ width: "100%", height: "64px", backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-sm)", padding: "8px", fontSize: "11px", color: "var(--text-primary)", outline: "none", marginBottom: "8px", resize: "none", boxSizing: "border-box" }}
+                  />
+                  <button
+                    onClick={handleIdeGitCommit}
+                    className="settings-btn primary"
+                    style={{ width: "100%", fontSize: "11px", padding: "6px", marginBottom: "14px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+                  >
+                    <Icon icon="mage:git-commit" /> Commit via Rust Core
+                  </button>
+
+                  <div style={{ fontSize: "10px", color: "var(--text-muted)", fontWeight: "700", marginBottom: "6px", textTransform: "uppercase" }}>
+                    Änderungen ({ideGitChanges.length})
+                  </div>
+                  <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "4px" }}>
+                    {ideGitChanges.map((change, idx) => (
+                      <div key={idx} style={{ fontSize: "11px", color: "#00FF87", padding: "4px 8px", backgroundColor: "var(--bg-tertiary)", borderRadius: "var(--radius-sm)", display: "flex", alignItems: "center", gap: "6px", border: "1px solid var(--border-color)" }}>
+                        <span style={{ fontWeight: "700" }}>M</span>
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{change}</span>
+                      </div>
+                    ))}
+                    {ideGitChanges.length === 0 && (
+                      <span style={{ fontSize: "11px", color: "var(--text-muted)", fontStyle: "italic", textAlign: "center", padding: "14px" }}>
+                        Arbeitsverzeichnis ist sauber.
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: SYSTEM & COMPILERS (RUST BACKEND POWERED) */}
+              {ideSidebarTab === "compilers" && (
+                <div style={{ display: "flex", flexDirection: "column", height: "100%", padding: "14px", overflowY: "auto" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                    <span style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--text-muted)" }}>
+                      NATIVE RUNTIMES (RUST)
+                    </span>
+                    <button
+                      onClick={async () => {
+                        setIsLoadingCompilers(true);
+                        const s = await getSystemCompilers();
+                        setCompilersStatus(s);
+                        setIsLoadingCompilers(false);
+                        showToast("Host-Compiler aktualisiert.");
+                      }}
+                      style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer" }}
+                      title="Neu prüfen"
+                    >
+                      <Icon icon={isLoadingCompilers ? "mage:spinner" : "mage:reload"} />
+                    </button>
+                  </div>
+
+                  <p style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "12px", lineHeight: "1.4" }}>
+                    WASM-Laufzeiten wurden auf Eis gelegt. Zeno nutzt nun 100% native Rust-Backend-Ausführung.
+                  </p>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    {/* Rust */}
+                    <div style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-md)", padding: "10px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                        <span style={{ fontSize: "12px", fontWeight: "600", display: "flex", alignItems: "center", gap: "6px" }}>
+                          <Icon icon="vscode-icons:file-type-rust" /> Rust (cargo/rustc)
+                        </span>
+                        <span style={{ fontSize: "10px", color: compilersStatus?.rustAvailable ? "#00FF87" : "#EF4444", fontWeight: "600" }}>
+                          {compilersStatus?.rustAvailable ? "Verfügbar" : "Nicht installiert"}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: "10px", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+                        {compilersStatus?.rustVersion || "Natives Rust Toolchain"}
+                      </div>
+                    </div>
+
+                    {/* Python */}
+                    <div style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-md)", padding: "10px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                        <span style={{ fontSize: "12px", fontWeight: "600", display: "flex", alignItems: "center", gap: "6px" }}>
+                          <Icon icon="vscode-icons:file-type-python" /> Python 3
+                        </span>
+                        <span style={{ fontSize: "10px", color: compilersStatus?.pythonAvailable ? "#00FF87" : "#EF4444", fontWeight: "600" }}>
+                          {compilersStatus?.pythonAvailable ? "Verfügbar" : "Nicht installiert"}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: "10px", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+                        {compilersStatus?.pythonVersion || "Python Interpreter"}
+                      </div>
+                    </div>
+
+                    {/* Node.js */}
+                    <div style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-md)", padding: "10px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                        <span style={{ fontSize: "12px", fontWeight: "600", display: "flex", alignItems: "center", gap: "6px" }}>
+                          <Icon icon="vscode-icons:file-type-node" /> Node.js / V8
+                        </span>
+                        <span style={{ fontSize: "10px", color: compilersStatus?.nodeAvailable ? "#00FF87" : "#EF4444", fontWeight: "600" }}>
+                          {compilersStatus?.nodeAvailable ? "Verfügbar" : "Nicht installiert"}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: "10px", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+                        {compilersStatus?.nodeVersion || "Node.js Engine"}
+                      </div>
+                    </div>
+
+                    {/* Git */}
+                    <div style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-md)", padding: "10px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                        <span style={{ fontSize: "12px", fontWeight: "600", display: "flex", alignItems: "center", gap: "6px" }}>
+                          <Icon icon="mage:git-branch" style={{ color: "var(--accent-color)" }} /> Git Core
+                        </span>
+                        <span style={{ fontSize: "10px", color: compilersStatus?.gitAvailable ? "#00FF87" : "#EF4444", fontWeight: "600" }}>
+                          {compilersStatus?.gitAvailable ? "Verfügbar" : "Nicht installiert"}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: "10px", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+                        {compilersStatus?.gitVersion || "Git System CLI"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 4: EXTENSIONS */}
+              {ideSidebarTab === "extensions" && (
+                <div style={{ display: "flex", flexDirection: "column", height: "100%", padding: "14px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                    <span style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--text-muted)" }}>
+                      EXTENSIONS
+                    </span>
+                    <span style={{ fontSize: "10px", color: "var(--accent-color)", backgroundColor: "rgba(53, 116, 240, 0.12)", padding: "2px 6px", borderRadius: "var(--radius-sm)" }}>
+                      {ideExtensions.filter((e) => e.installed).length} Aktiv
+                    </span>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Erweiterungen suchen..."
+                    value={ideExtensionsSearchQuery}
+                    onChange={(e) => setIdeExtensionsSearchQuery(e.target.value)}
+                    style={{ width: "100%", backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-sm)", padding: "6px 8px", fontSize: "11px", color: "var(--text-primary)", outline: "none", marginBottom: "10px", boxSizing: "border-box" }}
+                  />
+                  <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px" }}>
+                    {ideExtensions
+                      .filter(
+                        (ext) =>
+                          ext.name.toLowerCase().includes(ideExtensionsSearchQuery.toLowerCase()) ||
+                          ext.description.toLowerCase().includes(ideExtensionsSearchQuery.toLowerCase())
+                      )
+                      .map((ext) => (
+                        <div key={ext.id} style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", padding: "10px", borderRadius: "var(--radius-md)" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "4px" }}>
+                            <div style={{ fontSize: "12px", fontWeight: "600", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "6px" }}>
+                              <Icon icon={ext.icon || "mage:box-3d"} style={{ color: "var(--accent-color)", fontSize: "14px" }} />
+                              <span>{ext.name}</span>
+                            </div>
+                            <span style={{ fontSize: "9px", color: "var(--text-muted)" }}>⬇ {ext.downloads}</span>
+                          </div>
+                          <div style={{ fontSize: "10px", color: "var(--text-muted)", margin: "2px 0 8px 0", lineHeight: "1.3" }}>
+                            {ext.description}
+                          </div>
+                          <button
+                            onClick={() => (ext.installed ? handleExtensionUninstall(ext.id) : handleExtensionInstall(ext.id))}
+                            className={`settings-btn ${ext.installed ? "" : "primary"}`}
+                            style={{ fontSize: "10px", padding: "3px 8px" }}
+                          >
+                            {ext.installed ? "Deinstallieren" : "Installieren"}
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </aside>
+
+            {/* Editor Container */}
+            <main className="ide-editor-container" style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", backgroundColor: "var(--bg-primary)", minWidth: 0 }}>
+              
+              {/* JetBrains-Style Tabs Bar */}
+              <div className="ide-tabs-bar" style={{ display: "flex", backgroundColor: "var(--bg-secondary)", borderBottom: "1px solid var(--border-color)", height: "35px", alignItems: "flex-end", paddingLeft: "8px", overflowX: "auto", flexShrink: 0 }}>
+                {ideOpenTabs.map((tabPath) => {
+                  const isActive = tabPath === ideActiveFilePath;
+                  const fileName = tabPath.split("/").pop() || tabPath;
+                  const isDirty = ideGitChanges.includes(tabPath);
+                  const fileLang = activeIdeFile?.path === tabPath ? activeIdeFile.language : "";
+                  return (
+                    <div
+                      key={tabPath}
+                      onClick={() => handleIdeFileSelect(tabPath)}
+                      className={`ide-tab ${isActive ? "active" : ""}`}
+                      style={{ display: "flex", alignItems: "center", gap: "6px", padding: "0 12px", height: "30px", backgroundColor: isActive ? "var(--bg-primary)" : "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderBottom: isActive ? "1px solid var(--bg-primary)" : "none", borderTop: isActive ? "2px solid var(--accent-color)" : "1px solid var(--border-color)", borderRadius: "4px 4px 0 0", fontSize: "12px", color: isActive ? "var(--text-primary)" : "var(--text-muted)", cursor: "pointer", marginRight: "4px", whiteSpace: "nowrap", userSelect: "none" }}
+                    >
+                      <Icon icon={getFileIcon(fileLang, fileName)} style={{ fontSize: "14px" }} />
+                      <span>{fileName}</span>
+                      {isDirty && (
+                        <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: "var(--accent-color)" }} title="Ungespeicherte Änderungen" />
+                      )}
+                      <button
+                        onClick={(e) => handleIdeFileClose(tabPath, e)}
+                        className="ide-tab-close"
+                        style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: "2px", display: "flex", alignItems: "center" }}
+                        title="Schließen"
+                      >
+                        <Icon icon="mage:multiply" style={{ fontSize: "11px" }} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Monaco Editor Frame */}
+              <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
+                {activeIdeFile && !activeIdeFile.isFolder ? (
+                  <Editor
+                    height="100%"
+                    language={activeIdeFile.language}
+                    theme={theme === "light" ? "zeno-ide-light" : "zeno-ide-dark"}
+                    beforeMount={handleEditorBeforeMount}
+                    value={activeIdeFile.code}
+                    onChange={handleIdeCodeChange}
+                    onMount={(_, monaco) => setupZenoIntelliSense(monaco)}
+                    options={{
+                      minimap: { enabled: true, scale: 0.75 },
+                      fontSize: 13,
+                      fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
+                      fontLigatures: true,
+                      automaticLayout: true,
+                      renderLineHighlight: "all",
+                      cursorBlinking: "smooth",
+                      padding: { top: 10, bottom: 10 },
+                      scrollBeyondLastLine: false
+                    }}
+                  />
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text-muted)", gap: "10px" }}>
+                    <Icon icon="mage:code" style={{ fontSize: "42px", opacity: 0.4 }} />
+                    <p style={{ fontSize: "13px" }}>Wähle eine Datei im Explorer links aus, um sie in der Zeno IDE zu bearbeiten.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* DOCKED BOTTOM PANEL (TERMINAL / OUTPUT / SYSTEM) */}
+              <div className="ide-console" style={{ backgroundColor: "var(--bg-secondary)", borderTop: "1px solid var(--border-color)", display: "flex", flexDirection: "column", flexShrink: 0 }}>
+                {/* Header */}
+                <div style={{ height: "32px", padding: "0 12px", display: "flex", alignItems: "center", justifyContent: "space-between", backgroundColor: "var(--bg-tertiary)", borderBottom: isIdeConsoleExpanded ? "1px solid var(--border-color)" : "none", userSelect: "none" }}>
+                  <div style={{ display: "flex", gap: "16px", fontSize: "11px", fontWeight: "700" }}>
+                    <span
+                      onClick={() => { setActiveBottomTab("terminal"); setIsIdeConsoleExpanded(true); }}
+                      style={{ color: activeBottomTab === "terminal" ? "var(--accent-color)" : "var(--text-muted)", cursor: "pointer", borderBottom: activeBottomTab === "terminal" ? "2px solid var(--accent-color)" : "none", paddingBottom: "2px" }}
+                    >
+                      RUST CORE RUNNER & TERMINAL
+                    </span>
+                    <span
+                      onClick={() => { setActiveBottomTab("compilers"); setIsIdeConsoleExpanded(true); }}
+                      style={{ color: activeBottomTab === "compilers" ? "var(--accent-color)" : "var(--text-muted)", cursor: "pointer", borderBottom: activeBottomTab === "compilers" ? "2px solid var(--accent-color)" : "none", paddingBottom: "2px" }}
+                    >
+                      SYSTEM TOOLCHAINS
+                    </span>
+                    <span
+                      onClick={() => { setActiveBottomTab("problems"); setIsIdeConsoleExpanded(true); }}
+                      style={{ color: activeBottomTab === "problems" ? "var(--accent-color)" : "var(--text-muted)", cursor: "pointer", borderBottom: activeBottomTab === "problems" ? "2px solid var(--accent-color)" : "none", paddingBottom: "2px" }}
+                    >
+                      PROBLEME (0)
+                    </span>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    {isIdeConsoleExpanded && (
+                      <button
+                        onClick={() => setIdeConsoleOutput("")}
+                        style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: "11px" }}
+                        title="Ausgabe leeren"
+                      >
+                        <Icon icon="mage:trash" /> Leeren
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setIsIdeConsoleExpanded(!isIdeConsoleExpanded)}
+                      style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: "12px" }}
+                      title={isIdeConsoleExpanded ? "Panel einklappen" : "Panel ausklappen"}
+                    >
+                      <Icon icon={isIdeConsoleExpanded ? "mage:chevron-down" : "mage:chevron-up"} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Panel Body */}
+                {isIdeConsoleExpanded && (
+                  <div style={{ height: "140px", padding: "10px 14px", overflowY: "auto", fontFamily: "var(--font-mono)", fontSize: "12px", backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}>
+                    {activeBottomTab === "terminal" && (
+                      <pre style={{ margin: 0, whiteSpace: "pre-wrap", lineHeight: "1.4" }}>
+                        <code>{ideConsoleOutput || "[Zeno Rust Core] Bereit für native Programmausführung.\nDrücke 'Ausführen (Rust)' oder 'Ctrl + Enter', um die aktive Datei nativ im Rust-Backend auszuführen."}</code>
+                      </pre>
+                    )}
+
+                    {activeBottomTab === "compilers" && (
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px", fontSize: "11px" }}>
+                        <div>
+                          <strong>Rust Compiler:</strong><br />
+                          <span style={{ color: compilersStatus?.rustAvailable ? "#00FF87" : "#EF4444" }}>
+                            {compilersStatus?.rustVersion || "Nicht erkannt"}
+                          </span>
+                        </div>
+                        <div>
+                          <strong>Python:</strong><br />
+                          <span style={{ color: compilersStatus?.pythonAvailable ? "#00FF87" : "#EF4444" }}>
+                            {compilersStatus?.pythonVersion || "Nicht erkannt"}
+                          </span>
+                        </div>
+                        <div>
+                          <strong>Node.js:</strong><br />
+                          <span style={{ color: compilersStatus?.nodeAvailable ? "#00FF87" : "#EF4444" }}>
+                            {compilersStatus?.nodeVersion || "Nicht erkannt"}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {activeBottomTab === "problems" && (
+                      <div style={{ color: "var(--text-muted)", fontSize: "11px" }}>
+                        Keine Syntax- oder Kompilierungsfehler im aktuellen Workspace gefunden.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+            </main>
           </>
         )}
       </div>

@@ -1002,10 +1002,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {/* Tab: Monaco-Editor */}
             {activeSettingsTab === "editor" && (
               <div className="settings-tab-content" id="tab-editor">
-                <h3>Monaco-Editor Laufzeitumgebungen</h3>
+                <h3>Monaco-Editor & Native Ausführung</h3>
                 <p className="settings-help-text">
-                  Verwalte hier die clientseitigen Sandboxen und Compiler-Bibliotheken für verschiedene Programmiersprachen.
+                  Verwalte hier die Editor-Umgebung. Alle OS-Durchführungen und Ausführungsbefehle werden vollständig und sicher vom <strong>Rust-Backend</strong> übernommen.
                 </p>
+
+                <div style={{ backgroundColor: "rgba(53, 116, 240, 0.1)", border: "1px solid rgba(53, 116, 240, 0.25)", borderRadius: "var(--radius-md)", padding: "12px 16px", marginTop: "14px", display: "flex", alignItems: "center", gap: "10px" }}>
+                  <Icon icon="mage:shield-check" style={{ color: "var(--accent-color)", fontSize: "24px", flexShrink: 0 }} />
+                  <div style={{ fontSize: "11px", color: "var(--text-secondary)", lineHeight: "1.4" }}>
+                    <strong>WASM-Laufzeiten auf Eis gelegt:</strong> Instabile WASM-Simulatoren wurden zugunsten der nativen Rust-Ausführung deaktiviert. Die IDE führt Quellcode direkt über die echten System-Interpreter (Rust, Python, Node, Go) deines Host-Systems aus, vollständig entkoppelt von der JavaScript-Oberfläche.
+                  </div>
+                </div>
 
                 <div className="runtime-settings-list" style={{ marginTop: "20px", display: "flex", flexDirection: "column", gap: "16px" }}>
                   {[

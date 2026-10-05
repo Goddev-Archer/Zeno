@@ -25,6 +25,7 @@ import {
 } from "./services/cryptoService";
 import { executeZeroKnowledgeAuth, syncEncryptedVaultToServer } from "./services/backendService";
 import { commitAndPushServerManifest } from "./services/gitServerSyncService";
+import { executeCodeNatively } from "./services/ideBackendService";
 import {
   saveServerToDb,
   loadServersFromDb,
@@ -677,8 +678,8 @@ function ZenoMainApp() {
   const [ideFiles, setIdeFiles] = useState<IdeFile[]>(defaultWorkspace);
   const [ideActiveFilePath, setIdeActiveFilePath] = useState<string>("src/main.rs");
   const [ideOpenTabs, setIdeOpenTabs] = useState<string[]>(["src/main.rs", "Cargo.toml"]);
-  const [ideSidebarTab, setIdeSidebarTab] = useState<"explorer" | "git" | "extensions" | "gitlens">("explorer");
-  const [ideConsoleOutput, setIdeConsoleOutput] = useState<string>("[zeno-wasi] Virtual File System mount /src/main.rs\n[zeno-wasi] Ready for execution.\n");
+  const [ideSidebarTab, setIdeSidebarTab] = useState<"explorer" | "git" | "extensions" | "compilers" | "gitlens">("explorer");
+  const [ideConsoleOutput, setIdeConsoleOutput] = useState<string>("[Zeno Rust Core] Native Ausführungsumgebung aktiv. Bereit für Code-Ausführung.\n");
   const [isIdeConsoleExpanded, setIsIdeConsoleExpanded] = useState<boolean>(true);
   const [ideGitChanges, setIdeGitChanges] = useState<string[]>(["src/main.rs"]);
   const [ideGitMessage, setIdeGitMessage] = useState<string>("");
@@ -1463,12 +1464,35 @@ function ZenoMainApp() {
     }
   };
 
-  const handleIdeRun = () => {
+  const handleIdeRun = async () => {
     const activeFile = ideFiles.find((f) => f.path === ideActiveFilePath);
     if (!activeFile) return;
-    setIdeConsoleOutput((prev) => prev + `\n[zeno-wasi sandbox] Executing ${activeFile.name}...\n[zeno-wasi sandbox] Exit code 0 (Success)`);
     setIsIdeConsoleExpanded(true);
-    showToast(`Sandbox-Ausführung für "${activeFile.name}" beendet.`);
+    showToast(`Natives Ausführen für "${activeFile.name}" über Rust-Backend...`);
+    setIdeConsoleOutput((prev) => prev + `\n[Zeno Rust Backend] Starte native Ausführung für ${activeFile.name}...\n`);
+
+    try {
+      const res = await executeCodeNatively(activeFile.path, activeFile.code);
+      const timestamp = new Date().toLocaleTimeString();
+      let outputBlock = `\n[${timestamp}] ─── ${res.runner} ───\n`;
+      outputBlock += `Status: ${res.success ? "✓ ERFOLGREICH" : "✗ FEHLER"} (Exit-Code: ${res.exitCode ?? "N/A"}) in ${res.durationMs}ms\n`;
+      if (res.stdout) {
+        outputBlock += `\nSTDOUT:\n${res.stdout}\n`;
+      }
+      if (res.stderr) {
+        outputBlock += `\nSTDERR:\n${res.stderr}\n`;
+      }
+      outputBlock += `──────────────────────────────────────────────────\n`;
+      setIdeConsoleOutput((prev) => prev + outputBlock);
+      if (res.success) {
+        showToast(`✓ Ausführung von "${activeFile.name}" beendet (${res.durationMs}ms).`);
+      } else {
+        showToast(`⚠ Ausführung von "${activeFile.name}" fehlgeschlagen.`);
+      }
+    } catch (err: any) {
+      setIdeConsoleOutput((prev) => prev + `\nFehler bei nativer Ausführung: ${err?.message || err}\n`);
+      showToast("Fehler bei nativer Rust-Ausführung.");
+    }
   };
 
   const handleIdeGitCommit = () => {
@@ -1729,6 +1753,19 @@ function ZenoMainApp() {
             showToast={showToast}
             getContrastColor={getContrastColor}
             onOpenMarketplace={() => setIsMarketplaceOpen(true)}
+            onNavigateToIde={() => setHomeTab("ide")}
+            onNavigateToChannel={(server, channel) => {
+              setActiveServerId(server.id);
+              setActiveChannel(channel);
+            }}
+            onOpenSovereignModal={() => setIsSovereignModalOpen(true)}
+            onOpenInstanceBrowser={() => setIsInstanceBrowserOpen(true)}
+            onOpenGitSyncModal={() => setIsGitSyncModalOpen(true)}
+            userName={userName}
+            userIdentity={userIdentity}
+            servers={servers}
+            connectedRelaysCount={relayStatuses.filter((r) => r.status === "connected").length}
+            onJoinVoice={(channelId, channelName) => handleJoinVoice(channelId, channelName)}
           />
         ) : homeTab === "wasm_hub" ? (
           <WasmHub

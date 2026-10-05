@@ -252,3 +252,26 @@ export interface EncryptedVaultBlob {
   saltHex: string;
   timestamp: string;
 }
+
+export interface NativeExecutionResult {
+  success: boolean;
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+  durationMs: number;
+  runner: string;
+}
+
+export interface SystemCompilersStatus {
+  rustAvailable: boolean;
+  rustVersion?: string;
+  pythonAvailable: boolean;
+  pythonVersion?: string;
+  nodeAvailable: boolean;
+  nodeVersion?: string;
+  gitAvailable: boolean;
+  gitVersion?: string;
+  goAvailable: boolean;
+  goVersion?: string;
+}
+

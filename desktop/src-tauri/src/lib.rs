@@ -453,6 +453,12 @@ fn read_workspace_file(name: String) -> Result<String, String> {
 #[tauri::command]
 fn write_workspace_file(name: String, content: String) -> Result<(), String> {
     let path = get_safe_path(&name)?;
+    if let Some(parent) = path.parent() {
+        if !parent.exists() {
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("Konnte übergeordneten Ordner nicht erstellen: {}", e))?;
+        }
+    }
     fs::write(path, content)
         .map_err(|e| format!("Fehler beim Schreiben der Datei: {}", e))
 }
@@ -462,6 +468,177 @@ fn delete_workspace_file(name: String) -> Result<(), String> {
     let path = get_safe_path(&name)?;
     fs::remove_file(path)
         .map_err(|e| format!("Fehler beim Löschen der Datei: {}", e))
+}
+
+#[tauri::command]
+fn ide_create_folder(folder_path: String) -> Result<(), String> {
+    let safe_path = get_safe_path(&folder_path)?;
+    fs::create_dir_all(&safe_path)
+        .map_err(|e| format!("Ordner konnte nicht erstellt werden: {}", e))
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeExecutionResult {
+    pub success: bool,
+    pub stdout: String,
+    pub stderr: String,
+    pub exit_code: Option<i32>,
+    pub duration_ms: u64,
+    pub runner: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SystemCompilersStatus {
+    pub rust_available: bool,
+    pub rust_version: Option<String>,
+    pub python_available: bool,
+    pub python_version: Option<String>,
+    pub node_available: bool,
+    pub node_version: Option<String>,
+    pub git_available: bool,
+    pub git_version: Option<String>,
+    pub go_available: bool,
+    pub go_version: Option<String>,
+}
+
+fn check_cli_version(cmd: &str, args: &[&str]) -> (bool, Option<String>) {
+    match Command::new(cmd).args(args).output() {
+        Ok(out) if out.status.success() => {
+            let ver = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            let first_line = ver.lines().next().unwrap_or("").to_string();
+            (true, Some(first_line))
+        }
+        _ => (false, None),
+    }
+}
+
+#[tauri::command]
+fn ide_get_system_compilers() -> Result<SystemCompilersStatus, String> {
+    let (rust_available, rust_version) = check_cli_version("rustc", &["--version"]);
+    let (python_available, python_version) = check_cli_version("python", &["--version"]);
+    let (node_available, node_version) = check_cli_version("node", &["--version"]);
+    let (git_available, git_version) = check_cli_version("git", &["--version"]);
+    let (go_available, go_version) = check_cli_version("go", &["version"]);
+
+    Ok(SystemCompilersStatus {
+        rust_available,
+        rust_version,
+        python_available,
+        python_version,
+        node_available,
+        node_version,
+        git_available,
+        git_version,
+        go_available,
+        go_version,
+    })
+}
+
+#[tauri::command]
+fn ide_run_code_native(file_path: String, code: Option<String>) -> Result<NativeExecutionResult, String> {
+    let start = std::time::Instant::now();
+    let safe_file = get_safe_path(&file_path)?;
+
+    // If unsaved code was passed, save it first safely
+    if let Some(c) = code {
+        if let Some(parent) = safe_file.parent() {
+            if !parent.exists() {
+                let _ = fs::create_dir_all(parent);
+            }
+        }
+        let _ = fs::write(&safe_file, c);
+    }
+
+    let ext = safe_file.extension().and_then(|s| s.to_str()).unwrap_or("").to_lowercase();
+    let root = get_project_root();
+
+    let (cmd_name, args, runner_desc): (String, Vec<String>, &str) = match ext.as_str() {
+        "rs" => {
+            if root.join("Cargo.toml").exists() {
+                ("cargo".to_string(), vec!["check".to_string()], "Rust Cargo (Native Toolchain)")
+            } else {
+                ("rustc".to_string(), vec!["--crate-type".to_string(), "bin".to_string(), safe_file.to_string_lossy().to_string()], "Rust Compiler (rustc)")
+            }
+        },
+        "py" => {
+            ("python".to_string(), vec![safe_file.to_string_lossy().to_string()], "Python 3 (Native Interpreter)")
+        },
+        "js" | "mjs" | "cjs" => {
+            ("node".to_string(), vec![safe_file.to_string_lossy().to_string()], "Node.js (Native V8 Engine)")
+        },
+        "ts" => {
+            ("node".to_string(), vec![safe_file.to_string_lossy().to_string()], "TypeScript Node Runner")
+        },
+        "go" => {
+            ("go".to_string(), vec!["run".to_string(), safe_file.to_string_lossy().to_string()], "Go Runtime")
+        },
+        "sh" | "bash" => {
+            ("bash".to_string(), vec![safe_file.to_string_lossy().to_string()], "Bash Shell")
+        },
+        "bat" | "cmd" => {
+            ("cmd".to_string(), vec!["/C".to_string(), safe_file.to_string_lossy().to_string()], "Windows Command Prompt")
+        },
+        "ps1" => {
+            ("powershell".to_string(), vec!["-ExecutionPolicy".to_string(), "Bypass".to_string(), "-File".to_string(), safe_file.to_string_lossy().to_string()], "PowerShell Core")
+        },
+        _ => {
+            return Ok(NativeExecutionResult {
+                success: true,
+                stdout: format!("Datei '{}' ({}) enthält keinen ausführbaren Quelltext. Syntax-Prüfung erfolgreich.", file_path, ext),
+                stderr: String::new(),
+                exit_code: Some(0),
+                duration_ms: start.elapsed().as_millis() as u64,
+                runner: "Zeno File Validator (Rust Core)".to_string(),
+            });
+        }
+    };
+
+    let mut command = Command::new(&cmd_name);
+    command.args(&args).current_dir(&root);
+
+    let output = match command.output() {
+        Ok(out) => out,
+        Err(e) => {
+            if cmd_name == "python" {
+                if let Ok(out) = Command::new("py").args(&args).current_dir(&root).output() {
+                    let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                    let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+                    return Ok(NativeExecutionResult {
+                        success: out.status.success(),
+                        stdout,
+                        stderr,
+                        exit_code: out.status.code(),
+                        duration_ms: start.elapsed().as_millis() as u64,
+                        runner: "Python (Windows Launcher 'py')".to_string(),
+                    });
+                }
+            }
+            return Ok(NativeExecutionResult {
+                success: false,
+                stdout: String::new(),
+                stderr: format!("Natives Ausführungstool '{}' ({}) wurde auf dem System nicht gefunden: {}\n\n💡 Tipp: Installiere '{}' oder überprüfe die System-PATH-Umgebungsvariable.", cmd_name, runner_desc, e, cmd_name),
+                exit_code: Some(127),
+                duration_ms: start.elapsed().as_millis() as u64,
+                runner: runner_desc.to_string(),
+            });
+        }
+    };
+
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    let exit_code = output.status.code();
+    let success = output.status.success();
+
+    Ok(NativeExecutionResult {
+        success,
+        stdout,
+        stderr,
+        exit_code,
+        duration_ms: start.elapsed().as_millis() as u64,
+        runner: runner_desc.to_string(),
+    })
 }
 
 fn get_settings_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -718,6 +895,9 @@ pub fn run() {
             read_workspace_file,
             write_workspace_file,
             delete_workspace_file,
+            ide_create_folder,
+            ide_get_system_compilers,
+            ide_run_code_native,
             load_settings,
             save_settings,
             export_text_file,

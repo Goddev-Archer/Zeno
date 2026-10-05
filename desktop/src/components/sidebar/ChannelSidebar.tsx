@@ -108,20 +108,11 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                 </li>
                 <li>
                   <button 
-                    className={`channel-item ${homeTab === "wasm_hub" ? "active" : ""}`}
-                    onClick={() => setHomeTab("wasm_hub")}
-                  >
-                    <span className="channel-icon"><Icon icon="mage:box-3d" style={{ color: "#3574F0" }} /></span>
-                    <span className="channel-name">⚡ WASM Runtime Hub</span>
-                  </button>
-                </li>
-                <li>
-                  <button 
                     className={`channel-item ${homeTab === "ide" ? "active" : ""}`}
                     onClick={() => setHomeTab("ide")}
                   >
-                    <span className="channel-icon"><Icon icon="mage:code" style={{ color: "#59A869" }} /></span>
-                    <span className="channel-name">🛠️ Zeno Full-IDE</span>
+                    <span className="channel-icon"><Icon icon="mage:code" style={{ color: "var(--accent-color)" }} /></span>
+                    <span className="channel-name">🛠️ Zeno IDE</span>
                   </button>
                 </li>
                 <li>
