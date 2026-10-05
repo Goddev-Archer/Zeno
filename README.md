@@ -4,7 +4,7 @@
 [![Tauri Version](https://img.shields.io/badge/Tauri-v2.0-orange.svg)](https://tauri.app/)
 [![Monaco Editor Support](https://img.shields.io/badge/Editor-Monaco-blueviolet.svg)](https://microsoft.github.io/monaco-editor/)
 
-**Zeno** ist eine dezentrale, hochsichere Kommunikations- und Entwicklungsplattform, die speziell für Entwickler und sicherheitsbewusste Teams konzipiert wurde. Zeno kombiniert Echtzeit-Chats und Voice-Streaming mit einer direkt integrierten, clientseitigen Monaco-Code-Sandbox.
+**Zeno** ist eine dezentrale Kommunikations- und Entwicklungsplattform, die speziell für Entwickler und sicherheitsbewusste Teams konzipiert wurde. Zeno kombiniert Echtzeit-Chats und Voice-Streaming mit einer direkt integrierten, clientseitigen Monaco-Code-Sandbox.
 
 ---
 
@@ -47,8 +47,8 @@ graph TD
 <summary>🛠️ <b>Interaktive Setup-Checkliste (Ausklappen)</b></summary>
 
 ### Vorbereitung
-- [ ] Node.js (v18+) und npm auf deinem System installieren.
-- [ ] Rust-Toolchain installieren (falls Tauri nativ gebaut werden soll).
+- Node.js (v18+) und npm auf deinem System installieren.
+- Rust-Toolchain installieren (falls Tauri nativ gebaut werden soll).
 
 ### Installation & Start
 1. Repository klonen und in das Verzeichnis navigieren.
