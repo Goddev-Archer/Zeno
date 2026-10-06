@@ -67,7 +67,8 @@ export const ZeitschattenVoiceHalo: React.FC<ZeitschattenVoiceHaloProps> = ({
         height: `${size}px`,
         display: "flex",
         alignItems: "center",
-        justifyContent: "center"
+        justifyContent: "center",
+        overflow: "visible"
       }}
     >
       {/* Concentric Zeitschatten Echo Shells */}
@@ -77,7 +78,11 @@ export const ZeitschattenVoiceHalo: React.FC<ZeitschattenVoiceHaloProps> = ({
           // Scale from 1.0 to 1.0 + maxExpansion (Skill Rule 3)
           const scale = 1.0 + tau * maxExpansion * (0.8 + effectiveAudio * 0.4);
           // Sinusoidal fade envelope (Skill Rule 5)
-          const alpha = Math.sin(tau * Math.PI) * (1.0 - 0.35 * tau) * Math.min(effectiveAudio * 1.3, 1.0);
+          const rawAlpha = Math.sin(tau * Math.PI) * (1.0 - 0.35 * tau) * Math.min(effectiveAudio * 1.3, 1.0);
+          const safeAlpha = Math.max(0, Math.min(1, rawAlpha));
+          const hexAlpha = Math.floor(safeAlpha * 180)
+            .toString(16)
+            .padStart(2, "0");
 
           return (
             <div
@@ -92,10 +97,8 @@ export const ZeitschattenVoiceHalo: React.FC<ZeitschattenVoiceHaloProps> = ({
                 pointerEvents: "none",
                 transform: `scale(${scale})`,
                 border: `1.5px solid ${k % 2 === 0 ? color : secondaryColor}`,
-                opacity: alpha * 0.85,
-                boxShadow: `0 0 ${8 + tau * 12}px ${color}${Math.floor(alpha * 180)
-                  .toString(16)
-                  .padStart(2, "0")}`,
+                opacity: safeAlpha * 0.85,
+                boxShadow: `0 0 ${8 + tau * 12}px ${color}${hexAlpha}`,
                 transition: "opacity 0.08s ease"
               }}
             />
@@ -116,7 +119,8 @@ export const ZeitschattenVoiceHalo: React.FC<ZeitschattenVoiceHaloProps> = ({
           boxShadow: isVisible
             ? `0 0 10px ${color}88, inset 0 0 4px ${color}66`
             : "none",
-          transition: "box-shadow 0.15s ease"
+          transition: "box-shadow 0.15s ease",
+          overflow: "visible"
         }}
       >
         {children}

@@ -3,13 +3,16 @@
 export interface Channel {
   id: string;
   name: string;
+  type?: "text" | "voice" | "rules";
   active?: boolean;
   connectedUsers?: string[];
+  syncFile?: string; // e.g. "README.md"
+  rulesReadBy?: string[]; // AINs of users who confirmed reading the rules
 }
 
 export interface Category {
   name: string;
-  type: "text" | "voice";
+  type: "text" | "voice" | "rules";
   channels: Channel[];
 }
 
@@ -100,6 +103,8 @@ export interface Server {
   memberCount?: number;
   isOfficial?: boolean;
   tags?: string[];
+  members?: Profile[];
+  rulesReadBy?: string[];
 }
 
 
@@ -118,6 +123,10 @@ export interface Message {
   color: string;
   code?: string;
   attachment?: MessageAttachment;
+  isBoxed?: boolean;
+  isRulesDoc?: boolean;
+  syncFile?: string;
+  rulesReadBy?: string[];
 }
 
 export interface SocialLink {

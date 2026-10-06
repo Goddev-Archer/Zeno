@@ -21,7 +21,7 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
   showToast,
   hasGitRepo = false
 }) => {
-  const [channelType, setChannelType] = useState<"text" | "voice">("text");
+  const [channelType, setChannelType] = useState<"text" | "voice" | "rules">("text");
   const [channelName, setChannelName] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [autoCommitGit, setAutoCommitGit] = useState<boolean>(hasGitRepo);
@@ -45,12 +45,19 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
-    if (channelType === "text") {
-      // Slugify for text channels
+    if (channelType === "text" || channelType === "rules") {
+      // Slugify for text and rules channels
       const slugified = raw.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-_]/g, "");
       setChannelName(slugified);
     } else {
       setChannelName(raw);
+    }
+  };
+
+  const handleTypeSelect = (type: "text" | "voice" | "rules") => {
+    setChannelType(type);
+    if (type === "rules" && !channelName) {
+      setChannelName("regelwerk");
     }
   };
 
@@ -70,6 +77,8 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
     const newChannel: Channel = {
       id: `chn-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       name: cleanName,
+      type: channelType,
+      syncFile: channelType === "rules" ? "README.md" : undefined,
       connectedUsers: channelType === "voice" ? [] : undefined
     };
 
@@ -118,15 +127,15 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
                 width: "36px",
                 height: "36px",
                 borderRadius: "8px",
-                backgroundColor: "rgba(53, 116, 240, 0.15)",
+                backgroundColor: channelType === "rules" ? "rgba(168, 85, 247, 0.15)" : channelType === "voice" ? "rgba(0, 255, 135, 0.15)" : "rgba(53, 116, 240, 0.15)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "#3574F0",
+                color: channelType === "rules" ? "#A855F7" : channelType === "voice" ? "#00FF87" : "#3574F0",
                 fontSize: "20px"
               }}
             >
-              <Icon icon={channelType === "text" ? "mage:hashtag" : "mage:volume-up"} />
+              <Icon icon={channelType === "rules" ? "mage:shield-check" : channelType === "voice" ? "mage:volume-up" : "mage:hashtag"} />
             </div>
             <div>
               <h2 style={{ fontSize: "16px", fontWeight: "700", margin: 0, color: "#FFF" }}>
@@ -157,48 +166,90 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
           <label style={{ fontSize: "12px", fontWeight: "600", color: "#94A3B8" }}>
             KANAL-TYP
           </label>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
             <button
               type="button"
-              onClick={() => setChannelType("text")}
+              onClick={() => handleTypeSelect("text")}
               style={{
-                padding: "10px 12px",
+                padding: "8px 6px",
                 borderRadius: "8px",
                 border: channelType === "text" ? "1.5px solid #3574F0" : "1px solid #2B2D30",
                 backgroundColor: channelType === "text" ? "rgba(53, 116, 240, 0.12)" : "#18191B",
                 color: channelType === "text" ? "#FFF" : "#94A3B8",
                 display: "flex",
+                flexDirection: "column",
                 alignItems: "center",
-                gap: "8px",
+                gap: "4px",
                 cursor: "pointer",
                 fontWeight: "600",
-                fontSize: "13px"
+                fontSize: "12px",
+                textAlign: "center"
               }}
             >
-              <Icon icon="mage:hashtag" style={{ color: "#3574F0", fontSize: "16px" }} />
+              <Icon icon="mage:hashtag" style={{ color: "#3574F0", fontSize: "18px" }} />
               Text-Kanal
             </button>
             <button
               type="button"
-              onClick={() => setChannelType("voice")}
+              onClick={() => handleTypeSelect("voice")}
               style={{
-                padding: "10px 12px",
+                padding: "8px 6px",
                 borderRadius: "8px",
                 border: channelType === "voice" ? "1.5px solid #00FF87" : "1px solid #2B2D30",
                 backgroundColor: channelType === "voice" ? "rgba(0, 255, 135, 0.12)" : "#18191B",
                 color: channelType === "voice" ? "#FFF" : "#94A3B8",
                 display: "flex",
+                flexDirection: "column",
                 alignItems: "center",
-                gap: "8px",
+                gap: "4px",
                 cursor: "pointer",
                 fontWeight: "600",
-                fontSize: "13px"
+                fontSize: "12px",
+                textAlign: "center"
               }}
             >
-              <Icon icon="mage:volume-up" style={{ color: "#00FF87", fontSize: "16px" }} />
+              <Icon icon="mage:volume-up" style={{ color: "#00FF87", fontSize: "18px" }} />
               Sprach-Kanal
             </button>
+            <button
+              type="button"
+              onClick={() => handleTypeSelect("rules")}
+              style={{
+                padding: "8px 6px",
+                borderRadius: "8px",
+                border: channelType === "rules" ? "1.5px solid #A855F7" : "1px solid #2B2D30",
+                backgroundColor: channelType === "rules" ? "rgba(168, 85, 247, 0.15)" : "#18191B",
+                color: channelType === "rules" ? "#FFF" : "#94A3B8",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "4px",
+                cursor: "pointer",
+                fontWeight: "600",
+                fontSize: "12px",
+                textAlign: "center"
+              }}
+            >
+              <Icon icon="mage:shield-check" style={{ color: "#A855F7", fontSize: "18px" }} />
+              Regelwerk
+            </button>
           </div>
+
+          {channelType === "rules" && (
+            <div
+              style={{
+                padding: "8px 12px",
+                borderRadius: "6px",
+                backgroundColor: "rgba(168, 85, 247, 0.08)",
+                border: "1px solid rgba(168, 85, 247, 0.25)",
+                fontSize: "11px",
+                color: "#E2E8F0",
+                lineHeight: "1.4"
+              }}
+            >
+              🛡️ <strong>Regelwerkskanal (README.md):</strong> Nur der Server-Eigentümer kann hier schreiben. Die Nachricht wird nativ als <code style={{ color: "#A855F7" }}>README.md</code> im Git-Repository synchronisiert und ermöglicht den Mitgliedern eine native Freischaltung.
+            </div>
+          )}
         </div>
 
         {/* Category Dropdown */}

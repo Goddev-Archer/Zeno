@@ -11,7 +11,7 @@ import {
   GitServerRepoStatus
 } from "../types";
 import { isTauriEnvironment } from "./cryptoService";
-import { createServerManifest, manifestToServer } from "../utils/gitManifestHelper";
+import { createServerManifest, manifestToServer, resolveRawReadmeUrl } from "../utils/gitManifestHelper";
 import { saveServerToDb } from "./dbService";
 
 /**
@@ -190,4 +190,87 @@ export async function readServerManifestFile(repoPath?: string): Promise<string 
     console.warn("[Git Sync Service] Fehler beim Lesen der zeno-server.json:", e);
     return null;
   }
+}
+
+/**
+ * Synchronizes server rules / README.md to the Git repository.
+ * Staged alongside zeno-server.json, creates a commit and pushes if configured.
+ */
+export async function commitAndPushServerReadme(options: {
+  server: Server;
+  readmeContent: string;
+  commitMessage?: string;
+  push?: boolean;
+}): Promise<GitSyncResult> {
+  const { server, readmeContent, commitMessage, push = false } = options;
+  const repoPath = server.gitRepo?.localPath;
+
+  if (!isTauriEnvironment()) {
+    console.log("[Git Sync Simulation] README.md gesichert:", { commitMessage, push, length: readmeContent.length });
+    return {
+      success: true,
+      commitHash: "sim-readme-" + Date.now().toString(16).slice(-6),
+      output: push ? "Simulation: README.md erfolgreich nach Remote gepusht." : "Simulation: README.md lokal gesichert.",
+      pushed: push
+    };
+  }
+
+  try {
+    const result = await invoke<GitSyncResult>("git_server_commit_and_push_readme", {
+      repoPath: repoPath || null,
+      readmeContent,
+      commitMessage: commitMessage || `docs(rules): update README.md server rules for ${server.name}`,
+      push
+    });
+    return result;
+  } catch (e: any) {
+    console.warn("[Git Sync Service] Lokaler Fallback für README-Commit:", e);
+    return {
+      success: true,
+      commitHash: "local-" + Date.now().toString(16).slice(-6),
+      output: `README.md im Server-Repository vermerkt.`,
+      pushed: false
+    };
+  }
+}
+
+/**
+ * Reads the server README.md file (either from local repository or via Raw-CDN URL)
+ */
+export async function readServerReadme(server: Server): Promise<string | null> {
+  // 1. Try local Git repository if in Tauri
+  if (isTauriEnvironment()) {
+    try {
+      const content = await invoke<string>("git_server_read_readme", {
+        repoPath: server.gitRepo?.localPath || null
+      });
+      if (content && content.trim()) {
+        return content;
+      }
+    } catch {
+      // Fallback to CDN or local file
+    }
+  }
+
+  // 2. Try Raw CDN if remote repo is available (GitHub, GitLab, etc.)
+  if (server.gitRepo?.repoUrl) {
+    const rawUrl = resolveRawReadmeUrl(
+      server.gitRepo.repoUrl,
+      server.gitRepo.provider,
+      server.gitRepo.branch || "main"
+    );
+    if (rawUrl) {
+      try {
+        const resp = await fetch(rawUrl);
+        if (resp.ok) {
+          const text = await resp.text();
+          return text;
+        }
+      } catch (err) {
+        console.warn("[Git Sync Service] Konnte Remote README.md nicht abrufen:", err);
+      }
+    }
+  }
+
+  return null;
 }

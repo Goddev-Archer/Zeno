@@ -45,6 +45,18 @@ export function resolveRawManifestUrl(
 }
 
 /**
+ * Resolves a Git web/clone URL to the direct raw HTTP URL of README.md (Rules)
+ */
+export function resolveRawReadmeUrl(
+  repoUrl: string,
+  provider: "github" | "gitlab" | "gitea" | "custom_git" | "none" = "github",
+  branch: string = "main"
+): string {
+  if (provider === "none") return "";
+  return resolveRawManifestUrl(repoUrl, provider as any, branch, "README.md");
+}
+
+/**
  * Creates a compliant ZenoServerManifest
  */
 export function createServerManifest(

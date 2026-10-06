@@ -24,13 +24,14 @@ import {
   getActiveIdentityFromDb
 } from "./services/cryptoService";
 import { executeZeroKnowledgeAuth, syncEncryptedVaultToServer } from "./services/backendService";
-import { commitAndPushServerManifest } from "./services/gitServerSyncService";
+import { commitAndPushServerManifest, commitAndPushServerReadme, readServerReadme } from "./services/gitServerSyncService";
 import { executeCodeNatively } from "./services/ideBackendService";
 import {
   saveServerToDb,
   loadServersFromDb,
   saveMessageToDb,
-  loadChannelMessagesFromDb
+  loadChannelMessagesFromDb,
+  deleteMessageFromDb
 } from "./services/dbService";
 import {
   joinVoiceChannel,
@@ -158,6 +159,7 @@ function getContrastColor(hexColor: string): string {
 }
 
 const AVAILABLE_COMMANDS = [
+  { name: "/boxed", desc: "Rendert die Nachricht in einer formatierten Regel-/Infobox", icon: "mage:layout" },
   { name: "/clean", desc: "Reinigt URLs von allen Tracking-Parametern", icon: "mage:shield-check" },
   { name: "/code", desc: "Öffnet den Monaco-Editor für Code-Sharing", icon: "mage:code" },
   { name: "/privacy", desc: "Zeigt die aktuellen Verschlüsselungs-Metriken", icon: "mage:shield" },
@@ -302,6 +304,42 @@ function ZenoMainApp() {
   const [userIdentity, setUserIdentity] = useState<UserIdentity | null>(null);
   const [isSovereignModalOpen, setIsSovereignModalOpen] = useState<boolean>(false);
   const [sovereignModalTab, setSovereignModalTab] = useState<"create" | "restore" | "manage">("create");
+
+  // Server Rules Verification & Acknowledgment State
+  const [rulesAcceptedServers, setRulesAcceptedServers] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem("zeno_rules_accepted_servers");
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const isCurrentUserServerOwner = React.useMemo(() => {
+    if (!activeServer) return true;
+    if (!activeServer.ownerAin) return true; // Default to true if not set (creator or legacy)
+    return activeServer.ownerAin === userIdentity?.ain;
+  }, [activeServer, userIdentity?.ain]);
+
+  const hasAcceptedRules = Boolean(
+    rulesAcceptedServers[activeServer?.id] ||
+    rulesAcceptedServers[`${activeServer?.id}_${activeChannel?.id}`] ||
+    (activeChannel?.rulesReadBy && userIdentity?.ain && activeChannel.rulesReadBy.includes(userIdentity.ain)) ||
+    isCurrentUserServerOwner
+  );
+
+  const handleAcceptRules = (serverId: string, channelId: string) => {
+    setRulesAcceptedServers((prev) => {
+      const next = { ...prev, [serverId]: true, [`${serverId}_${channelId}`]: true };
+      try {
+        localStorage.setItem("zeno_rules_accepted_servers", JSON.stringify(next));
+      } catch (e) {
+        console.error(e);
+      }
+      return next;
+    });
+    showToast("📜 Regelwerk verifiziert & bestätigt! Voller Server-Zugriff freigeschaltet.");
+  };
 
   useEffect(() => {
     getActiveIdentityFromDb().then((activeIdn) => {
@@ -589,10 +627,31 @@ function ZenoMainApp() {
             ...prev,
             [activeChannel.id]: savedMsgs
           }));
+        } else if (activeChannel.type === "rules" || activeChannel.syncFile === "README.md" || activeChannel.name?.toLowerCase() === "regelwerk") {
+          // If rules channel has no messages yet, attempt to load README.md from Git / repo
+          readServerReadme(activeServer).then((readmeContent) => {
+            if (readmeContent && readmeContent.trim()) {
+              const rulesMsg: Message = {
+                id: `zeno-rules-${activeServer.id}`,
+                author: activeServer.name,
+                text: readmeContent,
+                time: "Git README.md",
+                color: "purple",
+                isBoxed: true,
+                isRulesDoc: true,
+                syncFile: "README.md"
+              };
+              setChatMessages((prev) => ({
+                ...prev,
+                [activeChannel.id]: [rulesMsg]
+              }));
+              saveMessageToDb(activeChannel.id, rulesMsg);
+            }
+          });
         }
       });
     }
-  }, [activeChannel?.id]);
+  }, [activeChannel?.id, activeServer]);
 
   const handleSaveProfileConfig = () => {
     const config = {
@@ -1145,15 +1204,38 @@ function ZenoMainApp() {
     e.preventDefault();
     if (!inputText.trim() && !pendingAttachment) return;
 
+    const isRulesChannel = activeChannel.type === "rules" || activeChannel.syncFile === "README.md" || activeChannel.name?.toLowerCase() === "regelwerk";
+
+    // Enforce owner-only writing in rules channels
+    if (isRulesChannel && !isCurrentUserServerOwner) {
+      showToast("🔒 Nur der Server-Eigentümer kann das Regelwerk bearbeiten!");
+      return;
+    }
+
     const time = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     const msgId = `zeno-msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+    let messageText = inputText;
+    let isBoxed = false;
+
+    if (messageText.startsWith("/boxed")) {
+      isBoxed = true;
+      messageText = messageText.slice(6).trim();
+    } else if (isRulesChannel) {
+      // In rules channels, format messages inside a card container by default
+      isBoxed = true;
+    }
+
     const newMsg: Message = {
       id: msgId,
       author: userName || "CipherNaut",
-      text: inputText,
+      text: messageText,
       time,
       color: "purple",
-      attachment: pendingAttachment || undefined
+      attachment: pendingAttachment || undefined,
+      isBoxed,
+      isRulesDoc: isRulesChannel,
+      syncFile: isRulesChannel ? "README.md" : undefined
     };
 
     appendUniqueChatMessage(activeChannel.id, newMsg);
@@ -1183,10 +1265,71 @@ function ZenoMainApp() {
     broadcastNetworkMessage(activeChannel.id, newMsg.author, newMsg.text, newMsg.color, newMsg.time, newMsg.code);
     relayClient.publishMessage(activeServer.id, activeChannel.id, newMsg.author, newMsg.text, userIdentity, myProfileData, msgId);
 
+    // If posting in a rules channel, automatically sync & commit README.md to Git repository!
+    if (isRulesChannel) {
+      commitAndPushServerReadme({
+        server: activeServer,
+        readmeContent: messageText,
+        commitMessage: `docs(rules): update server rules in README.md by ${userName || "CipherNaut"}`,
+        push: false
+      }).then((result) => {
+        if (result.success) {
+          showToast(`📜 README.md im Server-Git synchronisiert (${result.commitHash || "gespeichert"})`);
+        }
+      }).catch((err) => {
+        console.error("Git README sync error:", err);
+      });
+    }
+
     setInputText("");
     setPendingAttachment(null);
     setShowCommandSuggestions(false);
     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+  };
+
+  const handleDeleteChatMessage = async (channelId: string, messageId?: string, messageText?: string) => {
+    // 1. Remove from state
+    setChatMessages((prev) => {
+      const list = prev[channelId] || [];
+      const updated = list.filter((m) => (messageId ? m.id !== messageId : m.text !== messageText));
+      return {
+        ...prev,
+        [channelId]: updated
+      };
+    });
+
+    // 2. Remove from local SQLite database
+    if (messageText) {
+      deleteMessageFromDb(channelId, messageText);
+    }
+
+    // 3. If deleting in a rules channel, automatically sync & commit updated README.md to Git!
+    const isRules = activeChannel?.type === "rules" || activeChannel?.syncFile === "README.md" || activeChannel?.name?.toLowerCase() === "regelwerk";
+    if (isRules && isCurrentUserServerOwner) {
+      const remainingMsgs = (chatMessages[channelId] || []).filter((m) => (messageId ? m.id !== messageId : m.text !== messageText));
+      const newReadme = remainingMsgs.length > 0
+        ? remainingMsgs.map((m) => m.text).join("\n\n---\n\n")
+        : `# ${activeServer.name}\n\n*Das Regelwerk wurde zurückgesetzt.*`;
+
+      try {
+        const gitRes = await commitAndPushServerReadme({
+          server: activeServer,
+          readmeContent: newReadme,
+          commitMessage: `docs(rules): delete message in rules / update README.md for ${activeServer.name}`,
+          push: false
+        });
+        if (gitRes.success) {
+          showToast(`📜 Regelwerk-Nachricht gelöscht & README.md in Git aktualisiert! 🗑️`);
+        } else {
+          showToast("Nachricht gelöscht.");
+        }
+      } catch (err) {
+        console.error("Git README sync on delete error:", err);
+        showToast("Nachricht gelöscht.");
+      }
+    } else {
+      showToast("Nachricht gelöscht.");
+    }
   };
 
   const handleChatAttachmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1872,13 +2015,23 @@ function ZenoMainApp() {
             const connected = relayStatuses.filter((r) => r.status === "connected");
             showToast(`🛰️ ${connected.length}/${relayStatuses.length} Relays verbunden (${connected.map((r) => r.url.replace("wss://", "")).join(", ") || "Keine aktiv"})`);
           }}
+          currentUserAin={userIdentity?.ain}
+          currentUserName={userName || "CipherNaut"}
+          isServerOwner={isCurrentUserServerOwner}
+          onAcceptRules={handleAcceptRules}
+          hasAcceptedRules={hasAcceptedRules}
+          onDeleteMessage={handleDeleteChatMessage}
         />
       )}
 
       {/* 4. MEMBERS SIDEBAR */}
       <MembersSidebar
         activeServerId={activeServerId}
+        activeServer={activeServer}
         isMembersOpen={isMembersOpen}
+        currentUserName={userName || "CipherNaut"}
+        currentUserAin={userIdentity?.ain}
+        isServerOwner={isCurrentUserServerOwner}
         mockProfiles={profiles}
         onSelectProfile={setSelectedUserProfile}
       />

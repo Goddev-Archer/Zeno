@@ -335,6 +335,72 @@ fn git_server_read_manifest(repo_path: Option<String>) -> Result<String, String>
 }
 
 #[tauri::command]
+fn git_server_commit_and_push_readme(
+    repo_path: Option<String>,
+    readme_content: String,
+    commit_message: Option<String>,
+    push: bool,
+) -> Result<GitSyncResult, String> {
+    let dir = resolve_repo_path(repo_path)?;
+    let readme_path = dir.join("README.md");
+
+    // 1. Write the README.md content
+    fs::write(&readme_path, &readme_content)
+        .map_err(|e| format!("Fehler beim Schreiben von README.md: {}", e))?;
+
+    // 2. Git add README.md
+    run_git_in_dir(&dir, &["add", "README.md"])
+        .map_err(|e| format!("git add README.md fehlgeschlagen: {}", e))?;
+
+    // 3. Commit if changed
+    let status = run_git_in_dir(&dir, &["status", "--porcelain", "README.md"])
+        .unwrap_or_default();
+
+    let msg = commit_message.unwrap_or_else(|| "docs(rules): update server rules in README.md".to_string());
+
+    if !status.trim().is_empty() {
+        run_git_in_dir(&dir, &["commit", "-m", &msg])
+            .map_err(|e| format!("git commit fehlgeschlagen: {}", e))?;
+    }
+
+    let commit_hash = run_git_in_dir(&dir, &["rev-parse", "--short", "HEAD"]).ok();
+
+    // 4. Git push if requested
+    let (pushed, push_output) = if push {
+        let branch = run_git_in_dir(&dir, &["rev-parse", "--abbrev-ref", "HEAD"]).unwrap_or_else(|_| "main".to_string());
+        match run_git_in_dir(&dir, &["push", "origin", &branch]) {
+            Ok(out) => (true, if out.is_empty() { "Erfolgreich nach origin gepusht.".to_string() } else { out }),
+            Err(e1) => {
+                match run_git_in_dir(&dir, &["push"]) {
+                    Ok(out) => (true, if out.is_empty() { "Erfolgreich gepusht.".to_string() } else { out }),
+                    Err(_) => (false, format!("Lokal committet ({}), aber Remote-Push fehlgeschlagen: {}", commit_hash.as_deref().unwrap_or("?"), e1))
+                }
+            }
+        }
+    } else {
+        (false, "README.md lokal in Git gesichert (kein Remote-Push angefordert).".to_string())
+    };
+
+    Ok(GitSyncResult {
+        success: true,
+        commit_hash,
+        output: push_output,
+        pushed,
+    })
+}
+
+#[tauri::command]
+fn git_server_read_readme(repo_path: Option<String>) -> Result<String, String> {
+    let dir = resolve_repo_path(repo_path)?;
+    let readme_path = dir.join("README.md");
+    if !readme_path.exists() {
+        return Err("Keine README.md im Repository-Ordner gefunden.".to_string());
+    }
+    fs::read_to_string(readme_path)
+        .map_err(|e| format!("Fehler beim Lesen der README.md: {}", e))
+}
+
+#[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
@@ -794,6 +860,16 @@ fn db_get_channel_messages(
     db::fetch_channel_messages(&conn, &channel_id, limit.unwrap_or(100), offset.unwrap_or(0))
 }
 
+#[tauri::command]
+fn db_delete_message(
+    state: tauri::State<db::DbState>,
+    channel_id: String,
+    text: String,
+) -> Result<(), String> {
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    db::remove_message(&conn, &channel_id, &text)
+}
+
 // --- PHASE 3: VOICE & NETWORK COMMANDS ---
 #[tauri::command]
 fn voice_join(
@@ -891,6 +967,8 @@ pub fn run() {
             git_server_commit_and_push,
             git_server_pull,
             git_server_read_manifest,
+            git_server_commit_and_push_readme,
+            git_server_read_readme,
             list_workspace_files,
             read_workspace_file,
             write_workspace_file,
@@ -920,6 +998,7 @@ pub fn run() {
             db_delete_server,
             db_save_message,
             db_get_channel_messages,
+            db_delete_message,
             // Phase 3 Voice & Network
             voice_join,
             voice_leave,

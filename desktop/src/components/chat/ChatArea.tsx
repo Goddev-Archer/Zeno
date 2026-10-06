@@ -2,6 +2,7 @@ import React from "react";
 import { Icon } from "@iconify/react";
 import { Server, Channel, Message, Profile, MessageAttachment } from "../../types";
 import { cleanUrl } from "../../utils/urlCleaner";
+import { GfmChatRenderer } from "./GfmChatRenderer";
 
 interface ChatAreaProps {
   activeServer: Server;
@@ -33,6 +34,12 @@ interface ChatAreaProps {
   connectedRelaysCount?: number;
   relayTooltip?: string;
   onShowRelayDetails?: () => void;
+  currentUserAin?: string;
+  currentUserName?: string;
+  isServerOwner?: boolean;
+  onAcceptRules?: (serverId: string, channelId: string) => void;
+  hasAcceptedRules?: boolean;
+  onDeleteMessage?: (channelId: string, messageId?: string, messageText?: string) => void;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -64,16 +71,51 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   showToast,
   connectedRelaysCount = 0,
   relayTooltip = "Multi-Relay Transport Status",
-  onShowRelayDetails
+  onShowRelayDetails,
+  currentUserAin,
+  currentUserName = "CipherNaut",
+  isServerOwner = true,
+  onAcceptRules,
+  hasAcceptedRules = false,
+  onDeleteMessage
 }) => {
+  const isRulesChannel = activeChannel?.type === "rules" || activeChannel?.name?.toLowerCase() === "regelwerk";
+
   return (
     <main className="chat-area">
       <header className="chat-header">
         <div className="chat-header-left chat-header-info">
-          <span className="chat-header-icon"><Icon icon="mage:hashtag" /></span>
+          <span className="chat-header-icon" style={{ color: isRulesChannel ? "#A855F7" : undefined }}>
+            <Icon icon={isRulesChannel ? "mage:shield-check" : activeChannel?.type === "voice" ? "mage:volume-up" : "mage:hashtag"} />
+          </span>
           <h2 className="chat-header-channel">{activeChannel?.name || "allgemein"}</h2>
+          {isRulesChannel && (
+            <span
+              className="badge"
+              style={{
+                backgroundColor: "rgba(168, 85, 247, 0.15)",
+                color: "#C084FC",
+                border: "1px solid rgba(168, 85, 247, 0.35)",
+                fontSize: "10px",
+                fontWeight: "700",
+                padding: "2px 8px",
+                marginLeft: "8px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px"
+              }}
+              title="Dieses Regelwerk wird nativ als README.md im Git-Repository synchronisiert"
+            >
+              <Icon icon="octicon:git-branch-16" style={{ fontSize: "11px" }} />
+              README.MD REGELWERK
+            </span>
+          )}
           <span className="chat-header-divider" />
-          <p className="chat-header-description">Kanal für {activeChannel?.name || "allgemein"} in {activeServer?.name || "Server"}</p>
+          <p className="chat-header-description">
+            {isRulesChannel 
+              ? `Offizielles Server-Regelwerk für ${activeServer?.name || "Server"} (Git-synchronisiert)`
+              : `Kanal für ${activeChannel?.name || "allgemein"} in ${activeServer?.name || "Server"}`}
+          </p>
 
           {/* Live Multi-Relay Status Badge */}
           <div
@@ -138,10 +180,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           const urlMatch = msg.text ? msg.text.match(/(https?:\/\/[^\s]+)/) : null;
           const foundUrl = urlMatch ? urlMatch[0] : null;
           const urlDetails = foundUrl ? cleanUrl(foundUrl) : null;
+          const canDelete = isServerOwner || msg.author === (currentUserName || "CipherNaut");
 
           return (
             <article 
-              key={i} 
+              key={msg.id || i} 
               className="message message-animate"
               style={{ "--idx": Math.min(i, 6) } as React.CSSProperties}
             >
@@ -154,30 +197,43 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 {msg.author[0]}
               </div>
               <div className="message-body">
-                <header className="message-header">
-                  <span className={`message-author ${msg.color}`} onClick={() => setSelectedUserProfile(mockProfiles[msg.author] || null)} style={{ cursor: "pointer" }}>
-                    {msg.author}
-                  </span>
-                  {mockProfiles[msg.author]?.role === "Bot" && <span className="badge bot-badge">BOT</span>}
-                  <time className="message-timestamp">{msg.time}</time>
+                <header className="message-header" style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span className={`message-author ${msg.color}`} onClick={() => setSelectedUserProfile(mockProfiles[msg.author] || null)} style={{ cursor: "pointer" }}>
+                      {msg.author}
+                    </span>
+                    {mockProfiles[msg.author]?.role === "Bot" && <span className="badge bot-badge">BOT</span>}
+                    <time className="message-timestamp">{msg.time}</time>
+                  </div>
+                  {canDelete && (
+                    <button
+                      type="button"
+                      className="message-delete-action-btn"
+                      onClick={() => {
+                        if (window.confirm("Möchtest du diese Nachricht wirklich löschen?")) {
+                          onDeleteMessage && onDeleteMessage(activeChannel?.id || "allgemein", msg.id, msg.text);
+                        }
+                      }}
+                      title="Nachricht löschen"
+                    >
+                      <Icon icon="mage:trash" />
+                    </button>
+                  )}
                 </header>
                 <div className="message-content">
-                  <p>
-                    {foundUrl && urlDetails ? (
-                      <>
-                        {msg.text.split(foundUrl)[0]}
-                        <span 
-                          style={{ color: "var(--glow-color-1, #3574F0)", textDecoration: "underline", cursor: "pointer", fontWeight: "600" }} 
-                          onClick={() => openInPrivacyBrowser(foundUrl)}
-                        >
-                          {urlDetails.cleanedUrl}
-                        </span>
-                        {msg.text.split(foundUrl)[1]}
-                      </>
-                    ) : (
-                      msg.text
-                    )}
-                  </p>
+                  <GfmChatRenderer
+                    text={msg.text}
+                    isBoxed={msg.isBoxed || isRulesChannel}
+                    author={msg.author}
+                    time={msg.time}
+                    onOpenPrivacyBrowser={openInPrivacyBrowser}
+                    showToast={showToast}
+                    onDelete={canDelete ? () => {
+                      if (window.confirm("Möchtest du diesen Eintrag wirklich löschen?")) {
+                        onDeleteMessage && onDeleteMessage(activeChannel?.id || "allgemein", msg.id, msg.text);
+                      }
+                    } : undefined}
+                  />
 
                   {/* Privacy Preserving Link Preview Card */}
                   {foundUrl && urlDetails && (
@@ -278,6 +334,77 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             </article>
           );
         })}
+
+        {/* Sovereign Rules Verification & Unlock Banner */}
+        {isRulesChannel && (
+          <div className="rules-verification-banner">
+            <div className="rules-verification-info">
+              <div
+                className="rules-verification-icon-wrap"
+                style={{ color: hasAcceptedRules ? "#00FF87" : "#A855F7" }}
+              >
+                <Icon icon={hasAcceptedRules ? "mage:check-circle" : "mage:shield-check"} style={{ fontSize: "24px" }} />
+              </div>
+              <div className="rules-verification-text">
+                <h4 className="rules-verification-title" style={{ margin: "0 0 2px 0", fontSize: "13px", fontWeight: "700", color: "#FFF" }}>
+                  {hasAcceptedRules ? "Regelwerk verifiziert & bestätigt ✓" : "Souveräne Regelwerk-Freischaltung"}
+                </h4>
+                <p className="rules-verification-desc" style={{ margin: 0, fontSize: "11px", color: "#94A3B8", lineHeight: "1.4" }}>
+                  {hasAcceptedRules
+                    ? `Du hast dieses Regelwerk mit deiner souveränen Identität (${currentUserAin || "AIN"}) bestätigt und bist für diesen Server freigeschaltet.`
+                    : "Bestätige dieses Regelwerk nativ mit deiner dezentralen Identität, um den vollen Server-Zugriff freizuschalten – ohne externe Verify-Bots."}
+                </p>
+              </div>
+            </div>
+            <div className="rules-verification-actions">
+              {hasAcceptedRules ? (
+                <div
+                  className="rules-verified-pill"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    padding: "6px 12px",
+                    borderRadius: "20px",
+                    backgroundColor: "rgba(0, 255, 135, 0.12)",
+                    border: "1px solid rgba(0, 255, 135, 0.3)",
+                    color: "#00FF87",
+                    fontSize: "11px",
+                    fontWeight: "600"
+                  }}
+                >
+                  <Icon icon="mage:check" /> Freigeschaltet
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="rules-accept-btn"
+                  onClick={() => onAcceptRules && onAcceptRules(activeServer?.id || "", activeChannel?.id || "")}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    padding: "7px 14px",
+                    borderRadius: "8px",
+                    backgroundColor: "#A855F7",
+                    border: "none",
+                    color: "#FFF",
+                    fontSize: "11px",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                    boxShadow: "0 2px 8px rgba(168, 85, 247, 0.4)",
+                    transition: "all 0.15s ease"
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#9333EA")}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#A855F7")}
+                >
+                  <Icon icon="mage:check" /> Regelwerk gelesen & freischalten
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         <div ref={messagesEndRef} />
       </div>
 
@@ -342,34 +469,105 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           </div>
         )}
 
-        <form className="message-input-container" onSubmit={handleSendMessage}>
-          <button className="input-action-btn" type="button" onClick={() => chatAttachmentInputRef.current?.click()} title="Anhang hinzufügen">
-            <Icon icon="mage:plus" />
-          </button>
-          <div className="message-input-wrapper">
-            <input
-              type="text"
-              className="message-input"
-              id="chat-input-field"
-              placeholder={`Nachrichten an #${activeChannel?.name || "allgemein"}`}
-              value={inputText}
-              onChange={(e) => {
-                const val = e.target.value;
-                setInputText(val);
-                setShowCommandSuggestions(val.startsWith("/"));
+        {isRulesChannel && !isServerOwner ? (
+          <div
+            className="rules-input-locked"
+            style={{
+              padding: "14px 18px",
+              margin: "6px 12px 10px 12px",
+              backgroundColor: "rgba(24, 25, 27, 0.95)",
+              border: "1px solid rgba(168, 85, 247, 0.25)",
+              borderRadius: "8px",
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              color: "#94A3B8",
+              fontSize: "12px"
+            }}
+          >
+            <Icon icon="mage:lock" style={{ fontSize: "18px", color: "#A855F7", flexShrink: 0 }} />
+            <span>
+              🔒 <strong>Schreibgeschützt:</strong> Nur der Server-Eigentümer kann in diesem Regelwerkskanal schreiben. Bestätige das Regelwerk oben für deine Freischaltung.
+            </span>
+          </div>
+        ) : (
+          <>
+            {isRulesChannel && isServerOwner && (
+              <div
+                style={{
+                  padding: "6px 16px",
+                  fontSize: "11px",
+                  color: "#C084FC",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  backgroundColor: "rgba(168, 85, 247, 0.08)",
+                  borderTop: "1px solid rgba(168, 85, 247, 0.2)"
+                }}
+              >
+                <Icon icon="octicon:git-branch-16" />
+                <span>
+                  <strong>Eigentümer-Modus:</strong> Neue Nachrichten werden automatisch als <code>README.md</code> in Git synchronisiert. Tipp: Nutze <code>/boxed</code> für Card-Layout.
+                </span>
+              </div>
+            )}
+            <form
+              className="message-input-container"
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSendMessage(e);
+                const field = document.getElementById("chat-input-field") as HTMLTextAreaElement | null;
+                if (field) field.style.height = "auto";
               }}
-              autoComplete="off"
-            />
-          </div>
-          <div className="input-actions-right">
-            <button className="input-action-btn" type="button" onClick={() => { setEditorCode(""); setEditorWorkflowStep("select_action"); setIsEditorOpen(true); }} title="Codeblock teilen">
-              <Icon icon="mage:code" />
-            </button>
-            <button className="input-action-btn" type="button" onClick={() => showToast("Emojis sind deaktiviert")} title="Emoji hinzufügen">
-              <Icon icon="mage:smile" />
-            </button>
-          </div>
-        </form>
+            >
+              <button className="input-action-btn" type="button" onClick={() => chatAttachmentInputRef.current?.click()} title="Anhang hinzufügen">
+                <Icon icon="mage:plus" />
+              </button>
+              <div className="message-input-wrapper">
+                <textarea
+                  className="message-input"
+                  id="chat-input-field"
+                  rows={1}
+                  placeholder={
+                    isRulesChannel
+                      ? "Regelwerk verfassen (Markdown unterstützt, Shift+Enter für Zeilenumbruch)..."
+                      : `Nachrichten an #${activeChannel?.name || "allgemein"} (Shift+Enter für Zeilenumbruch)`
+                  }
+                  value={inputText}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setInputText(val);
+                    setShowCommandSuggestions(val.startsWith("/"));
+                    // Auto-grow textarea height
+                    e.target.style.height = "auto";
+                    e.target.style.height = `${Math.min(e.target.scrollHeight, 220)}px`;
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage(e);
+                      e.currentTarget.style.height = "auto";
+                    }
+                  }}
+                  autoComplete="off"
+                />
+              </div>
+              <div className="input-actions-right">
+                <button className="input-action-btn" type="button" onClick={() => { setEditorCode(""); setEditorWorkflowStep("select_action"); setIsEditorOpen(true); }} title="Codeblock teilen">
+                  <Icon icon="mage:code" />
+                </button>
+                <button
+                  className="input-action-btn send-btn"
+                  type="submit"
+                  title="Senden (Enter)"
+                  style={{ color: inputText.trim() ? "var(--accent-color, #38BDF8)" : undefined }}
+                >
+                  <Icon icon="mage:send" />
+                </button>
+              </div>
+            </form>
+          </>
+        )}
       </footer>
     </main>
   );

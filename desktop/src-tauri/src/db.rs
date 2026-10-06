@@ -249,6 +249,14 @@ pub fn fetch_channel_messages(
     Ok(result)
 }
 
+pub fn remove_message(conn: &Connection, channel_id: &str, text: &str) -> Result<(), String> {
+    conn.execute(
+        "DELETE FROM messages WHERE channel_id = ?1 AND text = ?2",
+        params![channel_id, text],
+    ).map_err(|e| format!("SQLite Message Delete Error: {}", e))?;
+    Ok(())
+}
+
 // --- IDENTITY OPERATIONS ---
 
 pub fn insert_or_update_identity(conn: &Connection, idn: &DbIdentityRecord) -> Result<(), String> {

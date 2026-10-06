@@ -160,3 +160,18 @@ export async function loadChannelMessagesFromDb(
     return null;
   }
 }
+
+/**
+ * Deletes a message from the SQLite database
+ */
+export async function deleteMessageFromDb(channelId: string, text: string): Promise<boolean> {
+  if (!isTauriEnvironment()) return true;
+
+  try {
+    await invoke("db_delete_message", { channelId, text });
+    return true;
+  } catch (e) {
+    console.error("[Zeno SQLite] Fehler beim Löschen der Nachricht:", e);
+    return false;
+  }
+}
