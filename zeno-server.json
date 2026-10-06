@@ -7,7 +7,7 @@
   "iconLetter": "🌐",
   "encrypted": true,
   "ownerAin": "ZENO-D432-EAA1-8B01",
-  "createdAt": "2026-10-06T07:25:18.088Z",
+  "createdAt": "2026-10-06T07:25:29.016Z",
   "gitRepo": {
     "provider": "github",
     "repoUrl": "https://github.com/Goddev-Archer/FirstTestServer",
@@ -36,6 +36,10 @@
         {
           "id": "chn-1790848688234-3",
           "name": "git-updates"
+        },
+        {
+          "id": "chn-1791271528990-igyr",
+          "name": "regelwerk"
         }
       ]
     },
