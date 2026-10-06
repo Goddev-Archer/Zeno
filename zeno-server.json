@@ -7,7 +7,7 @@
   "iconLetter": "🌐",
   "encrypted": true,
   "ownerAin": "ZENO-D432-EAA1-8B01",
-  "createdAt": "2026-10-06T08:05:01.639Z",
+  "createdAt": "2026-10-06T08:05:38.597Z",
   "gitRepo": {
     "provider": "github",
     "repoUrl": "https://github.com/Goddev-Archer/FirstTestServer",
@@ -53,7 +53,14 @@
     {
       "name": "NEWS & RULESET",
       "type": "text",
-      "channels": []
+      "channels": [
+        {
+          "id": "chn-1791273938552-l82v",
+          "name": "regelwerk",
+          "type": "rules",
+          "syncFile": "README.md"
+        }
+      ]
     }
   ]
 }
