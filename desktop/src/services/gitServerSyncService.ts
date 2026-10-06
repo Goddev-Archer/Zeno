@@ -33,10 +33,10 @@ export function serverToManifest(server: Server): ZenoServerManifest {
 /**
  * Fetches the live Git repository status for a server repository
  */
-export async function getServerRepoStatus(repoPath?: string): Promise<GitServerRepoStatus | null> {
+export async function getServerRepoStatus(repoPath?: string, serverId?: string): Promise<GitServerRepoStatus | null> {
   if (!isTauriEnvironment()) {
     return {
-      repoPath: repoPath || "c:/dev/Zeno (Web Dev Simulation)",
+      repoPath: repoPath || "instances/default (Web Dev Simulation)",
       branch: "main",
       isClean: true,
       hasRemote: true,
@@ -48,6 +48,7 @@ export async function getServerRepoStatus(repoPath?: string): Promise<GitServerR
 
   try {
     const status = await invoke<GitServerRepoStatus>("git_server_get_status", {
+      serverId: serverId || null,
       repoPath: repoPath || null
     });
     return status;
@@ -86,6 +87,7 @@ export async function commitAndPushServerManifest(options: {
 
   try {
     const result = await invoke<GitSyncResult>("git_server_commit_and_push", {
+      serverId: server.id,
       repoPath: repoPath || server.gitRepo?.localPath || null,
       manifestContent,
       commitMessage: commitMessage || `feat(server): update ${server.name} channels and categories`,
@@ -132,6 +134,7 @@ export async function pullServerManifest(options: {
 
   try {
     const result = await invoke<GitPullResult>("git_server_pull", {
+      serverId: currentServer.id,
       repoPath: repoPath || currentServer.gitRepo?.localPath || null
     });
 
@@ -217,6 +220,7 @@ export async function commitAndPushServerReadme(options: {
 
   try {
     const result = await invoke<GitSyncResult>("git_server_commit_and_push_readme", {
+      serverId: server.id,
       repoPath: repoPath || null,
       readmeContent,
       commitMessage: commitMessage || `docs(rules): update README.md server rules for ${server.name}`,
@@ -242,6 +246,7 @@ export async function readServerReadme(server: Server): Promise<string | null> {
   if (isTauriEnvironment()) {
     try {
       const content = await invoke<string>("git_server_read_readme", {
+        serverId: server.id,
         repoPath: server.gitRepo?.localPath || null
       });
       if (content && content.trim()) {
