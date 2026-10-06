@@ -69,7 +69,7 @@ Zeno kapselt den verschlüsselten Raum-Payload in ein standardisiertes Nostr-Eve
     badge: "100% Anonym",
     badgeColor: "#10B981",
     category: "Relays & Networking",
-    summary: "Routen von Zeno-Nachrichten über Tor Hidden Services ohne DNS, ohne öffentliche IP und immun gegen Sperren.",
+    summary: "Routen von Zeno-Nachrichten über Tor Hidden Services ohne DNS, ohne öffentliche IP und resistent gegen Netzwerkblockaden.",
     markdown: `
 # 🧅 Tor & .onion Relays für maximale Anonymität
 
@@ -259,28 +259,40 @@ Die Zeno-Clients aktualisieren ihre Kanalliste beim nächsten Abgleich automatis
 `
   },
   {
-    id: "eu-chatkontrolle-recht",
-    title: "EU-Chatkontrolle & Rechtlicher Entwicklerschutz",
-    icon: "mage:information-circle",
-    badge: "Rechtsanalyse",
-    badgeColor: "#EF4444",
+    id: "digitale-grundrechte-recht",
+    title: "Digitale Grundrechte & Rechtlicher Entwicklerschutz (Art. 10 GG / Art. 8 EMRK)",
+    icon: "mage:shield-check",
+    badge: "Grundrechte",
+    badgeColor: "#10B981",
     category: "Recht & Privatsphäre",
-    summary: "Die juristische Trennung zwischen FOSS-Software und Dienstanbietern – warum Entwickler geschützt sind.",
+    summary: "Fernmeldegeheimnis, Berufsgeheimnisträger (§ 203 StGB) und die FOSS-Wissenschaftsfreiheit im Lichte moderner Kryptografie.",
     markdown: `
-# ⚖️ EU-Chatkontrolle & Rechtlicher Entwicklerschutz
+# ⚖️ Digitale Grundrechte & Rechtlicher Entwicklerschutz
 
-Die geplante EU-Chatkontrolle (CSAR) will Anbieter von Messengern zwingen, Nachrichten **auf dem Endgerät zu scannen**, bevor sie verschlüsselt werden.
+Das Brief-, Post- und Fernmeldegeheimnis (**Art. 10 GG**) sowie das Recht auf Schutz des Privatlebens und der Korrespondenz (**Art. 8 EMRK**) sind unantastbare Pfeiler einer freien rechtsstaatlichen Gesellschaft.
 
 ---
 
-### Warum Open-Source-Entwickler geschützt sind
+### 1. Schutz vertraulicher Berufsgeheimnisse (§ 203 StGB)
+Ärzte, Psychotherapeuten, Rechtsanwälte, Notare, Journalisten (Informantenschutz) und Seelsorger sind gesetzlich verpflichtet, das Berufsgeheimnis ihrer Mandanten und Patienten lückenlos zu wahren.
+* **Gefährdung durch zentrale Plattformen:** Zentrale Serverbetreiber oder staatliche Hintertüren gefährden das Berufsgeheimnis unmittelbar strafrechtlich.
+* **Zenos Zero-Knowledge-Garantie:** Da Zeno kryptografische Schlüssel ausschließlich lokal auf den Endgeräten der Teilnehmer verwahrt, ist ein unbefugter Dritter oder Relay-Betreiber mathematisch ausgeschlossen.
 
-1. **Reine Software vs. Dienstanbieter:**
-   Das Gesetz richtet sich an *gewerbliche Betreiber von interpersonellen Kommunikationsdiensten* (wie WhatsApp oder Telegram). Wer Open-Source-Code auf GitHub veröffentlicht, betreibt keinen Dienst.
-2. **Die Haftungsfalle vermeiden:**
-   Betreibe niemals ein zentrales Relay unter deinem Klarnamen. Überlasse das Hosting den Communitys und Admins.
-3. **Quellcode ist freie Meinungsäußerung:**
-   Das Veröffentlichen von mathematischen Algorithmen (Kryptografie) ist in der EU durch die Charta der Grundrechte (Wissenschafts- und Informationsfreiheit) geschützt.
+---
+
+### 2. Reine FOSS-Software vs. Dienstanbieter
+* **Kein Plattform-Betreiber:** Zeno ist keine gewerbliche Kommunikationsplattform, sondern ein freies Open-Source-Protokoll und Client-Werkzeug.
+* **Entwicklerhaftung:** Wer quelloffene Software oder kryptografische Bibliotheken entwickelt und veröffentlicht, betreibt keinen regulierten Telekommunikationsdienst. Das Hosting von Relays und Räumen liegt vollständig dezentral in den Händen der jeweiligen Betreiber und Gemeinschaften.
+
+---
+
+### 3. Wissenschafts- und Informationsfreiheit (Art. 5 GG & Charta der Grundrechte)
+Das Erforschen, Implementieren und Publizieren moderner kryptografischer Verfahren (wie AES-256-GCM, SFrame und MLS/Sender Keys) ist völker- und verfassungsrechtlich als Bestandteil der Wissenschafts-, Forschungs- und Meinungsäußerungsfreiheit geschützt.
+
+---
+
+### 4. Zero-Knowledge-Architektur als Rechtsstandard
+Weder Relays noch Netzwerkknoten besitzen Schlüssel zur Entschlüsselung. Da über Relays ausschließlich nicht einsehbare Chiffrat-Blobs transportiert werden, besteht für Relay-Betreiber zu keinem Zeitpunkt Einsicht in vertrauliche Kommunikationsinhalte.
 `
   }
 ];

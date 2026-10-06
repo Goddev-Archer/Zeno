@@ -31,7 +31,8 @@ import {
   loadServersFromDb,
   saveMessageToDb,
   loadChannelMessagesFromDb,
-  deleteMessageFromDb
+  deleteMessageFromDb,
+  deleteMessageByIdFromDb
 } from "./services/dbService";
 import {
   joinVoiceChannel,
@@ -1226,6 +1227,10 @@ function ZenoMainApp() {
       isBoxed = true;
     }
 
+    if (!messageText.trim() && !pendingAttachment) {
+      return;
+    }
+
     const newMsg: Message = {
       id: msgId,
       author: userName || "CipherNaut",
@@ -1299,9 +1304,10 @@ function ZenoMainApp() {
     });
 
     // 2. Remove from local SQLite database
-    if (messageText) {
-      deleteMessageFromDb(channelId, messageText);
+    if (messageId && !isNaN(Number(messageId))) {
+      deleteMessageByIdFromDb(Number(messageId));
     }
+    deleteMessageFromDb(channelId, messageText ?? "");
 
     // 3. If deleting in a rules channel, automatically sync & commit updated README.md to Git!
     const isRules = activeChannel?.type === "rules" || activeChannel?.syncFile === "README.md" || activeChannel?.name?.toLowerCase() === "regelwerk";

@@ -177,6 +177,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         </div>
 
         {(chatMessages[activeChannel?.id || "allgemein"] || []).map((msg, i) => {
+          if (!msg.text?.trim() && !msg.code && !msg.attachment) {
+            return null;
+          }
           const urlMatch = msg.text ? msg.text.match(/(https?:\/\/[^\s]+)/) : null;
           const foundUrl = urlMatch ? urlMatch[0] : null;
           const urlDetails = foundUrl ? cleanUrl(foundUrl) : null;

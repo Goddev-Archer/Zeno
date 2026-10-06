@@ -277,8 +277,8 @@ SICHERHEITSHINWEISE:
 - Zeno speichert keine Passwörter auf zentralen Servern.
 - Dieser Schlüssel ist deine einzige Möglichkeit, deine Identität
   und Chats auf neuen Geräten wiederherzustellen.
-- Immun gegen EU-Client-Side-Scanning: Deine Schlüssel verlassen
-  niemals dein lokales Gerät.
+- Zero-Knowledge-Architektur: Deine Schlüssel verlassen
+  niemals dein lokales Gerät und sind vor Fremdzugriff geschützt.
 =====================================================`;
     const filename = `zeno-backup-${ain.toLowerCase()}.txt`;
     try {

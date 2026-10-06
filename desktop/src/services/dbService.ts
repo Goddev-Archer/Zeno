@@ -147,14 +147,17 @@ export async function loadChannelMessagesFromDb(
 
     if (!records) return null;
 
-    return records.map((r) => ({
-      author: r.author,
-      text: r.text,
-      time: r.time,
-      color: r.color,
-      code: r.code,
-      attachment: r.attachmentJson ? JSON.parse(r.attachmentJson) : undefined
-    }));
+    return records
+      .filter((r) => (r.text && r.text.trim().length > 0) || Boolean(r.code) || Boolean(r.attachmentJson))
+      .map((r) => ({
+        id: r.id ? String(r.id) : undefined,
+        author: r.author,
+        text: r.text,
+        time: r.time,
+        color: r.color,
+        code: r.code,
+        attachment: r.attachmentJson ? JSON.parse(r.attachmentJson) : undefined
+      }));
   } catch (e) {
     console.error("[Zeno SQLite] Fehler beim Laden der Nachrichten:", e);
     return null;
@@ -168,10 +171,25 @@ export async function deleteMessageFromDb(channelId: string, text: string): Prom
   if (!isTauriEnvironment()) return true;
 
   try {
-    await invoke("db_delete_message", { channelId, text });
+    await invoke("db_delete_message", { channelId, text: text || "" });
     return true;
   } catch (e) {
     console.error("[Zeno SQLite] Fehler beim Löschen der Nachricht:", e);
+    return false;
+  }
+}
+
+/**
+ * Deletes a message by its numeric primary key from the SQLite database
+ */
+export async function deleteMessageByIdFromDb(messageId: number): Promise<boolean> {
+  if (!isTauriEnvironment()) return true;
+
+  try {
+    await invoke("db_delete_message_by_id", { messageId });
+    return true;
+  } catch (e) {
+    console.error("[Zeno SQLite] Fehler beim Löschen der Nachricht per ID:", e);
     return false;
   }
 }

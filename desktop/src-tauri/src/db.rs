@@ -115,6 +115,12 @@ fn init_schema(conn: &Connection) -> SqlResult<()> {
     let _ = conn.execute("ALTER TABLE identities ADD COLUMN mnemonic TEXT", []);
     let _ = conn.execute("ALTER TABLE identities ADD COLUMN is_active INTEGER DEFAULT 1", []);
 
+    // Safe cleanup of legacy empty ghost messages
+    let _ = conn.execute(
+        "DELETE FROM messages WHERE TRIM(text) = '' AND (code IS NULL OR TRIM(code) = '') AND (attachment_json IS NULL OR TRIM(attachment_json) = '')",
+        [],
+    );
+
     Ok(())
 }
 
@@ -250,10 +256,23 @@ pub fn fetch_channel_messages(
 }
 
 pub fn remove_message(conn: &Connection, channel_id: &str, text: &str) -> Result<(), String> {
-    conn.execute(
-        "DELETE FROM messages WHERE channel_id = ?1 AND text = ?2",
-        params![channel_id, text],
-    ).map_err(|e| format!("SQLite Message Delete Error: {}", e))?;
+    if text.trim().is_empty() {
+        conn.execute(
+            "DELETE FROM messages WHERE channel_id = ?1 AND (TRIM(text) = '' OR text = ?2)",
+            params![channel_id, text],
+        ).map_err(|e| format!("SQLite Message Delete Error: {}", e))?;
+    } else {
+        conn.execute(
+            "DELETE FROM messages WHERE channel_id = ?1 AND text = ?2",
+            params![channel_id, text],
+        ).map_err(|e| format!("SQLite Message Delete Error: {}", e))?;
+    }
+    Ok(())
+}
+
+pub fn remove_message_by_id(conn: &Connection, id: i64) -> Result<(), String> {
+    conn.execute("DELETE FROM messages WHERE id = ?1", params![id])
+        .map_err(|e| format!("SQLite Message Delete Error: {}", e))?;
     Ok(())
 }
 

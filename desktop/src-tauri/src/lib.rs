@@ -186,11 +186,24 @@ pub struct GitServerRepoStatus {
     pub manifest_exists: bool,
 }
 
-fn resolve_repo_path(custom_path: Option<String>) -> Result<PathBuf, String> {
+fn resolve_instance_dir(
+    app: &tauri::AppHandle,
+    server_id: Option<String>,
+    custom_path: Option<String>,
+) -> Result<PathBuf, String> {
+    // 1. If explicit custom_path provided:
     if let Some(path_str) = custom_path {
         let trimmed = path_str.trim();
         if !trimmed.is_empty() {
             let path = PathBuf::from(trimmed);
+            // Strict safety check: NEVER allow using the Zeno development project root!
+            if let Some(git_root) = find_git_root() {
+                if let (Ok(c_path), Ok(c_root)) = (path.canonicalize(), git_root.canonicalize()) {
+                    if c_path == c_root {
+                        return Err("Sicherheitsblockade: Das Quellcode-Repository von Zeno kann nicht als Server-Instanzordner verwendet werden. Instanzen erhalten einen isolierten Datenspeicher.".to_string());
+                    }
+                }
+            }
             if path.exists() && path.is_dir() {
                 return Ok(path);
             } else {
@@ -198,12 +211,39 @@ fn resolve_repo_path(custom_path: Option<String>) -> Result<PathBuf, String> {
             }
         }
     }
-    find_git_root().ok_or_else(|| "Kein Git-Repository im aktuellen Workspace gefunden.".to_string())
+
+    // 2. Default isolated instance directory inside app_data_dir/instances/<sanitized_id>
+    let base_dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let raw_id = server_id.unwrap_or_else(|| "default-instance".to_string());
+    let sanitized_id: String = raw_id
+        .chars()
+        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .collect();
+
+    let instance_dir = base_dir.join("instances").join(sanitized_id);
+    if !instance_dir.exists() {
+        fs::create_dir_all(&instance_dir)
+            .map_err(|e| format!("Konnte Instanzordner nicht anlegen: {}", e))?;
+    }
+
+    // Initialize clean git repository if not yet present
+    let git_dir = instance_dir.join(".git");
+    if !git_dir.exists() {
+        let _ = run_git_in_dir(&instance_dir, &["init"]);
+        let _ = run_git_in_dir(&instance_dir, &["config", "user.name", "Zeno Instance"]);
+        let _ = run_git_in_dir(&instance_dir, &["config", "user.email", "instance@zeno.local"]);
+    }
+
+    Ok(instance_dir)
 }
 
 #[tauri::command]
-fn git_server_get_status(repo_path: Option<String>) -> Result<GitServerRepoStatus, String> {
-    let dir = resolve_repo_path(repo_path)?;
+fn git_server_get_status(
+    app: tauri::AppHandle,
+    server_id: Option<String>,
+    repo_path: Option<String>,
+) -> Result<GitServerRepoStatus, String> {
+    let dir = resolve_instance_dir(&app, server_id, repo_path)?;
     let branch = run_git_in_dir(&dir, &["rev-parse", "--abbrev-ref", "HEAD"])
         .unwrap_or_else(|_| "main".to_string());
     
@@ -233,12 +273,14 @@ fn git_server_get_status(repo_path: Option<String>) -> Result<GitServerRepoStatu
 
 #[tauri::command]
 fn git_server_commit_and_push(
+    app: tauri::AppHandle,
+    server_id: Option<String>,
     repo_path: Option<String>,
     manifest_content: String,
     commit_message: Option<String>,
     push: bool,
 ) -> Result<GitSyncResult, String> {
-    let dir = resolve_repo_path(repo_path)?;
+    let dir = resolve_instance_dir(&app, server_id, repo_path)?;
     let manifest_path = dir.join("zeno-server.json");
 
     // 1. Write the manifest content
@@ -287,8 +329,12 @@ fn git_server_commit_and_push(
 }
 
 #[tauri::command]
-fn git_server_pull(repo_path: Option<String>) -> Result<GitPullResult, String> {
-    let dir = resolve_repo_path(repo_path)?;
+fn git_server_pull(
+    app: tauri::AppHandle,
+    server_id: Option<String>,
+    repo_path: Option<String>,
+) -> Result<GitPullResult, String> {
+    let dir = resolve_instance_dir(&app, server_id, repo_path)?;
     let pull_res = run_git_in_dir(&dir, &["pull"]);
     let manifest_path = dir.join("zeno-server.json");
 
@@ -324,8 +370,12 @@ fn git_server_pull(repo_path: Option<String>) -> Result<GitPullResult, String> {
 }
 
 #[tauri::command]
-fn git_server_read_manifest(repo_path: Option<String>) -> Result<String, String> {
-    let dir = resolve_repo_path(repo_path)?;
+fn git_server_read_manifest(
+    app: tauri::AppHandle,
+    server_id: Option<String>,
+    repo_path: Option<String>,
+) -> Result<String, String> {
+    let dir = resolve_instance_dir(&app, server_id, repo_path)?;
     let manifest_path = dir.join("zeno-server.json");
     if !manifest_path.exists() {
         return Err("Keine zeno-server.json im Repository-Ordner gefunden.".to_string());
@@ -336,12 +386,14 @@ fn git_server_read_manifest(repo_path: Option<String>) -> Result<String, String>
 
 #[tauri::command]
 fn git_server_commit_and_push_readme(
+    app: tauri::AppHandle,
+    server_id: Option<String>,
     repo_path: Option<String>,
     readme_content: String,
     commit_message: Option<String>,
     push: bool,
 ) -> Result<GitSyncResult, String> {
-    let dir = resolve_repo_path(repo_path)?;
+    let dir = resolve_instance_dir(&app, server_id, repo_path)?;
     let readme_path = dir.join("README.md");
 
     // 1. Write the README.md content
@@ -390,8 +442,12 @@ fn git_server_commit_and_push_readme(
 }
 
 #[tauri::command]
-fn git_server_read_readme(repo_path: Option<String>) -> Result<String, String> {
-    let dir = resolve_repo_path(repo_path)?;
+fn git_server_read_readme(
+    app: tauri::AppHandle,
+    server_id: Option<String>,
+    repo_path: Option<String>,
+) -> Result<String, String> {
+    let dir = resolve_instance_dir(&app, server_id, repo_path)?;
     let readme_path = dir.join("README.md");
     if !readme_path.exists() {
         return Err("Keine README.md im Repository-Ordner gefunden.".to_string());
@@ -870,6 +926,15 @@ fn db_delete_message(
     db::remove_message(&conn, &channel_id, &text)
 }
 
+#[tauri::command]
+fn db_delete_message_by_id(
+    state: tauri::State<db::DbState>,
+    message_id: i64,
+) -> Result<(), String> {
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    db::remove_message_by_id(&conn, message_id)
+}
+
 // --- PHASE 3: VOICE & NETWORK COMMANDS ---
 #[tauri::command]
 fn voice_join(
@@ -999,6 +1064,7 @@ pub fn run() {
             db_save_message,
             db_get_channel_messages,
             db_delete_message,
+            db_delete_message_by_id,
             // Phase 3 Voice & Network
             voice_join,
             voice_leave,

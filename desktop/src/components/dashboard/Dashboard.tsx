@@ -183,7 +183,7 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
               </span>
             </div>
             <p style={{ fontSize: "11px", color: "var(--text-muted)", margin: "3px 0 0 0" }}>
-              Dezentrale, hochsichere Kollaborationsplattform gegen die EU-Chatkontrolle. Lokale Schlüsselhoheit &amp; Zero-Knowledge.
+              Dezentrale, souveräne Kollaborationsplattform. Lokale Schlüsselhoheit, Art. 10 GG Konformität &amp; Zero-Knowledge.
             </p>
           </div>
 

@@ -148,6 +148,10 @@ export const GfmChatRenderer: React.FC<GfmChatRendererProps> = ({
     if (showToast) showToast("Inhalt in die Zwischenablage kopiert! 📋");
   };
 
+  if (!rawSource.trim()) {
+    return null;
+  }
+
   if (effectiveBoxed) {
     return (
       <div className="boxed-message-card" onClick={handleContainerClick}>

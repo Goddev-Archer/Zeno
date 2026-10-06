@@ -1926,7 +1926,7 @@ button.settings-btn,
                   <div style={{ position: "relative", marginTop: "12px", marginBottom: "16px" }}>
                     <input
                       type="text"
-                      placeholder="Wiki durchsuchen (z. B. Cloudflare, Nostr, Tor, PGP, Chatkontrolle)..."
+                      placeholder="Wiki durchsuchen (z. B. Cloudflare, Nostr, Tor, PGP, Grundrechte, E2EE)..."
                       value={wikiSearch}
                       onChange={(e) => setWikiSearch(e.target.value)}
                       style={{

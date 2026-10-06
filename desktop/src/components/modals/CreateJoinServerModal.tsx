@@ -574,14 +574,14 @@ export const CreateJoinServerModal: React.FC<CreateJoinServerModalProps> = ({
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
                 <span style={{ fontSize: "11px", fontWeight: "700", color: "#FFF", display: "flex", alignItems: "center", gap: "6px" }}>
                   <Icon icon="mage:satellite-dish" style={{ color: "#A855F7" }} />
-                  RELAY-TRANSPORT &amp; ROUTING (CHATKONTROLLE-IMMUN)
+                  DEZENTRALER RELAY-TRANSPORT &amp; ROUTING (ZERO-KNOWLEDGE)
                 </span>
                 <span style={{ fontSize: "10px", color: "#A855F7", backgroundColor: "rgba(168,85,247,0.1)", padding: "2px 6px", borderRadius: "4px" }}>
                   Metadaten-Schutz
                 </span>
               </div>
               <p style={{ fontSize: "10px", color: "#94A3B8", margin: "0 0 10px 0", lineHeight: "1.4" }}>
-                Zeno hostet keine zentralen Überwachungsserver. Wähle, über welches dezentrale Relay-Netzwerk deine Community Nachrichten synchronisiert.
+                Zeno betreibt keine zentralen Datenspeicher. Wähle, über welche dezentrale Relay-Infrastruktur deine Community verschlüsselte Blobs synchronisiert.
               </p>
 
               {/* Provider Selection */}
@@ -1005,7 +1005,7 @@ export const CreateJoinServerModal: React.FC<CreateJoinServerModalProps> = ({
                 <div>
                   <h4 style={{ color: "#FFF", margin: "0 0 6px 0", fontSize: "13px" }}>🦺 Eigener Git-Server (Gitea / Forgejo / Bare Git):</h4>
                   <p style={{ margin: "0 0 8px 0" }}>
-                    Für maximale Unabhängigkeit von US-Cloudbetreibern und Immunität gegen Chatkontroll-Gesetze:
+                    Für maximale digitale Souveränität, Unabhängigkeit von zentralen Cloudbetreibern und garantierten Schutz des Fernmeldegeheimnisses:
                   </p>
                   <ol style={{ paddingLeft: "18px", margin: "0 0 10px 0" }}>
                     <li>Erstelle ein Repo auf deiner selbst gehosteten Gitea- oder Forgejo-Instanz.</li>

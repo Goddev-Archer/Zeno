@@ -6,7 +6,7 @@ Dieser Leitfaden beschreibt das dezentrale **Git-Server-Modell von Zeno** und er
 
 ## 🧭 1. Das Zeno Git-Server-Prinzip
 
-Klassische Chat-Plattformen wie Discord hosten Server-Strukturen, Kanallisten und Berechtigungen auf proprietären, zentralen Unternehmensservern. Fällt dieser Server aus oder greift Zensur bzw. die geplante EU-Chatkontrolle, verliert die Community die Kontrolle über ihre Räume.
+Klassische Chat-Plattformen hosten Server-Strukturen, Kanallisten und Berechtigungen auf proprietären, zentralen Unternehmensservern. Bei Serverausfällen, Plattform-Sperren oder Eingriffen in das Fernmeldegeheimnis verliert die Community die Kontrolle über ihre eigenen Räume.
 
 **Zenos Gegenentwurf:**
 * **Git als Single Source of Truth:** Jeder Zeno-Server wird über ein deklaratives Manifest (`zeno-server.json`) definiert, das in einem Git-Repository liegt.

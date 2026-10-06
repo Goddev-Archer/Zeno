@@ -105,20 +105,22 @@ export const initialMessages: Record<string, Message[]> = {
     { author: "MaxShield", text: "Hat jemand schon den neuen SFrame-Branch getestet? Die Latenz im Voice ist deutlich besser.", time: "10:14", color: "blue" },
     { author: "LenaCrypt", text: "Ja, funktioniert super! Hier ist mein Benchmark-Script:", time: "10:16", color: "green", code: "use zeno_core::crypto::sframe;\nuse std::time::Instant;\n\nfn main() {\n    let key = sframe::generate_key();\n    let payload = vec![0u8; 960];\n    let start = Instant::now();\n    for _ in 0..10_000 {\n        let _ = sframe::encrypt(&key, &payload);\n    }\n    println!(\"10k encryptions: {:?}\", start.elapsed());\n}" },
     { author: "CipherNaut", text: "Nice! 🔥 Die Zahlen sehen vielversprechend aus. Schaut euch auch die neue Tauri v2 Doku an: https://tauri.app/v2/guides/?utm_source=twitter&utm_medium=social&fbclid=IwAR982317983", time: "10:18", color: "purple" },
-    { author: "MaxShield", text: "Hier ist der Webrtc-RS Quellcode: https://github.com/webrtc-rs/webrtc?si=xyz123&utm_campaign=launch_announcement", time: "10:22", color: "blue" }
+    { author: "MaxShield", text: "Hier ist der Webrtc-RS Quellcode: https://github.com/webrtc-rs/webrtc?si=xyz123&utm_campaign=launch_announcement", time: "10:22", color: "blue" },
+    { author: "LenaCrypt", text: "Kanal-Sender-Key erfolgreich rotiert. Alle aktiven Teilnehmer haben die neuen Ephemeral-Schlüssel erhalten.", time: "10:25", color: "green" }
   ],
   "dev-talk": [
-    { author: "CipherNaut", text: "Wir müssen die WASM-Sandbox-Performance im Auge behalten.", time: "09:12", color: "purple" },
-    { author: "MaxShield", text: "Stimmt, ich mache dazu einen Benchmark.", time: "09:15", color: "blue" }
+    { author: "CipherNaut", text: "Wir müssen die WASM-Sandbox-Performance im Auge behalten. Die Speichergrenze ist auf 64 MB limitiert.", time: "09:12", color: "purple" },
+    { author: "MaxShield", text: "Stimmt, ich mache dazu einen Benchmark mit der nativen Tauri IPC-Bridge.", time: "09:15", color: "blue" }
   ],
   "ui-design": [
-    { author: "LenaCrypt", text: "Ich habe die neuen Entwürfe für das Zeno-Branding hochgeladen. Was meint ihr?", time: "11:02", color: "green" }
+    { author: "LenaCrypt", text: "Ich habe die neuen Entwürfe für das Zeno-Branding hochgeladen: Klare Typografie, barrierefreie Kontraste und diskrete Sicherheitsindikatoren.", time: "11:02", color: "green" }
   ],
   kryptografie: [
-    { author: "LenaCrypt", text: "Das 3-Stufen-Modell für Key-Recovery (Gerätekopplung, Cloud-Backup, Social Recovery) steht.", time: "14:20", color: "green" }
+    { author: "LenaCrypt", text: "Das 3-Stufen-Modell für Key-Recovery (Gerätekopplung, lokales Paper-Backup, Shamir Secret Sharing) steht.", time: "14:20", color: "green" },
+    { author: "MaxShield", text: "Kryptografischer Fingerprint für Kanal-Sender-Keys erfolgreich verifiziert: 0x8B2C4F6A0C7D8E9F0A1B2C3D4E5F67890BCDEF12. Integrität bestätigt.", time: "14:25", color: "blue" }
   ],
   lobby: [
-    { author: "MaxShield", text: "Moin, zockt heute jemand? 🎮", time: "18:44", color: "blue" }
+    { author: "MaxShield", text: "Willkommen in der Sovereign Workspace Lobby. Bereit für die nächste Peer-to-Peer Session? 🛰️", time: "18:44", color: "blue" }
   ]
 };
 
@@ -130,7 +132,7 @@ export const mockProfiles: Record<string, Profile> = {
     avatarColor: "blue",
     role: "Entwickler",
     roleColor: "blue",
-    status: '"Latenz-Optimierung läuft..."',
+    status: '"Latenz-Optimierung & E2EE Audits"',
     fingerprint: "0x8B2C4F6A0C7D8E9F0A1B2C3D4E5F67890BCDEF12",
     bannerGradient: "linear-gradient(135deg, #00C6FF 0%, #0072FF 100%)",
     badge: "⚡ CORE DEV",
