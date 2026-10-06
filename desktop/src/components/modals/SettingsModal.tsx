@@ -1,10 +1,11 @@
 import React from "react";
 import { Icon } from "@iconify/react";
 import { UserIdentity } from "../../types";
-import { signAuthChallenge, verifyAuthSignature } from "../../services/cryptoService";
+import { signAuthChallenge, verifyAuthSignature, exportNativeTextFile } from "../../services/cryptoService";
 import { ZENO_WIKI_GUIDES } from "../../data/wikiGuides";
 import { MarkdownReader } from "../common/MarkdownReader";
 import { AudioSettingsTab } from "../voice/AudioSettingsTab";
+import Editor from "@monaco-editor/react";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -138,6 +139,315 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const avatarFileInputRef = React.useRef<HTMLInputElement | null>(null);
   const [selectedWikiId, setSelectedWikiId] = React.useState<string>("cloudflare-relay-builder");
   const [wikiSearch, setWikiSearch] = React.useState<string>("");
+
+  // --- Theme Studio ("Vereinfacht" vs "Professional") State ---
+  const [themeCustomMode, setThemeCustomMode] = React.useState<"simplified" | "professional">("simplified");
+
+  const [accentColor, setAccentColor] = React.useState<string>(() => {
+    return localStorage.getItem("zeno_theme_accent_color") || "#00FF87";
+  });
+  const [fontFamily, setFontFamily] = React.useState<string>(() => {
+    return localStorage.getItem("zeno_theme_font_family") || "'Inter', sans-serif";
+  });
+  const [buttonRadius, setButtonRadius] = React.useState<string>(() => {
+    return localStorage.getItem("zeno_theme_button_radius") || "6px";
+  });
+  const [scrollbarStyle, setScrollbarStyle] = React.useState<string>(() => {
+    return localStorage.getItem("zeno_theme_scrollbar_style") || "standard";
+  });
+  const [islandOpacity, setIslandOpacity] = React.useState<number>(() => {
+    const saved = localStorage.getItem("zeno_theme_island_opacity");
+    return saved ? parseFloat(saved) : 0.75;
+  });
+  const [islandBlur, setIslandBlur] = React.useState<number>(() => {
+    const saved = localStorage.getItem("zeno_theme_island_blur");
+    return saved ? parseInt(saved, 10) : 14;
+  });
+
+  const DEFAULT_THEME_LAYERS: Record<string, string> = {
+    "theme-variables.css": `/* ============================================================
+   LAYER 1: THEME TOKENS & CSS VARIABLES
+   ============================================================ */
+:root {
+  --accent-color: #00FF87;
+  --accent-hover: #00E67A;
+  --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 12px;
+  --island-bg: rgba(35, 37, 42, 0.75);
+  --island-blur: 14px;
+  --island-border: rgba(255, 255, 255, 0.08);
+  --glow-color-1: rgba(0, 255, 135, 0.15);
+}`,
+    "floating-islands.css": `/* ============================================================
+   LAYER 2: FLOATING ISLANDS & GLASSMORPHISM
+   ============================================================ */
+.zeno-dashboard {
+  background-color: transparent !important;
+}
+
+.zeno-dashboard section,
+.dashboard-island,
+.zeno-dashboard .glass-card {
+  background: var(--island-bg, rgba(35, 37, 42, 0.75)) !important;
+  backdrop-filter: blur(var(--island-blur, 14px)) !important;
+  border: 1px solid var(--island-border, rgba(255, 255, 255, 0.08)) !important;
+  border-radius: var(--radius-lg, 12px) !important;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.28) !important;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.zeno-dashboard section:hover,
+.dashboard-island:hover {
+  box-shadow: 0 12px 38px rgba(0, 0, 0, 0.38) !important;
+}`,
+    "buttons-controls.css": `/* ============================================================
+   LAYER 3: BUTTONS, INPUTS & ERGONOMIC SCROLLBARS
+   ============================================================ */
+.settings-btn,
+button.settings-btn,
+.editor-toolbar-btn {
+  border-radius: var(--radius-md, 6px);
+  transition: all 0.15s ease-in-out;
+}
+
+.settings-btn.primary {
+  background-color: var(--accent-color, #00FF87) !important;
+  color: #08090C !important;
+  font-weight: 700 !important;
+}
+
+/* Ergonomic Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 99px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-color, #00FF87);
+}`,
+    "monaco-ide.css": `/* ============================================================
+   LAYER 4: MONACO IDE SURFACE & WORKBENCH
+   ============================================================ */
+.zeno-ide-container {
+  background: transparent !important;
+}
+
+.monaco-editor,
+.monaco-editor .overflow-guard {
+  border-radius: var(--radius-md, 6px);
+}
+
+.monaco-editor .current-line {
+  border: none !important;
+  background-color: rgba(255, 255, 255, 0.04) !important;
+}`
+  };
+
+  const [themeLayers, setThemeLayers] = React.useState<Record<string, string>>(() => {
+    try {
+      const saved = localStorage.getItem("zeno_custom_theme_layers");
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.warn("Konnte gespeicherte Theme-Layers nicht parsen:", e);
+    }
+    return DEFAULT_THEME_LAYERS;
+  });
+
+  const [activeThemeLayer, setActiveThemeLayer] = React.useState<string>("theme-variables.css");
+  const themeFileInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  const applyThemeCss = (cssContent: string) => {
+    let styleTag = document.getElementById("zeno-custom-theme-live");
+    if (!styleTag) {
+      styleTag = document.createElement("style");
+      styleTag.id = "zeno-custom-theme-live";
+      document.head.appendChild(styleTag);
+    }
+    styleTag.innerHTML = cssContent;
+  };
+
+  const applyAllLayers = (layers: Record<string, string>) => {
+    const combined = Object.values(layers).join("\n\n");
+    applyThemeCss(combined);
+    try {
+      localStorage.setItem("zeno_custom_theme_layers", JSON.stringify(layers));
+    } catch (e) {}
+  };
+
+  React.useEffect(() => {
+    try {
+      const saved = localStorage.getItem("zeno_custom_theme_layers");
+      if (saved) {
+        applyAllLayers(JSON.parse(saved));
+      }
+    } catch (e) {}
+  }, []);
+
+  const handleSimplifiedChange = (
+    newAccent: string,
+    newFont: string,
+    newRadius: string,
+    newScrollbar: string,
+    newOpacity: number,
+    newBlur: number
+  ) => {
+    setAccentColor(newAccent);
+    setFontFamily(newFont);
+    setButtonRadius(newRadius);
+    setScrollbarStyle(newScrollbar);
+    setIslandOpacity(newOpacity);
+    setIslandBlur(newBlur);
+
+    localStorage.setItem("zeno_theme_accent_color", newAccent);
+    localStorage.setItem("zeno_theme_font_family", newFont);
+    localStorage.setItem("zeno_theme_button_radius", newRadius);
+    localStorage.setItem("zeno_theme_scrollbar_style", newScrollbar);
+    localStorage.setItem("zeno_theme_island_opacity", newOpacity.toString());
+    localStorage.setItem("zeno_theme_island_blur", newBlur.toString());
+
+    const scrollbarWidth = newScrollbar === "narrow" ? "3px" : newScrollbar === "minimal" ? "4px" : "6px";
+    const updatedVariables = `/* ============================================================
+   LAYER 1: THEME TOKENS & CSS VARIABLES (GENERATED)
+   ============================================================ */
+:root {
+  --accent-color: ${newAccent};
+  --accent-hover: ${newAccent};
+  --font-ui: ${newFont};
+  --font-mono: 'JetBrains Mono', monospace;
+  --radius-sm: ${parseInt(newRadius, 10) > 4 ? "4px" : "2px"};
+  --radius-md: ${newRadius};
+  --radius-lg: ${parseInt(newRadius, 10) >= 12 ? newRadius : "10px"};
+  --island-bg: rgba(35, 37, 42, ${newOpacity});
+  --island-blur: ${newBlur}px;
+  --island-border: rgba(255, 255, 255, 0.08);
+  --glow-color-1: ${newAccent}26;
+}`;
+
+    const updatedButtons = `/* ============================================================
+   LAYER 3: BUTTONS, INPUTS & ERGONOMIC SCROLLBARS (GENERATED)
+   ============================================================ */
+.settings-btn,
+button.settings-btn,
+.editor-toolbar-btn {
+  border-radius: ${newRadius};
+  transition: all 0.15s ease-in-out;
+}
+
+.settings-btn.primary {
+  background-color: ${newAccent} !important;
+  color: #08090C !important;
+  font-weight: 700 !important;
+}
+
+::-webkit-scrollbar {
+  width: ${scrollbarWidth};
+  height: ${scrollbarWidth};
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 99px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: ${newAccent};
+}`;
+
+    const newLayers = {
+      ...themeLayers,
+      "theme-variables.css": updatedVariables,
+      "buttons-controls.css": updatedButtons
+    };
+    setThemeLayers(newLayers);
+    applyAllLayers(newLayers);
+  };
+
+  const handleExportTheme = async () => {
+    const expthemeData = {
+      manifestVersion: "1.0",
+      themeName: "Zeno Custom Theme",
+      author: userName || "Zeno Architect",
+      exportedAt: new Date().toISOString(),
+      simplified: {
+        accentColor,
+        fontFamily,
+        buttonRadius,
+        scrollbarStyle,
+        islandOpacity,
+        islandBlur,
+        canvasColor,
+        glowColor
+      },
+      layers: themeLayers
+    };
+    const content = JSON.stringify(expthemeData, null, 2);
+    try {
+      const savedPath = await exportNativeTextFile("zeno-custom-theme.exptheme", content);
+      showToast(`✓ Theme exportiert: ${savedPath}`);
+    } catch (e: any) {
+      showToast(`Export-Fehler: ${e?.message || e}`);
+    }
+  };
+
+  const handleImportTheme = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        const parsed = JSON.parse(text);
+        if (parsed.layers) {
+          setThemeLayers(parsed.layers);
+          applyAllLayers(parsed.layers);
+        }
+        if (parsed.simplified) {
+          if (parsed.simplified.accentColor) setAccentColor(parsed.simplified.accentColor);
+          if (parsed.simplified.fontFamily) setFontFamily(parsed.simplified.fontFamily);
+          if (parsed.simplified.buttonRadius) setButtonRadius(parsed.simplified.buttonRadius);
+          if (parsed.simplified.scrollbarStyle) setScrollbarStyle(parsed.simplified.scrollbarStyle);
+          if (parsed.simplified.islandOpacity) setIslandOpacity(parsed.simplified.islandOpacity);
+          if (parsed.simplified.islandBlur) setIslandBlur(parsed.simplified.islandBlur);
+        }
+        showToast("✓ .exptheme Theme erfolgreich importiert und angewendet! 🎨");
+      } catch (err: any) {
+        showToast(`Ungültiges Theme-Format: ${err?.message || err}`);
+      }
+    };
+    reader.readAsText(file);
+    if (themeFileInputRef.current) {
+      themeFileInputRef.current.value = "";
+    }
+  };
+
+  const handleResetTheme = () => {
+    setThemeLayers(DEFAULT_THEME_LAYERS);
+    applyAllLayers(DEFAULT_THEME_LAYERS);
+    setAccentColor("#00FF87");
+    setFontFamily("'Inter', sans-serif");
+    setButtonRadius("6px");
+    setScrollbarStyle("standard");
+    setIslandOpacity(0.75);
+    setIslandBlur(14);
+    localStorage.removeItem("zeno_custom_theme_layers");
+    localStorage.removeItem("zeno_theme_accent_color");
+    localStorage.removeItem("zeno_theme_font_family");
+    localStorage.removeItem("zeno_theme_button_radius");
+    localStorage.removeItem("zeno_theme_scrollbar_style");
+    localStorage.removeItem("zeno_theme_island_opacity");
+    localStorage.removeItem("zeno_theme_island_blur");
+    showToast("Theme auf Werkseinstellungen zurückgesetzt ↺");
+  };
 
   if (!isOpen) return null;
 
@@ -732,60 +1042,506 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             )}
 
-            {/* Tab: Appearance */}
+            {/* Tab: Appearance / Theme Studio */}
             {activeSettingsTab === "appearance" && (
               <div className="settings-tab-content" id="tab-appearance">
-                <h3>Erscheinungsbild & Canvas</h3>
-                <div className="settings-form-group">
-                  <label>Milchglas-Effekt (Glassmorphism)</label>
-                  <div className="switch-control">
-                    <span>Transparenz- und Blur-Effekte aktivieren</span>
-                    <label className="switch">
-                      <input 
-                        type="checkbox" 
-                        checked={glassmorphism} 
-                        onChange={(e) => setGlassmorphism(e.target.checked)} 
-                      />
-                      <span className="slider" />
-                    </label>
+                <input
+                  type="file"
+                  ref={themeFileInputRef}
+                  accept=".exptheme,.json"
+                  style={{ display: "none" }}
+                  onChange={handleImportTheme}
+                />
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px", flexWrap: "wrap", gap: "8px" }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "700" }}>Theme Studio &amp; Erscheinungsbild</h3>
+                    <p className="settings-help-text" style={{ marginTop: "3px" }}>
+                      Passe das gesamte Erscheinungsbild von Zeno an. Wähle zwischen vereinfachten Presets oder vollem CSS-Codezugriff.
+                    </p>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <button
+                      type="button"
+                      onClick={handleExportTheme}
+                      className="settings-btn"
+                      style={{ fontSize: "11px", display: "flex", alignItems: "center", gap: "5px", padding: "5px 10px" }}
+                      title="Theme als .exptheme-Datei exportieren"
+                    >
+                      <Icon icon="mage:download" /> Exportieren (.exptheme)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => themeFileInputRef.current?.click()}
+                      className="settings-btn"
+                      style={{ fontSize: "11px", display: "flex", alignItems: "center", gap: "5px", padding: "5px 10px" }}
+                      title="Bestehendes .exptheme Theme importieren"
+                    >
+                      <Icon icon="mage:upload" /> Importieren
+                    </button>
                   </div>
                 </div>
-                <div className="settings-form-group">
-                  <label>Hintergrund-Presets</label>
-                  <div className="color-presets" id="settings-color-presets">
-                    {(theme === "light" ? lightPresets : darkPresets).map((preset) => (
+
+                {/* Mode Switcher: "Vereinfacht" vs "Professional" */}
+                <div style={{ display: "flex", backgroundColor: "#0D0E12", padding: "4px", borderRadius: "10px", marginBottom: "18px", border: "1px solid #1E222D", gap: "6px" }}>
+                  <button
+                    type="button"
+                    onClick={() => setThemeCustomMode("simplified")}
+                    style={{
+                      flex: 1,
+                      padding: "8px 12px",
+                      borderRadius: "8px",
+                      border: "none",
+                      backgroundColor: themeCustomMode === "simplified" ? "#1E222D" : "transparent",
+                      color: themeCustomMode === "simplified" ? "#00FF87" : "#94A3B8",
+                      fontSize: "12px",
+                      fontWeight: "700",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "6px",
+                      transition: "all 0.15s ease"
+                    }}
+                  >
+                    <Icon icon="mage:palette" /> Vereinfacht (Presets &amp; Regler)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setThemeCustomMode("professional")}
+                    style={{
+                      flex: 1,
+                      padding: "8px 12px",
+                      borderRadius: "8px",
+                      border: "none",
+                      backgroundColor: themeCustomMode === "professional" ? "#1E222D" : "transparent",
+                      color: themeCustomMode === "professional" ? "#38BDF8" : "#94A3B8",
+                      fontSize: "12px",
+                      fontWeight: "700",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "6px",
+                      transition: "all 0.15s ease"
+                    }}
+                  >
+                    <Icon icon="mage:code" /> Professional (Monaco Editor &amp; CSS-Layers)
+                  </button>
+                </div>
+
+                {/* --- MODE 1: VEREINFACHT --- */}
+                {themeCustomMode === "simplified" && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                    {/* Akzentfarbe Presets & Custom */}
+                    <div className="settings-form-group">
+                      <label>Akzent- &amp; Highlightfarbe</label>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginTop: "6px" }}>
+                        {[
+                          { color: "#00FF87", label: "Zeno Neon" },
+                          { color: "#38BDF8", label: "Cyber Sky" },
+                          { color: "#3574F0", label: "JetBrains" },
+                          { color: "#A855F7", label: "Cyber Purple" },
+                          { color: "#F59E0B", label: "Amber Flame" },
+                          { color: "#F43F5E", label: "Neo Crimson" }
+                        ].map((p) => (
+                          <button
+                            key={p.color}
+                            type="button"
+                            onClick={() => handleSimplifiedChange(p.color, fontFamily, buttonRadius, scrollbarStyle, islandOpacity, islandBlur)}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "6px",
+                              backgroundColor: accentColor === p.color ? "rgba(255,255,255,0.12)" : "#18191B",
+                              border: accentColor === p.color ? `2px solid ${p.color}` : "1px solid rgba(255,255,255,0.08)",
+                              borderRadius: "6px",
+                              padding: "5px 10px",
+                              cursor: "pointer",
+                              color: "#DFE1E5",
+                              fontSize: "11px",
+                              fontWeight: "600"
+                            }}
+                          >
+                            <span style={{ width: "12px", height: "12px", borderRadius: "50%", backgroundColor: p.color, display: "inline-block" }} />
+                            {p.label}
+                          </button>
+                        ))}
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginLeft: "auto" }}>
+                          <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>Eigenes Hex:</span>
+                          <input
+                            type="color"
+                            value={accentColor}
+                            onChange={(e) => handleSimplifiedChange(e.target.value, fontFamily, buttonRadius, scrollbarStyle, islandOpacity, islandBlur)}
+                            style={{ width: "28px", height: "28px", padding: 0, border: "none", borderRadius: "6px", cursor: "pointer", background: "none" }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Schriftarten / Typography */}
+                    <div className="settings-form-group">
+                      <label>Benutzeroberflächen-Schriftart (Font Family)</label>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "8px", marginTop: "6px" }}>
+                        {[
+                          { id: "'Inter', sans-serif", label: "Inter (Zeno Standard)" },
+                          { id: "'JetBrains Mono', monospace", label: "JetBrains Mono" },
+                          { id: "'Fira Code', monospace", label: "Fira Code" },
+                          { id: "'Roboto', sans-serif", label: "Roboto Clean" },
+                          { id: "system-ui, sans-serif", label: "System UI (Native)" }
+                        ].map((f) => (
+                          <button
+                            key={f.id}
+                            type="button"
+                            onClick={() => handleSimplifiedChange(accentColor, f.id, buttonRadius, scrollbarStyle, islandOpacity, islandBlur)}
+                            style={{
+                              padding: "7px 10px",
+                              backgroundColor: fontFamily === f.id ? "rgba(0,255,135,0.12)" : "#18191B",
+                              border: fontFamily === f.id ? "1px solid #00FF87" : "1px solid rgba(255,255,255,0.06)",
+                              borderRadius: "6px",
+                              color: fontFamily === f.id ? "#00FF87" : "#DFE1E5",
+                              fontSize: "11px",
+                              fontFamily: f.id,
+                              cursor: "pointer",
+                              textAlign: "center",
+                              fontWeight: fontFamily === f.id ? "700" : "500"
+                            }}
+                          >
+                            {f.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Button- & Eckenrundung */}
+                    <div className="settings-form-group">
+                      <label>Eckenrundung von Steuerelementen &amp; Buttons</label>
+                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "6px" }}>
+                        {[
+                          { id: "2px", label: "Eckig (2px)" },
+                          { id: "6px", label: "Subtil (6px)" },
+                          { id: "12px", label: "Weich (12px)" },
+                          { id: "99px", label: "Pill / Kapsel" }
+                        ].map((r) => (
+                          <button
+                            key={r.id}
+                            type="button"
+                            onClick={() => handleSimplifiedChange(accentColor, fontFamily, r.id, scrollbarStyle, islandOpacity, islandBlur)}
+                            style={{
+                              flex: 1,
+                              padding: "7px 10px",
+                              backgroundColor: buttonRadius === r.id ? "rgba(0,255,135,0.12)" : "#18191B",
+                              border: buttonRadius === r.id ? "1px solid #00FF87" : "1px solid rgba(255,255,255,0.06)",
+                              borderRadius: r.id === "99px" ? "20px" : r.id,
+                              color: buttonRadius === r.id ? "#00FF87" : "#DFE1E5",
+                              fontSize: "11px",
+                              cursor: "pointer",
+                              fontWeight: buttonRadius === r.id ? "700" : "500"
+                            }}
+                          >
+                            {r.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Scrollbar-Stil */}
+                    <div className="settings-form-group">
+                      <label>Scrollbar-Design</label>
+                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "6px" }}>
+                        {[
+                          { id: "standard", label: "Standard (6px Abgerundet)" },
+                          { id: "narrow", label: "Ultra-Schmal (3px Minimal)" },
+                          { id: "minimal", label: "Dezent (4px)" }
+                        ].map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => handleSimplifiedChange(accentColor, fontFamily, buttonRadius, s.id, islandOpacity, islandBlur)}
+                            style={{
+                              flex: 1,
+                              padding: "7px 10px",
+                              backgroundColor: scrollbarStyle === s.id ? "rgba(0,255,135,0.12)" : "#18191B",
+                              border: scrollbarStyle === s.id ? "1px solid #00FF87" : "1px solid rgba(255,255,255,0.06)",
+                              borderRadius: "6px",
+                              color: scrollbarStyle === s.id ? "#00FF87" : "#DFE1E5",
+                              fontSize: "11px",
+                              cursor: "pointer",
+                              fontWeight: scrollbarStyle === s.id ? "700" : "500"
+                            }}
+                          >
+                            {s.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Floating Island Transparenz & Blur */}
+                    <div className="settings-form-group">
+                      <label>Floating Islands &amp; Glassmorphism</label>
+                      <div className="switch-control" style={{ marginBottom: "10px" }}>
+                        <span>Transparenz- und Blur-Effekte aktivieren</span>
+                        <label className="switch">
+                          <input 
+                            type="checkbox" 
+                            checked={glassmorphism} 
+                            onChange={(e) => setGlassmorphism(e.target.checked)} 
+                          />
+                          <span className="slider" />
+                        </label>
+                      </div>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginTop: "8px" }}>
+                        <div>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "4px" }}>
+                            <span>Karten-Deckkraft (Inseln)</span>
+                            <span style={{ fontWeight: "700", color: "#00FF87" }}>{Math.round(islandOpacity * 100)}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0.4"
+                            max="1.0"
+                            step="0.05"
+                            value={islandOpacity}
+                            onChange={(e) => handleSimplifiedChange(accentColor, fontFamily, buttonRadius, scrollbarStyle, parseFloat(e.target.value), islandBlur)}
+                            style={{ width: "100%", accentColor: "#00FF87", cursor: "pointer" }}
+                          />
+                        </div>
+                        <div>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "4px" }}>
+                            <span>Milchglas-Unschärfe (Blur)</span>
+                            <span style={{ fontWeight: "700", color: "#38BDF8" }}>{islandBlur}px</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="30"
+                            step="2"
+                            value={islandBlur}
+                            onChange={(e) => handleSimplifiedChange(accentColor, fontFamily, buttonRadius, scrollbarStyle, islandOpacity, parseInt(e.target.value, 10))}
+                            style={{ width: "100%", accentColor: "#38BDF8", cursor: "pointer" }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Hintergrund Presets & Canvas */}
+                    <div className="settings-form-group">
+                      <label>Canvas Hintergrund-Presets</label>
+                      <div className="color-presets" id="settings-color-presets" style={{ marginTop: "6px" }}>
+                        {(theme === "light" ? lightPresets : darkPresets).map((preset) => (
+                          <button
+                            key={preset.color}
+                            className={`preset-btn ${canvasColor === preset.color ? "active" : ""}`}
+                            style={{ backgroundColor: preset.color }}
+                            title={preset.title}
+                            onClick={() => setCanvasColor(preset.color)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                      <div className="settings-form-group">
+                        <div className="custom-color-control">
+                          <label htmlFor="settings-canvas-color">Eigene Hintergrundfarbe:</label>
+                          <input 
+                            type="color" 
+                            id="settings-canvas-color" 
+                            value={canvasColor} 
+                            onChange={(e) => setCanvasColor(e.target.value)} 
+                          />
+                        </div>
+                      </div>
+                      <div className="settings-form-group">
+                        <div className="custom-color-control">
+                          <label htmlFor="settings-glow-color">Radial-Glow Farbe:</label>
+                          <input 
+                            type="color" 
+                            id="settings-glow-color" 
+                            value={glowColor} 
+                            onChange={(e) => setGlowColor(e.target.value)} 
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "10px" }}>
                       <button
-                        key={preset.color}
-                        className={`preset-btn ${canvasColor === preset.color ? "active" : ""}`}
-                        style={{ backgroundColor: preset.color }}
-                        title={preset.title}
-                        onClick={() => setCanvasColor(preset.color)}
+                        type="button"
+                        onClick={handleResetTheme}
+                        className="settings-btn"
+                        style={{ fontSize: "11px", color: "var(--text-muted)" }}
+                      >
+                        Auf Standard zurücksetzen
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* --- MODE 2: PROFESSIONAL (MONACO IDE & CSS LAYERS) --- */}
+                {themeCustomMode === "professional" && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                    {/* Layer Selector */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", overflowX: "auto", paddingBottom: "4px" }}>
+                      <span style={{ fontSize: "11px", fontWeight: "700", color: "var(--text-muted)", textTransform: "uppercase", marginRight: "4px" }}>
+                        Theme-Ebenen:
+                      </span>
+                      {[
+                        { id: "theme-variables.css", label: "theme-variables.css", icon: "mage:file-records" },
+                        { id: "floating-islands.css", label: "floating-islands.css", icon: "mage:dashboard" },
+                        { id: "buttons-controls.css", label: "buttons-controls.css", icon: "mage:toggle" },
+                        { id: "monaco-ide.css", label: "monaco-ide.css", icon: "mage:code" }
+                      ].map((layer) => (
+                        <button
+                          key={layer.id}
+                          type="button"
+                          onClick={() => setActiveThemeLayer(layer.id)}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            padding: "5px 10px",
+                            backgroundColor: activeThemeLayer === layer.id ? "#1E222D" : "#111319",
+                            border: activeThemeLayer === layer.id ? "1px solid #38BDF8" : "1px solid rgba(255,255,255,0.06)",
+                            borderRadius: "6px",
+                            color: activeThemeLayer === layer.id ? "#38BDF8" : "#94A3B8",
+                            fontSize: "11px",
+                            fontFamily: "var(--font-mono)",
+                            cursor: "pointer",
+                            fontWeight: activeThemeLayer === layer.id ? "700" : "500",
+                            whiteSpace: "nowrap"
+                          }}
+                        >
+                          <Icon icon={layer.icon} /> {layer.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Monaco Editor Instance */}
+                    <div
+                      style={{
+                        border: "1px solid #1E222D",
+                        borderRadius: "8px",
+                        overflow: "hidden",
+                        backgroundColor: "#18191B"
+                      }}
+                    >
+                      <div
+                        style={{
+                          backgroundColor: "#111319",
+                          padding: "6px 12px",
+                          borderBottom: "1px solid #1E222D",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          fontSize: "11px"
+                        }}
+                      >
+                        <span style={{ fontFamily: "var(--font-mono)", color: "#38BDF8", fontWeight: "600" }}>
+                          ● {activeThemeLayer}
+                        </span>
+                        <span style={{ color: "var(--text-muted)", fontSize: "10px" }}>
+                          CSS-Syntax • Live-Injection
+                        </span>
+                      </div>
+                      <Editor
+                        height="320px"
+                        language="css"
+                        theme={theme === "light" ? "zeno-light-theme" : "zeno-dark-theme"}
+                        value={themeLayers[activeThemeLayer] || ""}
+                        onChange={(val) => {
+                          setThemeLayers((prev) => ({
+                            ...prev,
+                            [activeThemeLayer]: val || ""
+                          }));
+                        }}
+                        options={{
+                          minimap: { enabled: false },
+                          fontSize: 12.5,
+                          fontFamily: "var(--font-mono)",
+                          automaticLayout: true,
+                          tabSize: 2,
+                          scrollBeyondLastLine: false
+                        }}
                       />
-                    ))}
+                    </div>
+
+                    {/* Action Bar */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            applyAllLayers(themeLayers);
+                            showToast("✓ Theme-Code live angewendet & gespeichert!");
+                          }}
+                          className="settings-btn primary"
+                          style={{
+                            backgroundColor: "#00FF87",
+                            color: "#08090C",
+                            fontWeight: "700",
+                            fontSize: "11px",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            padding: "6px 14px"
+                          }}
+                        >
+                          <Icon icon="mage:check" /> Änderungen anwenden &amp; speichern
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleResetTheme}
+                          className="settings-btn"
+                          style={{ fontSize: "11px", display: "flex", alignItems: "center", gap: "5px" }}
+                        >
+                          <Icon icon="mage:refresh" /> Zurücksetzen
+                        </button>
+                      </div>
+
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <button
+                          type="button"
+                          onClick={handleExportTheme}
+                          className="settings-btn"
+                          style={{ fontSize: "11px", display: "flex", alignItems: "center", gap: "5px" }}
+                        >
+                          <Icon icon="mage:download" /> .exptheme Export
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => themeFileInputRef.current?.click()}
+                          className="settings-btn"
+                          style={{ fontSize: "11px", display: "flex", alignItems: "center", gap: "5px" }}
+                        >
+                          <Icon icon="mage:upload" /> .exptheme Import
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Security Sandbox Callout */}
+                    <div
+                      style={{
+                        backgroundColor: "rgba(56, 189, 248, 0.08)",
+                        border: "1px solid rgba(56, 189, 248, 0.2)",
+                        borderRadius: "8px",
+                        padding: "10px 14px",
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: "10px",
+                        marginTop: "4px"
+                      }}
+                    >
+                      <Icon icon="mage:shield" style={{ fontSize: "18px", color: "#38BDF8", flexShrink: 0, marginTop: "2px" }} />
+                      <div style={{ fontSize: "11px", lineHeight: "1.4", color: "#94A3B8" }}>
+                        <strong style={{ color: "#38BDF8" }}>Frontend-Sandbox Sicherheitsgarantie:</strong>
+                        <br />
+                        Themes und Plugins operieren rein deklarativ über CSS-Stile und DOM-Templates. Sicherheitskritische Operationen (Dateizugriffe, Netzwerk-Transport, Kryptografie) sind im Tauri-Frontend strikt gesperrt und laufen ausschließlich im nativen Rust-Backend.
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div className="settings-form-group">
-                  <div className="custom-color-control">
-                    <label htmlFor="settings-canvas-color">Eigene Hintergrundfarbe:</label>
-                    <input 
-                      type="color" 
-                      id="settings-canvas-color" 
-                      value={canvasColor} 
-                      onChange={(e) => setCanvasColor(e.target.value)} 
-                    />
-                  </div>
-                </div>
-                <div className="settings-form-group">
-                  <div className="custom-color-control">
-                    <label htmlFor="settings-glow-color">Radial-Glow Farbe:</label>
-                    <input 
-                      type="color" 
-                      id="settings-glow-color" 
-                      value={glowColor} 
-                      onChange={(e) => setGlowColor(e.target.value)} 
-                    />
-                  </div>
-                </div>
+                )}
               </div>
             )}
 

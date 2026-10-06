@@ -332,6 +332,22 @@ function ZenoMainApp() {
         setIsSovereignModalOpen(true);
       }
     });
+
+    // Apply saved custom theme layers if present
+    try {
+      const savedLayers = localStorage.getItem("zeno_custom_theme_layers");
+      if (savedLayers) {
+        const parsed = JSON.parse(savedLayers);
+        const combined = Object.values(parsed).join("\n\n");
+        let styleTag = document.getElementById("zeno-custom-theme-live");
+        if (!styleTag) {
+          styleTag = document.createElement("style");
+          styleTag.id = "zeno-custom-theme-live";
+          document.head.appendChild(styleTag);
+        }
+        styleTag.innerHTML = combined;
+      }
+    } catch (e) {}
   }, []);
 
   const handleIdentityChanged = (newIdentity: UserIdentity, newUsername: string) => {
@@ -2043,6 +2059,7 @@ function ZenoMainApp() {
         onIdentityChanged={handleIdentityChanged}
         showToast={showToast}
         initialTab={sovereignModalTab}
+        isMandatoryOnboarding={!userIdentity || !userIdentity.mnemonic}
       />
 
       <CreateChannelModal

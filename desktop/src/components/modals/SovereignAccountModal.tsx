@@ -18,6 +18,7 @@ interface SovereignAccountModalProps {
   onIdentityChanged: (identity: UserIdentity, username: string) => void;
   showToast: (msg: string) => void;
   initialTab?: "create" | "restore" | "manage";
+  isMandatoryOnboarding?: boolean;
 }
 
 export const SovereignAccountModal: React.FC<SovereignAccountModalProps> = ({
@@ -26,7 +27,8 @@ export const SovereignAccountModal: React.FC<SovereignAccountModalProps> = ({
   currentIdentity,
   onIdentityChanged,
   showToast,
-  initialTab = "create"
+  initialTab = "create",
+  isMandatoryOnboarding = false
 }) => {
   const [activeTab, setActiveTab] = useState<"create" | "restore" | "manage">(initialTab);
 
@@ -293,7 +295,7 @@ SICHERHEITSHINWEISE:
   return (
     <div
       className="modal-overlay open"
-      onClick={onClose}
+      onClick={isMandatoryOnboarding ? undefined : onClose}
       style={{
         position: "fixed",
         top: 0,
@@ -354,14 +356,56 @@ SICHERHEITSHINWEISE:
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            style={{ background: "none", border: "none", color: "#64748B", cursor: "pointer", fontSize: "20px" }}
-            title="Schließen"
-          >
-            <Icon icon="mage:multiply" />
-          </button>
+          {isMandatoryOnboarding ? (
+            <span
+              style={{
+                fontSize: "11px",
+                fontWeight: "700",
+                color: "#FFB020",
+                backgroundColor: "rgba(255, 176, 32, 0.12)",
+                border: "1px solid rgba(255, 176, 32, 0.3)",
+                padding: "4px 10px",
+                borderRadius: "6px",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px"
+              }}
+            >
+              <Icon icon="mage:lock" /> AIN-Setup erforderlich
+            </span>
+          ) : (
+            <button
+              onClick={onClose}
+              style={{ background: "none", border: "none", color: "#64748B", cursor: "pointer", fontSize: "20px" }}
+              title="Schließen"
+            >
+              <Icon icon="mage:multiply" />
+            </button>
+          )}
         </div>
+
+        {/* Mandatory OOBE Banner */}
+        {isMandatoryOnboarding && (
+          <div
+            style={{
+              backgroundColor: "rgba(0, 255, 135, 0.08)",
+              border: "1px solid rgba(0, 255, 135, 0.25)",
+              borderRadius: "8px",
+              padding: "10px 14px",
+              marginBottom: "16px",
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "10px"
+            }}
+          >
+            <Icon icon="mage:shield-exclamation" style={{ fontSize: "20px", color: "#00FF87", flexShrink: 0, marginTop: "2px" }} />
+            <div style={{ fontSize: "11.5px", lineHeight: "1.4", color: "#DFE1E5" }}>
+              <strong style={{ color: "#00FF87" }}>Ersteinrichtung erforderlich (Out-of-the-Box Experience):</strong>
+              <br />
+              Zeno erhebt keine Nutzerdaten und speichert keine Passwörter. Um das dezentrale Netzwerk vor Missbrauch zu schützen und echte Ende-zu-Ende-Verschlüsselung zu garantieren, ist die Erstellung oder Wiederherstellung deiner souveränen AIN verpflichtend.
+            </div>
+          </div>
+        )}
 
         {/* 3-Tab Selector */}
         <div style={{ display: "flex", backgroundColor: "#0D0E12", padding: "4px", borderRadius: "10px", marginBottom: "20px", border: "1px solid #1E222D", gap: "4px" }}>

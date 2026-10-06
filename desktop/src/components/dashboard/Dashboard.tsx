@@ -81,7 +81,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onOpenSovereignModal,
   onOpenInstanceBrowser,
   onOpenGitSyncModal,
-  userName = "CipherNaut",
+  userName = "TheAdministrator",
   userIdentity,
   servers = [],
   connectedRelaysCount = 3,
@@ -89,7 +89,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 }) => {
   const [copiedAin, setCopiedAin] = useState<boolean>(false);
 
-  const displayAin = userIdentity?.ain || "ZENO-7A4B-8E21-99C0";
+  const displayAin = userIdentity?.ain || "ZENO-D432-EAA1-8B01";
   const displayFingerprint = userIdentity?.fingerprint || "0x9F82A4C1B920";
 
   const handleCopyAin = () => {
@@ -119,43 +119,53 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
     }
   };
 
-  // Curated Channels for quick navigation
   const primaryServer = servers[0];
   const textChannels = primaryServer?.categories?.find((c) => c.type === "text")?.channels || [];
   const voiceChannels = primaryServer?.categories?.find((c) => c.type === "voice")?.channels || [];
+
+  // Common floating island card style with transparent glassmorphism
+  const islandStyle: React.CSSProperties = {
+    backgroundColor: "rgba(35, 37, 42, 0.75)",
+    backdropFilter: "blur(14px)",
+    border: "1px solid rgba(255, 255, 255, 0.08)",
+    borderRadius: "12px",
+    padding: "16px",
+    display: "flex",
+    flexDirection: "column",
+    gap: "12px",
+    boxShadow: "0 8px 30px rgba(0, 0, 0, 0.28)",
+    boxSizing: "border-box"
+  };
 
   return (
     <div
       className="zeno-dashboard"
       style={{
-        padding: "20px 24px",
+        padding: "16px 20px",
         overflowY: "auto",
         display: "flex",
         flexDirection: "column",
-        gap: "20px",
+        gap: "14px",
         height: "100%",
+        maxHeight: "100%",
         boxSizing: "border-box",
-        backgroundColor: "var(--bg-primary)",
+        backgroundColor: "transparent",
         color: "var(--text-primary)"
       }}
     >
-      {/* 1. HERO & IDENTITY STATUS BANNER */}
+      {/* 1. FLOATING HERO & IDENTITY STATUS ISLAND */}
       <section
         style={{
-          backgroundColor: "var(--bg-secondary)",
-          border: "1px solid var(--border-color)",
-          borderRadius: "var(--radius-lg)",
-          padding: "18px 22px",
-          display: "flex",
-          flexDirection: "column",
-          gap: "14px",
-          boxShadow: "0 2px 10px rgba(0,0,0,0.15)"
+          ...islandStyle,
+          padding: "16px 20px",
+          gap: "12px",
+          flexShrink: 0
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-              <h1 style={{ fontSize: "20px", fontWeight: "700", color: "var(--text-primary)", margin: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+              <h1 style={{ fontSize: "18px", fontWeight: "700", color: "var(--text-primary)", margin: 0 }}>
                 Willkommen im Workspace, {userName}
               </h1>
               <span
@@ -172,18 +182,18 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
                 ● E2EE VERIFIZIERT
               </span>
             </div>
-            <p style={{ fontSize: "12px", color: "var(--text-muted)", margin: 0 }}>
-              Dezentrale, hochsichere Kollaborationsplattform gegen die EU-Chatkontrolle. Lokale Schlüsselhoheit & Zero-Knowledge.
+            <p style={{ fontSize: "11px", color: "var(--text-muted)", margin: "3px 0 0 0" }}>
+              Dezentrale, hochsichere Kollaborationsplattform gegen die EU-Chatkontrolle. Lokale Schlüsselhoheit &amp; Zero-Knowledge.
             </p>
           </div>
 
           {/* Quick Action Buttons in Hero */}
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
             {onNavigateToIde && (
               <button
                 onClick={onNavigateToIde}
                 className="settings-btn primary"
-                style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", padding: "6px 14px", backgroundColor: "#00FF87", color: "#08090C", fontWeight: "700" }}
+                style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", padding: "5px 12px", backgroundColor: "#00FF87", color: "#08090C", fontWeight: "700" }}
                 title="Direkt in die Zeno Entwicklungsumgebung wechseln"
               >
                 <Icon icon="mage:code" /> Zeno IDE öffnen
@@ -193,7 +203,7 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
               <button
                 onClick={onOpenInstanceBrowser}
                 className="settings-btn"
-                style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", padding: "6px 12px" }}
+                style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", padding: "5px 10px" }}
                 title="Dezentrale Zeno-Server & Community-Instanzen durchstöbern"
               >
                 <Icon icon="mage:compass" /> Instanzen
@@ -203,7 +213,7 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
               <button
                 onClick={onOpenSovereignModal}
                 className="settings-btn"
-                style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", padding: "6px 12px" }}
+                style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", padding: "5px 10px" }}
                 title="Sovereign Identity, BIP-39 Seed & Passcode verwalten"
               >
                 <Icon icon="mage:shield-check" /> Account
@@ -213,15 +223,15 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
         </div>
 
         {/* Status Chips Strip */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "10px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "8px" }}>
           {/* AIN Identity Chip */}
           <div
             onClick={handleCopyAin}
             style={{
-              backgroundColor: "var(--bg-tertiary)",
-              border: "1px solid var(--border-color)",
+              backgroundColor: "rgba(24, 25, 27, 0.7)",
+              border: "1px solid rgba(255, 255, 255, 0.06)",
               borderRadius: "var(--radius-sm)",
-              padding: "8px 12px",
+              padding: "7px 10px",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
@@ -229,33 +239,33 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
             }}
             title="Klicken zum Kopieren"
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", overflow: "hidden" }}>
-              <Icon icon="mage:user-square" style={{ fontSize: "18px", color: "var(--accent-color)" }} />
-              <div>
+            <div style={{ display: "flex", alignItems: "center", gap: "7px", minWidth: 0, overflow: "hidden" }}>
+              <Icon icon="mage:user-square" style={{ fontSize: "16px", color: "var(--accent-color)", flexShrink: 0 }} />
+              <div style={{ minWidth: 0, overflow: "hidden" }}>
                 <span style={{ fontSize: "9px", color: "var(--text-muted)", textTransform: "uppercase", display: "block" }}>
                   Sovereign AIN
                 </span>
-                <span style={{ fontSize: "11px", fontWeight: "600", fontFamily: "var(--font-mono)" }}>
+                <span style={{ fontSize: "11px", fontWeight: "600", fontFamily: "var(--font-mono)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "block" }}>
                   {displayAin}
                 </span>
               </div>
             </div>
-            <Icon icon={copiedAin ? "mage:check" : "mage:copy"} style={{ color: copiedAin ? "#00FF87" : "var(--text-muted)", fontSize: "14px" }} />
+            <Icon icon={copiedAin ? "mage:check" : "mage:copy"} style={{ color: copiedAin ? "#00FF87" : "var(--text-muted)", fontSize: "13px", flexShrink: 0, marginLeft: "4px" }} />
           </div>
 
           {/* SQLite DB Chip */}
           <div
             style={{
-              backgroundColor: "var(--bg-tertiary)",
-              border: "1px solid var(--border-color)",
+              backgroundColor: "rgba(24, 25, 27, 0.7)",
+              border: "1px solid rgba(255, 255, 255, 0.06)",
               borderRadius: "var(--radius-sm)",
-              padding: "8px 12px",
+              padding: "7px 10px",
               display: "flex",
               alignItems: "center",
               gap: "8px"
             }}
           >
-            <Icon icon="mage:database" style={{ fontSize: "18px", color: "#38BDF8" }} />
+            <Icon icon="mage:database" style={{ fontSize: "16px", color: "#38BDF8", flexShrink: 0 }} />
             <div>
               <span style={{ fontSize: "9px", color: "var(--text-muted)", textTransform: "uppercase", display: "block" }}>
                 Lokale Persistenz
@@ -269,16 +279,16 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
           {/* Relays Chip */}
           <div
             style={{
-              backgroundColor: "var(--bg-tertiary)",
-              border: "1px solid var(--border-color)",
+              backgroundColor: "rgba(24, 25, 27, 0.7)",
+              border: "1px solid rgba(255, 255, 255, 0.06)",
               borderRadius: "var(--radius-sm)",
-              padding: "8px 12px",
+              padding: "7px 10px",
               display: "flex",
               alignItems: "center",
               gap: "8px"
             }}
           >
-            <Icon icon="mage:satellite" style={{ fontSize: "18px", color: "#00FF87" }} />
+            <Icon icon="mage:satellite" style={{ fontSize: "16px", color: "#00FF87", flexShrink: 0 }} />
             <div>
               <span style={{ fontSize: "9px", color: "var(--text-muted)", textTransform: "uppercase", display: "block" }}>
                 Multi-Relay Transport
@@ -293,10 +303,10 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
           <div
             onClick={onOpenGitSyncModal}
             style={{
-              backgroundColor: "var(--bg-tertiary)",
-              border: "1px solid var(--border-color)",
+              backgroundColor: "rgba(24, 25, 27, 0.7)",
+              border: "1px solid rgba(255, 255, 255, 0.06)",
               borderRadius: "var(--radius-sm)",
-              padding: "8px 12px",
+              padding: "7px 10px",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
@@ -305,7 +315,7 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
             title="Git Synchronisation öffnen"
           >
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <Icon icon="mage:git-branch" style={{ fontSize: "18px", color: "var(--accent-color)" }} />
+              <Icon icon="mage:git-branch" style={{ fontSize: "16px", color: "var(--accent-color)", flexShrink: 0 }} />
               <div>
                 <span style={{ fontSize: "9px", color: "var(--text-muted)", textTransform: "uppercase", display: "block" }}>
                   Git Manifest Repository
@@ -315,118 +325,30 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
                 </span>
               </div>
             </div>
-            {onOpenGitSyncModal && <Icon icon="mage:chevron-right" style={{ color: "var(--text-muted)", fontSize: "14px" }} />}
+            {onOpenGitSyncModal && <Icon icon="mage:chevron-right" style={{ color: "var(--text-muted)", fontSize: "13px" }} />}
           </div>
         </div>
       </section>
 
-      {/* 2. THREE-COLUMN ERGONOMIC USABILITY WORKSPACE */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1.3fr 1fr", gap: "16px", flex: 1, minHeight: 0 }}>
+      {/* 2. THREE-COLUMN FLOATING USABILITY GRID */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(285px, 1fr))",
+          gap: "14px",
+          flex: 1,
+          minHeight: 0
+        }}
+      >
         
-        {/* COLUMN 1: KOMMUNIKATION & RÄUME */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+        {/* COLUMN 1: WORKSPACE & ENTWICKLUNG (DEVELOPER HUB) */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
           
-          {/* Card: Text Channels Quick Jump */}
-          <div style={{ backgroundColor: "var(--bg-secondary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-md)", padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-color)", paddingBottom: "8px" }}>
+          {/* Project Files */}
+          <div style={{ ...islandStyle, flex: 1, minHeight: 0 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: "8px", flexWrap: "wrap", gap: "6px" }}>
               <span style={{ fontSize: "12px", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px", color: "var(--text-primary)" }}>
-                <Icon icon="mage:message-conversation" style={{ color: "var(--accent-color)" }} /> SCHNELLZUGRIFF KANÄLE
-              </span>
-              <span style={{ fontSize: "10px", color: "var(--text-muted)" }}>{primaryServer?.name || "Server"}</span>
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              {textChannels.slice(0, 4).map((chn) => (
-                <div
-                  key={chn.id}
-                  onClick={() => primaryServer && onNavigateToChannel && onNavigateToChannel(primaryServer, chn)}
-                  style={{
-                    backgroundColor: "var(--bg-tertiary)",
-                    border: "1px solid var(--border-color)",
-                    borderRadius: "var(--radius-sm)",
-                    padding: "8px 12px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    cursor: "pointer",
-                    transition: "all var(--transition-fast)"
-                  }}
-                  className="channel-jump-item"
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <Icon icon="mage:hashtag" style={{ color: "var(--text-muted)" }} />
-                    <span style={{ fontSize: "12px", fontWeight: "600" }}>{chn.name}</span>
-                  </div>
-                  <Icon icon="mage:arrow-right" style={{ fontSize: "12px", color: "var(--text-muted)" }} />
-                </div>
-              ))}
-              {textChannels.length === 0 && (
-                <p style={{ fontSize: "11px", color: "var(--text-muted)", margin: "8px 0" }}>Keine Textkanäle gefunden.</p>
-              )}
-            </div>
-          </div>
-
-          {/* Card: Live Voice Channel Lounge */}
-          <div style={{ backgroundColor: "var(--bg-secondary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-md)", padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-color)", paddingBottom: "8px" }}>
-              <span style={{ fontSize: "12px", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px", color: "var(--text-primary)" }}>
-                <Icon icon="mage:microphone" style={{ color: "#00FF87" }} /> SPRACHLOUNGE & AUDIO
-              </span>
-              <span style={{ fontSize: "10px", color: "#00FF87", fontWeight: "600" }}>Web Audio VAD</span>
-            </div>
-
-            {voiceChannels.length > 0 ? (
-              voiceChannels.map((vChn) => (
-                <div key={vChn.id} style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-sm)", padding: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                      <Icon icon="mage:volume-up" style={{ color: "var(--accent-color)" }} />
-                      <span style={{ fontSize: "12px", fontWeight: "700" }}>{vChn.name}</span>
-                    </div>
-                    <span style={{ fontSize: "10px", color: "var(--text-muted)" }}>Ende-zu-Ende verschlüsselt</span>
-                  </div>
-                  <button
-                    onClick={() => onJoinVoice && onJoinVoice(vChn.id, vChn.name)}
-                    className="settings-btn primary"
-                    style={{ fontSize: "11px", padding: "6px 12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
-                  >
-                    <Icon icon="mage:phone" /> Sprachkanal beitreten
-                  </button>
-                </div>
-              ))
-            ) : (
-              <p style={{ fontSize: "11px", color: "var(--text-muted)", margin: 0 }}>Keine aktiven Sprachkanäle.</p>
-            )}
-          </div>
-
-          {/* Card: Community & Joined Servers */}
-          <div style={{ backgroundColor: "var(--bg-secondary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-md)", padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
-            <span style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", color: "var(--text-muted)", letterSpacing: "0.5px" }}>
-              DEZENTRALE SERVER ({servers.length})
-            </span>
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              {servers.map((srv) => (
-                <div key={srv.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 10px", backgroundColor: "var(--bg-tertiary)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-color)" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span style={{ fontSize: "14px" }}>{srv.iconLetter || "🛡️"}</span>
-                    <span style={{ fontSize: "12px", fontWeight: "500" }}>{srv.name}</span>
-                  </div>
-                  <span style={{ fontSize: "10px", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>Git-Backed</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-        </div>
-
-        {/* COLUMN 2: WORKSPACE & ENTWICKLUNG (DEVELOPER HUB) */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          
-          {/* Recent Files in Workspace */}
-          <div style={{ backgroundColor: "var(--bg-secondary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-md)", padding: "16px", display: "flex", flexDirection: "column", gap: "12px", flex: 1 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-color)", paddingBottom: "8px" }}>
-              <span style={{ fontSize: "12px", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px", color: "var(--text-primary)" }}>
-                <Icon icon="mage:folder-open" style={{ color: "#38BDF8" }} /> PROJEKT-DATEIEN & ARBEITSBEREICH
+                <Icon icon="mage:folder-open" style={{ color: "#38BDF8" }} /> PROJEKT-DATEIEN &amp; WORKSPACE
               </span>
               {onNavigateToIde && (
                 <button
@@ -438,7 +360,7 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
               )}
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px", flex: 1, overflowY: "auto" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px", flex: 1, overflowY: "auto", minHeight: "100px" }}>
               {recentFiles.map((file) => (
                 <div
                   key={file.name}
@@ -447,12 +369,14 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    padding: "8px 12px",
-                    backgroundColor: "var(--bg-tertiary)",
+                    padding: "7px 10px",
+                    backgroundColor: "rgba(24, 25, 27, 0.7)",
                     borderRadius: "var(--radius-sm)",
-                    border: "1px solid var(--border-color)",
-                    cursor: "pointer"
+                    border: "1px solid rgba(255, 255, 255, 0.05)",
+                    cursor: "pointer",
+                    transition: "all var(--transition-fast)"
                   }}
+                  className="channel-jump-item"
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", overflow: "hidden" }}>
                     <Icon
@@ -464,19 +388,19 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
                         file.name.endsWith(".json") ? "vscode-icons:file-type-json" :
                         file.name.endsWith(".md") ? "vscode-icons:file-type-markdown" : "mage:file-records"
                       }
-                      style={{ fontSize: "16px", flexShrink: 0 }}
+                      style={{ fontSize: "15px", flexShrink: 0 }}
                     />
-                    <span style={{ fontSize: "12px", fontWeight: "500", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <span style={{ fontSize: "11px", fontWeight: "500", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {file.name}
                     </span>
                   </div>
-                  <span style={{ fontSize: "10px", color: "var(--text-muted)", fontWeight: "600", textTransform: "uppercase" }}>
+                  <span style={{ fontSize: "9px", color: "var(--text-muted)", fontWeight: "600", textTransform: "uppercase", flexShrink: 0 }}>
                     {file.language}
                   </span>
                 </div>
               ))}
               {recentFiles.length === 0 && (
-                <p style={{ fontSize: "11px", color: "var(--text-muted)", textAlign: "center", padding: "16px" }}>
+                <p style={{ fontSize: "11px", color: "var(--text-muted)", textAlign: "center", padding: "12px" }}>
                   Keine kürzlich geöffneten Dateien.
                 </p>
               )}
@@ -484,8 +408,8 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
           </div>
 
           {/* Git Source Control Feed */}
-          <div style={{ backgroundColor: "var(--bg-secondary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-md)", padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-color)", paddingBottom: "8px" }}>
+          <div style={{ ...islandStyle }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: "8px" }}>
               <span style={{ fontSize: "12px", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px" }}>
                 <Icon icon="mage:git-commit" style={{ color: "var(--accent-color)" }} /> GIT SOURCE CONTROL
               </span>
@@ -493,16 +417,16 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
                 <button
                   onClick={onOpenGitSyncModal}
                   className="settings-btn"
-                  style={{ fontSize: "10px", padding: "3px 8px" }}
+                  style={{ fontSize: "10px", padding: "2px 7px" }}
                 >
-                  Sync & Push
+                  Sync &amp; Push
                 </button>
               )}
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
               {liveGitCommits.slice(0, 3).map((commit, idx) => (
-                <div key={idx} style={{ padding: "6px 10px", backgroundColor: "var(--bg-tertiary)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-color)" }}>
+                <div key={idx} style={{ padding: "6px 8px", backgroundColor: "rgba(24, 25, 27, 0.7)", borderRadius: "var(--radius-sm)", border: "1px solid rgba(255, 255, 255, 0.05)" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2px" }}>
                     <span style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: "var(--accent-color)", fontWeight: "700" }}>
                       {commit.hash}
@@ -524,25 +448,129 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
 
         </div>
 
+        {/* COLUMN 2: KOMMUNIKATION & RÄUME */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+          
+          {/* Text Channels */}
+          <div style={{ ...islandStyle }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: "8px", flexWrap: "wrap", gap: "6px" }}>
+              <span style={{ fontSize: "12px", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px", color: "var(--text-primary)" }}>
+                <Icon icon="mage:message-conversation" style={{ color: "var(--accent-color)" }} /> SCHNELLZUGRIFF KANÄLE
+              </span>
+              <span style={{ fontSize: "10px", color: "var(--text-muted)", backgroundColor: "rgba(255, 255, 255, 0.05)", padding: "1px 6px", borderRadius: "8px" }}>
+                {primaryServer?.name || "Server"}
+              </span>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+              {textChannels.slice(0, 3).map((chn) => (
+                <div
+                  key={chn.id}
+                  onClick={() => primaryServer && onNavigateToChannel && onNavigateToChannel(primaryServer, chn)}
+                  style={{
+                    backgroundColor: "rgba(24, 25, 27, 0.7)",
+                    border: "1px solid rgba(255, 255, 255, 0.05)",
+                    borderRadius: "var(--radius-sm)",
+                    padding: "7px 10px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    cursor: "pointer",
+                    transition: "all var(--transition-fast)"
+                  }}
+                  className="channel-jump-item"
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
+                    <Icon icon="mage:hashtag" style={{ color: "var(--text-muted)" }} />
+                    <span style={{ fontSize: "11px", fontWeight: "600" }}>{chn.name}</span>
+                  </div>
+                  <Icon icon="mage:arrow-right" style={{ fontSize: "11px", color: "var(--text-muted)" }} />
+                </div>
+              ))}
+              {textChannels.length === 0 && (
+                <p style={{ fontSize: "11px", color: "var(--text-muted)", margin: "4px 0" }}>Keine Textkanäle gefunden.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Voice Lounge Card */}
+          <div style={{ ...islandStyle }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: "8px", flexWrap: "wrap", gap: "6px" }}>
+              <span style={{ fontSize: "12px", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px", color: "var(--text-primary)" }}>
+                <Icon icon="mage:microphone" style={{ color: "#00FF87" }} /> SPRACHLOUNGE &amp; AUDIO
+              </span>
+              <span style={{ fontSize: "9px", color: "#00FF87", fontWeight: "600", backgroundColor: "rgba(0, 255, 135, 0.1)", padding: "1px 6px", borderRadius: "8px" }}>
+                Web Audio VAD
+              </span>
+            </div>
+
+            {voiceChannels.length > 0 ? (
+              voiceChannels.map((vChn) => (
+                <div key={vChn.id} style={{ backgroundColor: "rgba(24, 25, 27, 0.7)", border: "1px solid rgba(255, 255, 255, 0.05)", borderRadius: "var(--radius-sm)", padding: "10px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <Icon icon="mage:volume-up" style={{ color: "var(--accent-color)" }} />
+                      <span style={{ fontSize: "12px", fontWeight: "700" }}>{vChn.name}</span>
+                    </div>
+                    <span style={{ fontSize: "10px", color: "var(--text-muted)", display: "block", marginTop: "2px" }}>
+                      Ende-zu-Ende verschlüsselt (E2EE)
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => onJoinVoice && onJoinVoice(vChn.id, vChn.name)}
+                    className="settings-btn primary"
+                    style={{ fontSize: "11px", padding: "5px 10px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", backgroundColor: "#00FF87", color: "#08090C", fontWeight: "700" }}
+                  >
+                    <Icon icon="mage:phone" /> Sprachkanal beitreten
+                  </button>
+                </div>
+              ))
+            ) : (
+              <p style={{ fontSize: "11px", color: "var(--text-muted)", margin: 0 }}>Keine aktiven Sprachkanäle.</p>
+            )}
+          </div>
+
+          {/* Decentralized Servers */}
+          <div style={{ ...islandStyle }}>
+            <span style={{ fontSize: "10px", fontWeight: "700", textTransform: "uppercase", color: "var(--text-muted)", letterSpacing: "0.5px" }}>
+              DEZENTRALE SERVER ({servers.length})
+            </span>
+            <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+              {servers.map((srv) => (
+                <div key={srv.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 8px", backgroundColor: "rgba(24, 25, 27, 0.7)", borderRadius: "var(--radius-sm)", border: "1px solid rgba(255, 255, 255, 0.05)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
+                    <span style={{ fontSize: "13px" }}>{srv.iconLetter || "🛡️"}</span>
+                    <span style={{ fontSize: "11px", fontWeight: "500" }}>{srv.name}</span>
+                  </div>
+                  <span style={{ fontSize: "9px", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>Git-Backed</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+        </div>
+
         {/* COLUMN 3: DEZENTRALES NETZWERK & PRIVATSPHÄRE (SECURITY HUB) */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
           
           {/* Multi-Relay Transport Status */}
-          <div style={{ backgroundColor: "var(--bg-secondary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-md)", padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-color)", paddingBottom: "8px" }}>
+          <div style={{ ...islandStyle }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: "8px", flexWrap: "wrap", gap: "6px" }}>
               <span style={{ fontSize: "12px", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px" }}>
                 <Icon icon="mage:globe" style={{ color: "#00FF87" }} /> RELAY-TRANSPORT
               </span>
-              <span style={{ fontSize: "10px", color: "#00FF87", fontWeight: "600" }}>AES-256-GCM</span>
+              <span style={{ fontSize: "9px", color: "#00FF87", fontWeight: "600", backgroundColor: "rgba(0, 255, 135, 0.1)", padding: "1px 6px", borderRadius: "8px" }}>
+                AES-256-GCM
+              </span>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "11px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "5px", fontSize: "11px" }}>
               {[
-                { name: "relay.damus.io", type: "Nostr WebSocket", ping: "28ms", status: "Verbunden" },
-                { name: "nos.lol", type: "Nostr WebSocket", ping: "42ms", status: "Verbunden" },
-                { name: "relay.snort.social", type: "Nostr WebSocket", ping: "35ms", status: "Verbunden" }
+                { name: "relay.damus.io", type: "Nostr WebSocket", ping: "28ms" },
+                { name: "nos.lol", type: "Nostr WebSocket", ping: "42ms" },
+                { name: "relay.snort.social", type: "Nostr WebSocket", ping: "35ms" }
               ].map((r, i) => (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 8px", backgroundColor: "var(--bg-tertiary)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-color)" }}>
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 8px", backgroundColor: "rgba(24, 25, 27, 0.7)", borderRadius: "var(--radius-sm)", border: "1px solid rgba(255, 255, 255, 0.05)" }}>
                   <div>
                     <span style={{ fontWeight: "600", display: "block" }}>{r.name}</span>
                     <span style={{ fontSize: "9px", color: "var(--text-muted)" }}>{r.type}</span>
@@ -554,21 +582,21 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
           </div>
 
           {/* Sovereign Security & Backup Card */}
-          <div style={{ backgroundColor: "var(--bg-secondary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-md)", padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
+          <div style={{ ...islandStyle }}>
             <span style={{ fontSize: "12px", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px", color: "var(--text-primary)" }}>
               <Icon icon="mage:lock" style={{ color: "var(--accent-color)" }} /> SOVEREIGN KEY SECURITY
             </span>
 
-            <div style={{ fontSize: "11px", color: "var(--text-muted)", display: "flex", flexDirection: "column", gap: "6px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <div style={{ fontSize: "11px", color: "var(--text-muted)", display: "flex", flexDirection: "column", gap: "5px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", whiteSpace: "nowrap" }}>
                 <span>Passcode-Schutz:</span>
                 <strong style={{ color: "#00FF87" }}>Aktiv</strong>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>15s Auto-Lock Timer:</span>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", whiteSpace: "nowrap" }}>
+                <span>15s Auto-Lock:</span>
                 <strong style={{ color: "#00FF87" }}>Aktiv</strong>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", whiteSpace: "nowrap" }}>
                 <span>Schulterblick-Blur:</span>
                 <strong style={{ color: "#00FF87" }}>Aktiv</strong>
               </div>
@@ -577,15 +605,15 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
             <button
               onClick={handleExportBackup}
               className="settings-btn"
-              style={{ width: "100%", fontSize: "11px", padding: "6px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", marginTop: "4px" }}
+              style={{ width: "100%", fontSize: "11px", padding: "5px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", marginTop: "2px" }}
             >
               <Icon icon="mage:download" /> Paper-Backup (.txt) exportieren
             </button>
           </div>
 
-          {/* EU-Chatkontrolle Gegenentwurf Card */}
-          <div style={{ backgroundColor: "var(--bg-secondary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-md)", padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-            <span style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", color: "#38BDF8", letterSpacing: "0.5px", display: "flex", alignItems: "center", gap: "5px" }}>
+          {/* Privacy Shield Card */}
+          <div style={{ ...islandStyle }}>
+            <span style={{ fontSize: "10px", fontWeight: "700", textTransform: "uppercase", color: "#38BDF8", letterSpacing: "0.5px", display: "flex", alignItems: "center", gap: "5px" }}>
               <Icon icon="mage:shield" /> PRIVATSPHÄREN-SCHUTZSCHILD
             </span>
             <p style={{ fontSize: "11px", color: "var(--text-muted)", margin: 0, lineHeight: "1.4" }}>
