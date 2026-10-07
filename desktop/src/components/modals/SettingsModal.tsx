@@ -6,6 +6,7 @@ import { ZENO_WIKI_GUIDES } from "../../data/wikiGuides";
 import { MarkdownReader } from "../common/MarkdownReader";
 import { AudioSettingsTab } from "../voice/AudioSettingsTab";
 import Editor from "@monaco-editor/react";
+import { PluginsSettingsTab } from "../settings/PluginsSettingsTab";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -506,6 +507,14 @@ button.settings-btn,
             onClick={() => setActiveSettingsTab("github")}
           >
             GitHub-Integration
+          </button>
+          <button 
+            className={`settings-nav-item ${activeSettingsTab === "plugins" ? "active" : ""}`} 
+            onClick={() => setActiveSettingsTab("plugins")}
+            style={{ display: "flex", alignItems: "center", gap: "8px" }}
+          >
+            <Icon icon="mage:puzzle" style={{ color: "#C084FC" }} />
+            Community-Plugins
           </button>
           <button 
             className={`settings-nav-item ${activeSettingsTab === "wiki" ? "active" : ""}`} 
@@ -2100,6 +2109,11 @@ button.settings-btn,
                   </div>
                 </div>
               </div>
+            )}
+
+            {/* Tab: Community-Plugins (Obsidian-Architektur) */}
+            {activeSettingsTab === "plugins" && (
+              <PluginsSettingsTab showToast={showToast} />
             )}
           </div>
 

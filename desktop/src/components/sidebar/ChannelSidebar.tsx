@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Icon } from "@iconify/react";
 import { Server, Channel, Profile } from "../../types";
 import { ZeitschattenVoiceHalo } from "../common/ZeitschattenVoiceHalo";
+import { PluginSlotRenderer } from "../plugins/PluginSlotRenderer";
 
 interface ChannelSidebarProps {
   activeServerId: string;
@@ -447,6 +448,9 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
           </div>
         </>
       )}
+
+      {/* Plugin UI Extension Slot: sidebar_bottom */}
+      <PluginSlotRenderer slot="sidebar_bottom" />
 
       {/* User Info Footer (Discord-Style Integrated Dock) */}
       <footer className="user-panel-dock">

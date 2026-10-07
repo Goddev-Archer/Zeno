@@ -1020,6 +1020,69 @@ fn network_broadcast_message(
     Ok(())
 }
 
+// --- PHASE 3: OBSIDIAN PLUGIN SYSTEM HOST COMMANDS ---
+
+#[tauri::command]
+fn plugin_open_folder(app: tauri::AppHandle) -> Result<(), String> {
+    let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let plugins_dir = app_data_dir.join("plugins");
+    if !plugins_dir.exists() {
+        let _ = fs::create_dir_all(&plugins_dir);
+    }
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("explorer")
+            .arg(&plugins_dir)
+            .spawn()
+            .map_err(|e| format!("Fehler beim Öffnen des Explorers: {}", e))?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .arg(&plugins_dir)
+            .spawn()
+            .map_err(|e| format!("Fehler beim Öffnen des Finders: {}", e))?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        Command::new("xdg-open")
+            .arg(&plugins_dir)
+            .spawn()
+            .map_err(|e| format!("Fehler beim Öffnen des Dateimanagers: {}", e))?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn plugin_save_installed_files(
+    app: tauri::AppHandle,
+    plugin_id: String,
+    manifest_json: String,
+    main_js: String,
+    styles_css: String,
+) -> Result<(), String> {
+    let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let plugin_dir = app_data_dir.join("plugins").join(&plugin_id);
+    fs::create_dir_all(&plugin_dir).map_err(|e| e.to_string())?;
+
+    fs::write(plugin_dir.join("manifest.json"), manifest_json).map_err(|e| e.to_string())?;
+    fs::write(plugin_dir.join("main.js"), main_js).map_err(|e| e.to_string())?;
+    if !styles_css.is_empty() {
+        let _ = fs::write(plugin_dir.join("styles.css"), styles_css);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn plugin_delete_installed(app: tauri::AppHandle, plugin_id: String) -> Result<(), String> {
+    let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let plugin_dir = app_data_dir.join("plugins").join(&plugin_id);
+    if plugin_dir.exists() {
+        fs::remove_dir_all(&plugin_dir).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -1073,7 +1136,11 @@ pub fn run() {
             voice_update_speaking,
             voice_send_signal,
             voice_get_status,
-            network_broadcast_message
+            network_broadcast_message,
+            // Phase 3 Plugins
+            plugin_open_folder,
+            plugin_save_installed_files,
+            plugin_delete_installed
         ])
         .setup(|app| {
             let app_data_dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));

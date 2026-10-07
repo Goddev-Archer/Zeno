@@ -78,6 +78,8 @@ import { IdeProjectWizardModal, IdeNewItemModal } from "./components/modals/IdeM
 import { CreateChannelModal } from "./components/modals/CreateChannelModal";
 import { GitSyncModal } from "./components/modals/GitSyncModal";
 import { InstanceBrowserModal } from "./components/modals/InstanceBrowserModal";
+import { pluginManager } from "./services/pluginManagerService";
+import { PluginChatCommand } from "./types/pluginTypes";
 
 // Configure Monaco Environment to prevent dynamic worker fetch errors in Vite
 if (typeof window !== "undefined") {
@@ -408,6 +410,16 @@ function ZenoMainApp() {
   // Zero-Knowledge Backend Auth & Sync State
   const [sessionToken, setSessionToken] = useState<string>("");
   const [relayStatuses, setRelayStatuses] = useState<RelayNodeStatus[]>([]);
+
+  // Dynamic Community Plugin Commands (Obsidian-Architektur)
+  const [pluginCommands, setPluginCommands] = useState<PluginChatCommand[]>([]);
+  useEffect(() => {
+    const update = () => {
+      setPluginCommands(pluginManager.getRegisteredCommands());
+    };
+    update();
+    return pluginManager.onPluginChange(update);
+  }, []);
 
   const handleAuthenticateWithBackend = async () => {
     if (!userIdentity) {
@@ -1196,6 +1208,21 @@ function ZenoMainApp() {
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim() && !pendingAttachment) return;
+
+    const trimmedInput = inputText.trim();
+    // Intercept registered Community Plugin commands (e.g. /radio, /tor, /matrix, /lora)
+    if (trimmedInput.startsWith("/")) {
+      const matchedPluginCmd = pluginManager.getRegisteredCommands().find((c) =>
+        trimmedInput === c.name || trimmedInput.startsWith(c.name + " ")
+      );
+      if (matchedPluginCmd) {
+        const args = trimmedInput.slice(matchedPluginCmd.name.length).trim();
+        matchedPluginCmd.execute(args, { channelId: activeChannel.id, serverId: activeServer.id });
+        setInputText("");
+        setShowCommandSuggestions(false);
+        return;
+      }
+    }
 
     const isRulesChannel = activeChannel.type === "rules" || activeChannel.syncFile === "README.md" || activeChannel.name?.toLowerCase() === "regelwerk";
 
@@ -2001,7 +2028,14 @@ function ZenoMainApp() {
           pendingAttachment={pendingAttachment}
           messagesEndRef={messagesEndRef}
           chatAttachmentInputRef={chatAttachmentInputRef}
-          AVAILABLE_COMMANDS={AVAILABLE_COMMANDS}
+          AVAILABLE_COMMANDS={[
+            ...AVAILABLE_COMMANDS,
+            ...pluginCommands.map((c) => ({
+              name: c.name,
+              desc: c.description,
+              icon: c.icon || "mage:puzzle"
+            }))
+          ]}
           setIsMembersOpen={setIsMembersOpen}
           setSelectedUserProfile={setSelectedUserProfile}
           setInputText={setInputText}
