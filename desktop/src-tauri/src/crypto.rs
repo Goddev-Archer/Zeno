@@ -187,16 +187,28 @@ pub fn verify_signature(
     }
 }
 
-/// AES-256-GCM Vault Encryption (PBKDF2-HMAC-SHA256, 100,000 Iterations)
+/// Derives a 256-bit AES key using high-security Argon2id (64 MB RAM, 3 iterations, 1 lane)
+/// to neutralize GPU/ASIC brute-force attacks in compliance with OWASP & BSI guidelines.
+pub fn derive_key_argon2id(passcode: &[u8], salt: &[u8]) -> Result<[u8; 32], String> {
+    let params = argon2::Params::new(64 * 1024, 3, 1, Some(32))
+        .map_err(|e| format!("Argon2id Parameterfehler: {}", e))?;
+    let argon2 = argon2::Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params);
+    let mut key = [0u8; 32];
+    argon2
+        .hash_password_into(passcode, salt, &mut key)
+        .map_err(|e| format!("Argon2id KDF Fehler: {}", e))?;
+    Ok(key)
+}
+
+/// AES-256-GCM Vault Encryption (Hardened with Argon2id: 64 MB RAM, 3 iterations)
 pub fn encrypt_vault(plaintext: &str, passcode: &str) -> Result<EncryptedVaultBlob, String> {
     let mut salt = [0u8; 16];
     let mut iv = [0u8; 12];
     rand::rngs::OsRng.fill_bytes(&mut salt);
     rand::rngs::OsRng.fill_bytes(&mut iv);
 
-    // Derive 256-bit AES key via PBKDF2
-    let mut derived_key = [0u8; 32];
-    pbkdf2::pbkdf2_hmac::<Sha256>(passcode.as_bytes(), &salt, 100_000, &mut derived_key);
+    // Derive 256-bit AES key via Argon2id (64 MB Memory hardness)
+    let mut derived_key = derive_key_argon2id(passcode.as_bytes(), &salt)?;
 
     let cipher = Aes256Gcm::new_from_slice(&derived_key)
         .map_err(|e| format!("Cipher-Fehler: {}", e))?;
@@ -215,7 +227,7 @@ pub fn encrypt_vault(plaintext: &str, passcode: &str) -> Result<EncryptedVaultBl
     })
 }
 
-/// AES-256-GCM Vault Decryption
+/// AES-256-GCM Vault Decryption (Tries Argon2id first, gracefully falls back to PBKDF2 for legacy vaults)
 pub fn decrypt_vault(vault: &EncryptedVaultBlob, passcode: &str) -> Result<String, String> {
     let salt = hex::decode(&vault.salt_hex)
         .map_err(|e| format!("Ungültiger Salt-Hex: {}", e))?;
@@ -228,14 +240,29 @@ pub fn decrypt_vault(vault: &EncryptedVaultBlob, passcode: &str) -> Result<Strin
         return Err("Ungültige Salt- oder IV-Länge.".to_string());
     }
 
-    let mut derived_key = [0u8; 32];
-    pbkdf2::pbkdf2_hmac::<Sha256>(passcode.as_bytes(), &salt, 100_000, &mut derived_key);
-
-    let cipher = Aes256Gcm::new_from_slice(&derived_key)
-        .map_err(|e| format!("Cipher-Fehler: {}", e))?;
-    derived_key.zeroize();
-
     let nonce = Nonce::from_slice(&iv);
+
+    // 1. Primary KDF: Try Argon2id (64 MB memory)
+    if let Ok(mut argon_key) = derive_key_argon2id(passcode.as_bytes(), &salt) {
+        if let Ok(cipher) = Aes256Gcm::new_from_slice(&argon_key) {
+            argon_key.zeroize();
+            if let Ok(decrypted_bytes) = cipher.decrypt(nonce, ciphertext.as_ref()) {
+                if let Ok(plain) = String::from_utf8(decrypted_bytes) {
+                    return Ok(plain);
+                }
+            }
+        }
+        argon_key.zeroize();
+    }
+
+    // 2. Fallback KDF: PBKDF2-HMAC-SHA256 (for backwards compatibility with older vault blobs)
+    let mut pbkdf2_key = [0u8; 32];
+    pbkdf2::pbkdf2_hmac::<Sha256>(passcode.as_bytes(), &salt, 100_000, &mut pbkdf2_key);
+
+    let cipher = Aes256Gcm::new_from_slice(&pbkdf2_key)
+        .map_err(|e| format!("Cipher-Fehler: {}", e))?;
+    pbkdf2_key.zeroize();
+
     let decrypted_bytes = cipher
         .decrypt(nonce, ciphertext.as_ref())
         .map_err(|_| "Entschlüsselung fehlgeschlagen (Falsches Passwort oder korrupte Daten).".to_string())?;

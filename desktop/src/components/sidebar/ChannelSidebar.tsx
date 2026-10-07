@@ -529,8 +529,8 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
             onClick={() => {
               if (onOpenSovereignModal) {
                 onOpenSovereignModal();
-              } else if (mockProfiles.CipherNaut) {
-                setSelectedUserProfile(mockProfiles.CipherNaut);
+              } else if (userName && mockProfiles[userName]) {
+                setSelectedUserProfile(mockProfiles[userName]);
               }
             }}
             title="Konto & souveräne Identität (12 Wörter / AIN) verwalten"

@@ -8,6 +8,7 @@ export interface Channel {
   connectedUsers?: string[];
   syncFile?: string; // e.g. "README.md"
   rulesReadBy?: string[]; // AINs of users who confirmed reading the rules
+  isEncrypted?: boolean;
 }
 
 export interface Category {
@@ -127,6 +128,7 @@ export interface Message {
   isRulesDoc?: boolean;
   syncFile?: string;
   rulesReadBy?: string[];
+  isEncrypted?: boolean;
 }
 
 export interface SocialLink {

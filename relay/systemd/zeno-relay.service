@@ -1,0 +1,36 @@
+[Unit]
+Description=Zeno Zero-Knowledge Blind Relay Daemon
+Documentation=https://github.com/zeno-messenger/zeno
+After=network.target
+
+[Service]
+Type=simple
+User=nobody
+Group=nogroup
+WorkingDirectory=/opt/zeno-relay
+ExecStart=/usr/bin/node /opt/zeno-relay/server.mjs
+Restart=always
+RestartSec=5
+
+# Umwelt- und Sicherheitsbegrenzungen
+Environment=NODE_ENV=production
+Environment=PORT=4242
+Environment=HOST=0.0.0.0
+Environment=RATE_LIMIT_PER_MINUTE=180
+
+# Systemd Hardening Flags
+ProtectSystem=strict
+ProtectHome=true
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+# Ressourcenbeschränkungen (RAM & CPU)
+MemoryMax=128M
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target
+

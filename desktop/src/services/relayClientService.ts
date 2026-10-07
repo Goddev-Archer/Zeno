@@ -6,6 +6,14 @@
 import { UserIdentity, Message, Profile } from "../types";
 import { signAuthChallenge } from "./cryptoService";
 import { saveMessageToDb } from "./dbService";
+import {
+  ZeroKnowledgeEnvelope,
+  encryptWithSenderKey,
+  decryptSenderKeyEnvelope,
+  unpackAndRegisterSenderKey,
+  packSenderKeyDistribution,
+  EncryptedSenderKeyDistribution
+} from "./senderKeyService";
 
 export interface RelayNodeStatus {
   url: string;
@@ -43,6 +51,8 @@ class ZenoRelayClient {
   private activeServerId: string | null = null;
   private activeChannelId: string | null = null;
   private reconnectTimers: Map<string, any> = new Map();
+  private currentIdentity: UserIdentity | null = null;
+  private knownRoomSecrets: Map<string, string> = new Map();
 
   /**
    * Updates or initializes the list of relays for the active server
@@ -205,7 +215,20 @@ class ZenoRelayClient {
 
         const contentStr = nostrEvent.content;
         try {
-          const envelope = JSON.parse(contentStr) as EncryptedRelayEnvelope;
+          const contentObj = JSON.parse(contentStr);
+          if (contentObj.type === "zeno_zk_envelope" && contentObj.envelope) {
+            this.processZeroKnowledgeEnvelope(contentObj.envelope);
+            return;
+          }
+          if (contentObj.type === "zeno_sender_key_distribution") {
+            this.processSenderKeyDistribution(contentObj as EncryptedSenderKeyDistribution);
+            return;
+          }
+          if (contentObj.protocolVersion === "zeno-zk-v1") {
+            this.processZeroKnowledgeEnvelope(contentObj as ZeroKnowledgeEnvelope);
+            return;
+          }
+          const envelope = contentObj as EncryptedRelayEnvelope;
           this.processEnvelope(envelope);
         } catch {
           // If raw text or non-Zeno nostr event, ignore
@@ -213,13 +236,25 @@ class ZenoRelayClient {
         return;
       }
 
-      // 2. Generic Zeno Envelope (Cloudflare Worker or Custom Relay)
+      // 2. Zero-Knowledge Envelope (Megolm/MLS E2EE)
+      if (parsed.type === "zeno_zk_envelope" && parsed.envelope) {
+        this.processZeroKnowledgeEnvelope(parsed.envelope as ZeroKnowledgeEnvelope);
+        return;
+      }
+
+      // 3. Sender-Key Distribution Envelope
+      if (parsed.type === "zeno_sender_key_distribution") {
+        this.processSenderKeyDistribution(parsed as EncryptedSenderKeyDistribution);
+        return;
+      }
+
+      // 4. Generic Zeno Envelope (Cloudflare Worker or Custom Relay)
       if (parsed.type === "zeno_message" && parsed.envelope) {
         this.processEnvelope(parsed.envelope as EncryptedRelayEnvelope);
         return;
       }
 
-      // 3. Profile Sync Event
+      // 5. Profile Sync Event
       if (parsed.type === "zeno_profile_sync" && parsed.profile) {
         this.dispatchProfile(parsed.profile);
         return;
@@ -293,6 +328,64 @@ class ZenoRelayClient {
     this.dispatchMessage(envelope.channelId, msg);
   }
 
+  private async processZeroKnowledgeEnvelope(envelope: ZeroKnowledgeEnvelope): Promise<void> {
+    if (!envelope || !envelope.channelId || !envelope.senderAin) return;
+    const dedupeId = `zk-${envelope.channelId}-${envelope.senderAin}-${envelope.iteration}-${envelope.ivHex.slice(0, 8)}`;
+    if (this.processedMessageIds.has(dedupeId)) return;
+    this.processedMessageIds.add(dedupeId);
+
+    // Keep deduplication set bounded
+    if (this.processedMessageIds.size > 3000) {
+      const firstEntries = Array.from(this.processedMessageIds).slice(0, 1000);
+      for (const id of firstEntries) this.processedMessageIds.delete(id);
+    }
+
+    // Process attached peer profile metadata
+    if (envelope.profile) {
+      const fullProfile: Profile = {
+        name: envelope.profile.name || envelope.senderAin,
+        avatar: (envelope.profile.name || envelope.senderAin).slice(0, 1).toUpperCase(),
+        avatarColor: "purple",
+        role: "Souveräner Nutzer",
+        fingerprint: envelope.senderAin,
+        ...envelope.profile
+      };
+      this.dispatchProfile(fullProfile);
+    }
+
+    const myAin = this.currentIdentity?.ain || "ZENO-ANONYMOUS";
+    const decryptResult = await decryptSenderKeyEnvelope(envelope, myAin);
+
+    const msg: Message = {
+      id: dedupeId,
+      author: envelope.profile?.name || envelope.senderAin,
+      text: decryptResult.plaintext,
+      time: envelope.timestamp || new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      color: "purple",
+      isEncrypted: true
+    };
+
+    // Save to local SQLite database
+    saveMessageToDb(envelope.channelId, msg);
+
+    // Dispatch to active chat UI
+    this.dispatchMessage(envelope.channelId, msg);
+  }
+
+  private async processSenderKeyDistribution(dist: EncryptedSenderKeyDistribution): Promise<void> {
+    if (!dist || !dist.channelId) return;
+    const knownSecret = this.knownRoomSecrets.get(dist.channelId) || `zeno-default-room-${dist.channelId}`;
+    await unpackAndRegisterSenderKey(dist, knownSecret);
+  }
+
+  public setCurrentIdentity(identity: UserIdentity | null): void {
+    this.currentIdentity = identity;
+  }
+
+  public setRoomSecret(channelId: string, secret: string): void {
+    this.knownRoomSecrets.set(channelId, secret);
+  }
+
   public getActiveServerId(): string | null {
     return this.activeServerId;
   }
@@ -302,7 +395,9 @@ class ZenoRelayClient {
   }
 
   /**
-   * Broadcasts a message to all connected relays with optional profile card metadata
+   * Broadcasts a message to all connected relays with optional profile card metadata.
+   * If isEncrypted is true, encapsulates into a Zero-Knowledge Sender-Key envelope
+   * so relay hosts and VPS owners have 0% deciphering capabilities.
    */
   public async publishMessage(
     serverId?: string,
@@ -311,10 +406,67 @@ class ZenoRelayClient {
     text: string = "",
     identity: UserIdentity | null = null,
     profile?: Partial<Profile>,
-    msgIdOverride?: string
+    msgIdOverride?: string,
+    isEncrypted: boolean = false
   ): Promise<boolean> {
     const targetServerId = serverId || this.activeServerId || "zeno-network";
     const targetChannelId = channelId || this.activeChannelId || "allgemein";
+    const myAin = identity?.ain || this.currentIdentity?.ain || "ZENO-ANONYMOUS";
+    if (identity) this.currentIdentity = identity;
+
+    // --- 1. ZERO-KNOWLEDGE SENDER-KEY / MLS RATCHET MODE ---
+    if (isEncrypted) {
+      try {
+        const zkEnvelope = await encryptWithSenderKey(
+          targetChannelId,
+          targetServerId,
+          text,
+          myAin,
+          profile
+        );
+
+        const zkDedupeId = `zk-${targetChannelId}-${myAin}-${zkEnvelope.iteration}-${zkEnvelope.ivHex.slice(0, 8)}`;
+        this.processedMessageIds.add(zkDedupeId);
+
+        let successCount = 0;
+        for (const [url, ws] of this.sockets.entries()) {
+          if (ws.readyState === WebSocket.OPEN) {
+            try {
+              if (url.includes("nostr") || url.includes("damus") || url.includes("nos.lol") || url.includes("snort")) {
+                const nostrEvent = [
+                  "EVENT",
+                  {
+                    id: `zk-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                    pubkey: myAin,
+                    created_at: Math.floor(Date.now() / 1000),
+                    kind: 20000,
+                    tags: [["e", targetChannelId], ["p", targetServerId], ["zk", "v1"]],
+                    content: JSON.stringify({ type: "zeno_zk_envelope", envelope: zkEnvelope })
+                  }
+                ];
+                ws.send(JSON.stringify(nostrEvent));
+              } else {
+                ws.send(JSON.stringify({
+                  type: "zeno_zk_envelope",
+                  envelope: zkEnvelope
+                }));
+              }
+              const status = this.relayStatuses.get(url);
+              if (status) status.messagesSent += 1;
+              successCount++;
+            } catch (err) {
+              console.warn(`[Zeno Relay] Fehler beim Senden von ZK-Envelope an ${url}:`, err);
+            }
+          }
+        }
+        this.notifyStatusListeners();
+        return successCount > 0;
+      } catch (zkErr) {
+        console.error("[Zeno Relay] Fehler bei Zero-Knowledge Verschlüsselung:", zkErr);
+      }
+    }
+
+    // --- 2. STANDARD / AUTHENTICATED TRANSPORT MODE ---
     const msgId = msgIdOverride || `zeno-msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
     const time = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
@@ -327,7 +479,7 @@ class ZenoRelayClient {
       serverId: targetServerId,
       channelId: targetChannelId,
       author,
-      authorAin: identity?.ain || "ZENO-ANONYMOUS",
+      authorAin: myAin,
       timestamp: time,
       ciphertext: text,
       signature: "",
@@ -338,7 +490,7 @@ class ZenoRelayClient {
     // Sign with user's private key if available
     if (identity?.privateKeyEncryptedHex) {
       try {
-        const nonce = `${msgId}:${channelId}:${text}`;
+        const nonce = `${msgId}:${targetChannelId}:${text}`;
         envelope.signature = await signAuthChallenge(nonce, identity.privateKeyEncryptedHex);
       } catch (sigErr) {
         console.warn("[Zeno Relay] Konnte Nachricht nicht kryptografisch signieren:", sigErr);
@@ -355,10 +507,10 @@ class ZenoRelayClient {
               "EVENT",
               {
                 id: msgId,
-                pubkey: identity?.ain || "zeno-user",
+                pubkey: myAin,
                 created_at: Math.floor(Date.now() / 1000),
                 kind: 20000,
-                tags: [["e", channelId], ["p", serverId]],
+                tags: [["e", targetChannelId], ["p", targetServerId]],
                 content: JSON.stringify(envelope)
               }
             ];
@@ -382,6 +534,35 @@ class ZenoRelayClient {
 
     this.notifyStatusListeners();
     return successCount > 0;
+  }
+
+  /**
+   * Broadcasts the local channel Sender-Key to authorized room members
+   */
+  public async publishSenderKeyAnnouncement(
+    channelId: string,
+    serverId: string,
+    roomSecret?: string,
+    identity?: UserIdentity | null
+  ): Promise<boolean> {
+    const myAin = identity?.ain || this.currentIdentity?.ain || "ZENO-ANONYMOUS";
+    const secret = roomSecret || this.knownRoomSecrets.get(channelId) || `zeno-default-room-${channelId}`;
+    try {
+      const dist = await packSenderKeyDistribution(channelId, serverId, myAin, secret);
+      let count = 0;
+      for (const ws of this.sockets.values()) {
+        if (ws.readyState === WebSocket.OPEN) {
+          try {
+            ws.send(JSON.stringify(dist));
+            count++;
+          } catch {}
+        }
+      }
+      return count > 0;
+    } catch (e) {
+      console.warn("[Zeno Relay] Fehler beim Senden der Sender-Key Verteilung:", e);
+      return false;
+    }
   }
 
   /**

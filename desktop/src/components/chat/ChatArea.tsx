@@ -184,6 +184,16 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           const foundUrl = urlMatch ? urlMatch[0] : null;
           const urlDetails = foundUrl ? cleanUrl(foundUrl) : null;
           const canDelete = isServerOwner || msg.author === (currentUserName || "CipherNaut");
+          const authorProfile: Profile = mockProfiles[msg.author] || {
+            id: `peer-${msg.author}`,
+            name: msg.author,
+            avatar: (msg.author || "P")[0].toUpperCase(),
+            avatarColor: msg.color || "purple",
+            role: "Teilnehmer",
+            roleColor: "blue",
+            status: '"Souveräner Peer online"',
+            fingerprint: "ZENO-SOVEREIGN"
+          };
 
           return (
             <article 
@@ -193,7 +203,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             >
               <div 
                 className={`message-avatar ${msg.color}`}
-                onClick={() => setSelectedUserProfile(mockProfiles[msg.author] || null)}
+                onClick={() => setSelectedUserProfile(authorProfile)}
                 style={{ cursor: "pointer" }}
                 title={`Profil von ${msg.author} anzeigen`}
               >
@@ -202,10 +212,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               <div className="message-body">
                 <header className="message-header" style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span className={`message-author ${msg.color}`} onClick={() => setSelectedUserProfile(mockProfiles[msg.author] || null)} style={{ cursor: "pointer" }}>
+                    <span className={`message-author ${msg.color}`} onClick={() => setSelectedUserProfile(authorProfile)} style={{ cursor: "pointer" }}>
                       {msg.author}
                     </span>
-                    {mockProfiles[msg.author]?.role === "Bot" && <span className="badge bot-badge">BOT</span>}
+                    {authorProfile.role === "Bot" && <span className="badge bot-badge">BOT</span>}
                     <time className="message-timestamp">{msg.time}</time>
                   </div>
                   {canDelete && (

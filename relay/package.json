@@ -1,0 +1,29 @@
+{
+  "name": "zeno-relay",
+  "version": "1.0.0",
+  "description": "Zeno Zero-Knowledge Blind Relay Daemon — Ephemeral WebSocket transport without decryption capability",
+  "main": "server.mjs",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node --watch server.mjs"
+  },
+  "keywords": [
+    "zeno",
+    "relay",
+    "zero-knowledge",
+    "websocket",
+    "e2ee",
+    "nostr",
+    "privacy"
+  ],
+  "author": "Zeno Contributors",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
+

@@ -357,9 +357,6 @@ function ZenoMainApp() {
         if (activeIdn.username) {
           setUserName(activeIdn.username);
         }
-        if (mockProfiles.CipherNaut) {
-          mockProfiles.CipherNaut.fingerprint = activeIdn.fingerprint;
-        }
         // If the active identity does NOT have a 12-word seed phrase (legacy mock key), launch the Sovereign Onboarding Wizard!
         if (!activeIdn.mnemonic) {
           setSovereignModalTab("create");
@@ -391,13 +388,17 @@ function ZenoMainApp() {
 
   const handleIdentityChanged = (newIdentity: UserIdentity, newUsername: string) => {
     setUserIdentity(newIdentity);
+    relayClient.setCurrentIdentity(newIdentity);
     if (newUsername) {
       setUserName(newUsername);
     }
-    if (mockProfiles.CipherNaut) {
-      mockProfiles.CipherNaut.fingerprint = newIdentity.fingerprint;
-    }
   };
+
+  useEffect(() => {
+    if (userIdentity) {
+      relayClient.setCurrentIdentity(userIdentity);
+    }
+  }, [userIdentity]);
 
   const handleRegenerateIdentity = async () => {
     setSovereignModalTab("create");
@@ -483,24 +484,6 @@ function ZenoMainApp() {
 
   useEffect(() => {
     const currentName = userName || "CipherNaut";
-    if (mockProfiles.CipherNaut) {
-      mockProfiles.CipherNaut.name = currentName;
-      mockProfiles.CipherNaut.themePreset = userProfilePreset;
-      mockProfiles.CipherNaut.customCss = userCustomCss;
-      mockProfiles.CipherNaut.badge = userBadge;
-      mockProfiles.CipherNaut.badgePosition = userBadgePosition;
-      mockProfiles.CipherNaut.status = `"${userStatusQuote}"`;
-      mockProfiles.CipherNaut.bannerGradient = userBannerGradient;
-      mockProfiles.CipherNaut.avatarImage = userAvatarImage;
-      mockProfiles.CipherNaut.avatarHoverEffect = userAvatarHoverEffect;
-      mockProfiles.CipherNaut.avatarEffectFrame = userAvatarEffectFrame;
-      mockProfiles.CipherNaut.badgeBgColor = userBadgeBgColor;
-      mockProfiles.CipherNaut.badgeTextColor = userBadgeTextColor;
-      mockProfiles.CipherNaut.cardBgColor = userCardBgColor;
-      mockProfiles.CipherNaut.cardHoverEffect = userCardHoverEffect;
-      mockProfiles.CipherNaut.layoutOrder = userLayoutOrder;
-      mockProfiles.CipherNaut.animationPreset = userAnimationPreset;
-    }
 
     setProfiles((prev) => ({
       ...prev,
@@ -543,6 +526,15 @@ function ZenoMainApp() {
     loadServersFromDb().then((dbServers) => {
       if (dbServers && dbServers.length > 0) {
         setServers(dbServers);
+        setActiveServer((prev) => {
+          const exists = dbServers.some((s) => s.id === prev.id);
+          return exists ? prev : dbServers[0];
+        });
+        setActiveChannel((prevCh) => {
+          const currentSrv = dbServers[0];
+          const hasCh = currentSrv.categories?.some((c) => c.channels.some((ch) => ch.id === prevCh.id));
+          return hasCh ? prevCh : (currentSrv.categories?.[0]?.channels?.[0] || prevCh);
+        });
       }
     });
 
@@ -1268,7 +1260,17 @@ function ZenoMainApp() {
     // Rust Backend Core: Save to SQLite & Broadcast via Multi-Relay Transport
     saveMessageToDb(activeChannel.id, newMsg);
     broadcastNetworkMessage(activeChannel.id, newMsg.author, newMsg.text, newMsg.color, newMsg.time, newMsg.code);
-    relayClient.publishMessage(activeServer.id, activeChannel.id, newMsg.author, newMsg.text, userIdentity, myProfileData, msgId);
+    const isChannelEncrypted = !!activeServer.encrypted || !!activeChannel.isEncrypted;
+    relayClient.publishMessage(
+      activeServer.id,
+      activeChannel.id,
+      newMsg.author,
+      newMsg.text,
+      userIdentity,
+      myProfileData,
+      msgId,
+      isChannelEncrypted
+    );
 
     // If posting in a rules channel, automatically sync & commit README.md to Git repository!
     if (isRulesChannel) {

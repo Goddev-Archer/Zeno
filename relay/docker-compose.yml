@@ -1,0 +1,29 @@
+services:
+  zeno-relay:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zeno-relay
+    restart: unless-stopped
+    ports:
+      - "4242:4242"
+    environment:
+      - PORT=4242
+      - HOST=0.0.0.0
+      - NODE_ENV=production
+      - RATE_LIMIT_PER_MINUTE=180
+      - CHANNEL_RING_BUFFER_SIZE=50
+    # Sicherheits- und Ressourcenbegrenzung
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.50"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
