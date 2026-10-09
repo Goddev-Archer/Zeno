@@ -3,6 +3,7 @@
 // Push-To-Talk (PTT), Loopback Echo Test, and WebRTC Peer Connections.
 
 import { updateVoiceSpeaking, sendVoiceSignal, VoiceSignalPayload } from "./voiceNetworkService";
+import { audioE2EEngine, VoiceE2EEStats } from "./audioE2EEngine";
 
 export interface AudioSettingsConfig {
   inputDeviceId: string;
@@ -414,8 +415,40 @@ class AudioStreamService {
     return () => this.speakingListeners.delete(callback);
   }
 
+  // Current active channel
+  private activeChannelId: string | null = null;
+
+  public getActiveChannelId(): string | null {
+    return this.activeChannelId;
+  }
+
   /**
-   * WebRTC Peer-to-Peer Audio Channel
+   * Initialisiert E2EE Voice Session für einen Kanal und teilt Schlüssel
+   */
+  public async initChannelE2EE(channelId: string): Promise<string> {
+    this.activeChannelId = channelId;
+    const keyHex = await audioE2EEngine.initLocalVoiceKey();
+    this.broadcastVoiceKey(channelId);
+    return keyHex;
+  }
+
+  /**
+   * Sendet den lokalen 256-Bit Voice-Schlüssel über die Control Plane (Relay) an alle Peers
+   */
+  public broadcastVoiceKey(channelId: string) {
+    const keyHex = audioE2EEngine.getLocalKeyHex();
+    if (keyHex) {
+      sendVoiceSignal({
+        channelId,
+        sender: "local",
+        signalType: "voice_key_share",
+        data: keyHex
+      });
+    }
+  }
+
+  /**
+   * WebRTC Peer-to-Peer Audio Channel mit Frame-by-Frame E2EE
    */
   public async createPeerConnection(peerId: string, channelId: string): Promise<RTCPeerConnection> {
     const pc = new RTCPeerConnection({
@@ -425,15 +458,20 @@ class AudioStreamService {
       ]
     });
 
-    // Add local microphone audio track to connection
+    // 1. Add local microphone audio track & WebRTC Insertable Streams Sender E2EE
     if (this.mediaStream) {
       this.mediaStream.getAudioTracks().forEach((track) => {
-        pc.addTrack(track, this.mediaStream!);
+        const sender = pc.addTrack(track, this.mediaStream!);
+        audioE2EEngine.setupSenderTransform(sender, channelId);
       });
     }
 
-    // Handle remote track playback
+    // 2. Handle remote track playback & Receiver E2EE Transform
     pc.ontrack = (event) => {
+      if (event.receiver) {
+        audioE2EEngine.setupReceiverTransform(event.receiver, peerId, channelId);
+      }
+
       const [remoteStream] = event.streams;
       let audio = this.remoteAudioElements.get(peerId);
       if (!audio) {
@@ -447,7 +485,7 @@ class AudioStreamService {
       audio.play().catch((e) => console.warn("[Zeno Audio] Remote Audio Autoplay:", e));
     };
 
-    // Send local ICE candidates to peer via Rust relay
+    // 3. Send local ICE candidates to peer via Rust relay (Control Plane)
     pc.onicecandidate = (event) => {
       if (event.candidate) {
         const payload: VoiceSignalPayload = {
@@ -465,6 +503,91 @@ class AudioStreamService {
     return pc;
   }
 
+  /**
+   * Behandelt eingehende Control-Plane Signale (Offer, Answer, ICE, Key Share)
+   */
+  public async handleVoiceSignal(signal: VoiceSignalPayload): Promise<void> {
+    const { channelId, sender: peerId, signalType, data } = signal;
+
+    if (signalType === "voice_key_share") {
+      await audioE2EEngine.registerPeerVoiceKey(peerId, data);
+      return;
+    }
+
+    if (signalType === "offer") {
+      let pc = this.peerConnections.get(peerId);
+      if (!pc) {
+        pc = await this.createPeerConnection(peerId, channelId);
+      }
+      const remoteOffer = JSON.parse(data) as RTCSessionDescriptionInit;
+      await pc.setRemoteDescription(new RTCSessionDescription(remoteOffer));
+
+      const answer = await pc.createAnswer();
+      // Optimiere Opus SDP für 48kHz, FEC und VBR
+      const optimizedSdp = audioE2EEngine.optimizeOpusSdp(answer.sdp || "");
+      const finalAnswer = { type: answer.type, sdp: optimizedSdp };
+      await pc.setLocalDescription(finalAnswer);
+
+      sendVoiceSignal({
+        channelId,
+        sender: "local",
+        target: peerId,
+        signalType: "answer",
+        data: JSON.stringify(finalAnswer)
+      });
+      return;
+    }
+
+    if (signalType === "answer") {
+      const pc = this.peerConnections.get(peerId);
+      if (pc) {
+        const remoteAnswer = JSON.parse(data) as RTCSessionDescriptionInit;
+        await pc.setRemoteDescription(new RTCSessionDescription(remoteAnswer));
+      }
+      return;
+    }
+
+    if (signalType === "ice_candidate") {
+      const pc = this.peerConnections.get(peerId);
+      if (pc && data) {
+        try {
+          const candidate = JSON.parse(data);
+          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (e) {
+          console.warn("[Zeno Audio] Fehler beim Hinzufügen von ICE Candidate:", e);
+        }
+      }
+      return;
+    }
+
+    if (signalType === "user_left") {
+      const pc = this.peerConnections.get(peerId);
+      if (pc) {
+        pc.close();
+        this.peerConnections.delete(peerId);
+      }
+      const audio = this.remoteAudioElements.get(peerId);
+      if (audio) {
+        audio.pause();
+        audio.srcObject = null;
+        this.remoteAudioElements.delete(peerId);
+      }
+      audioE2EEngine.removePeerVoiceKey(peerId);
+    }
+  }
+
+  public getE2eeStats(): VoiceE2EEStats {
+    return audioE2EEngine.getStats();
+  }
+
+  public setE2eeActive(active: boolean) {
+    audioE2EEngine.setE2eeActive(active);
+  }
+
+  public setFecEnabled(enabled: boolean) {
+    audioE2EEngine.setFecEnabled(enabled);
+  }
+
   public closeAllPeers() {
     this.peerConnections.forEach((pc) => pc.close());
     this.peerConnections.clear();
@@ -473,6 +596,7 @@ class AudioStreamService {
       audio.srcObject = null;
     });
     this.remoteAudioElements.clear();
+    this.activeChannelId = null;
   }
 }
 

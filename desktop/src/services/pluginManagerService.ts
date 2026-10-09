@@ -12,6 +12,8 @@ import {
   TransportProvider,
   AudioSourceProvider,
   PluginChatCommand,
+  ProfileThemeDefinition,
+  PluginDockItem,
   ZenoPluginApi,
   ZenoPluginInstance
 } from "../types/pluginTypes";
@@ -31,6 +33,8 @@ class ZenoPluginManager {
   private registeredAudioSources: Map<string, AudioSourceProvider> = new Map();
   private registeredUIComponents: Map<UISlot, Map<string, UIComponentDef>> = new Map();
   private registeredCommands: Map<string, PluginChatCommand> = new Map();
+  private registeredProfileThemes: Map<string, ProfileThemeDefinition> = new Map();
+  private registeredDockItems: Map<string, PluginDockItem> = new Map();
   private eventListeners: Map<string, Set<(...args: any[]) => void>> = new Map();
 
   // Zuordnung: Plugin-ID -> Set der von ihm registrierten Ressourcen für sauberes Unloading
@@ -39,6 +43,8 @@ class ZenoPluginManager {
     audioSources: Set<string>;
     uiSlots: Array<{ slot: UISlot; id: string }>;
     commands: Set<string>;
+    profileThemes: Set<string>;
+    dockItems: Set<string>;
     eventCleanups: Array<() => void>;
   }> = new Map();
 
@@ -153,6 +159,7 @@ class ZenoPluginManager {
         repo: entry.repo,
         category: entry.category,
         icon: entry.icon,
+        logoUrl: entry.logoUrl,
         permissions: entry.permissions
       };
       let mainJs = "";
@@ -280,6 +287,8 @@ class ZenoPluginManager {
         audioSources: new Set(),
         uiSlots: [],
         commands: new Set(),
+        profileThemes: new Set(),
+        dockItems: new Set(),
         eventCleanups: []
       });
 
@@ -297,6 +306,7 @@ class ZenoPluginManager {
 
       plugin.enabled = true;
       if (persist) this.saveToStorage();
+
       this.notifyChange();
       return true;
     } catch (e) {
@@ -338,6 +348,8 @@ class ZenoPluginManager {
         if (slotMap) slotMap.delete(id);
       }
       for (const cmd of resources.commands) this.registeredCommands.delete(cmd);
+      for (const themeId of resources.profileThemes) this.registeredProfileThemes.delete(themeId);
+      for (const dockId of resources.dockItems) this.registeredDockItems.delete(dockId);
       for (const cleanup of resources.eventCleanups) cleanup();
       this.pluginResources.delete(pluginId);
     }
@@ -458,7 +470,31 @@ class ZenoPluginManager {
         }
       },
 
-      // 7. System-Benachrichtigungen
+      // 7. Profil- & Design-Erweiterungen
+      registerProfileTheme: (theme: ProfileThemeDefinition) => {
+        this.registeredProfileThemes.set(theme.id, theme);
+        resTracker.profileThemes.add(theme.id);
+        this.notifyChange();
+      },
+      unregisterProfileTheme: (themeId: string) => {
+        this.registeredProfileThemes.delete(themeId);
+        resTracker.profileThemes.delete(themeId);
+        this.notifyChange();
+      },
+
+      // 8. Serverleiste / Plugin-Dock Items
+      registerDockItem: (item: PluginDockItem) => {
+        this.registeredDockItems.set(item.id, item);
+        resTracker.dockItems.add(item.id);
+        this.notifyChange();
+      },
+      unregisterDockItem: (id: string) => {
+        this.registeredDockItems.delete(id);
+        resTracker.dockItems.delete(id);
+        this.notifyChange();
+      },
+
+      // 9. System-Benachrichtigungen
       showNotice: (message: string, _durationMs?: number) => {
         if (this.toastHandler) {
           this.toastHandler(message);
@@ -507,6 +543,14 @@ class ZenoPluginManager {
 
   public getTransports(): TransportProvider[] {
     return Array.from(this.registeredTransports.values());
+  }
+
+  public getRegisteredProfileThemes(): ProfileThemeDefinition[] {
+    return Array.from(this.registeredProfileThemes.values());
+  }
+
+  public getDockItems(): PluginDockItem[] {
+    return Array.from(this.registeredDockItems.values());
   }
 
   public onPluginChange(listener: () => void): () => void {

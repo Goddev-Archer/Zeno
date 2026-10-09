@@ -25,7 +25,17 @@ import {
 } from "./services/cryptoService";
 import { executeZeroKnowledgeAuth, syncEncryptedVaultToServer } from "./services/backendService";
 import { commitAndPushServerManifest, commitAndPushServerReadme, readServerReadme } from "./services/gitServerSyncService";
-import { executeCodeNatively } from "./services/ideBackendService";
+import {
+  executeCodeNatively,
+  openFolderDialog,
+  openFileDialog,
+  readDirectory,
+  readFileContent,
+  writeFileContent,
+  createFileEntry,
+  createFolderEntry,
+  deleteEntry
+} from "./services/ideBackendService";
 import {
   saveServerToDb,
   loadServersFromDb,
@@ -41,6 +51,7 @@ import {
   setVoiceDeafen,
   broadcastNetworkMessage,
   subscribeToVoiceState,
+  subscribeToVoiceSignals,
   subscribeToIncomingMessages
 } from "./services/voiceNetworkService";
 import { audioStreamService } from "./services/audioStreamService";
@@ -50,7 +61,6 @@ import {
   initialServers,
   initialMessages,
   mockProfiles,
-  defaultWorkspace,
   HUB_RUNTIMES_CATALOG,
   INITIAL_WIDGETS
 } from "./data/mockData";
@@ -64,6 +74,9 @@ import { ChatArea } from "./components/chat/ChatArea";
 import { Dashboard } from "./components/dashboard/Dashboard";
 import { WasmHub } from "./components/wasm/WasmHub";
 import { ZenoIde } from "./components/ide/ZenoIde";
+import { SplashScreen } from "./components/common/SplashScreen";
+import { KnowledgeHubView } from "./components/wiki/KnowledgeHubView";
+import { PluginsSettingsTab } from "./components/settings/PluginsSettingsTab";
 
 // --- MODALS ---
 import { SovereignAccountModal } from "./components/modals/SovereignAccountModal";
@@ -210,7 +223,7 @@ function ZenoMainApp() {
     }
   }, [servers]);
   const [activeServerId, setActiveServerId] = useState<string>("home");
-  const [homeTab, setHomeTab] = useState<"dashboard" | "wasm_hub" | "ide">("dashboard");
+  const [homeTab, setHomeTab] = useState<"dashboard" | "wasm_hub" | "ide" | "plugins" | "wiki">("dashboard");
   const [activeServer, setActiveServer] = useState<Server>(initialServers[0]);
   const [activeChannel, setActiveChannel] = useState<Channel>(initialServers[0].categories[0].channels[0]);
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
@@ -271,6 +284,24 @@ function ZenoMainApp() {
   // UI Panels & Layout State
   const [isMembersOpen, setIsMembersOpen] = useState<boolean>(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("zeno_sidebar_collapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleSidebar = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("zeno_sidebar_collapsed", String(next));
+      } catch {}
+      return next;
+    });
+  };
+
   const [activeSettingsTab, setActiveSettingsTab] = useState<string>("profile");
   const [selectedUserProfile, setSelectedUserProfile] = useState<Profile | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -494,6 +525,22 @@ function ZenoMainApp() {
     }
   }, []);
 
+  // Globaler Tastatur-Shortcut: Strg+B zum Ein-/Ausklappen der Seitenleiste
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === "b" || e.key === "B")) {
+        const target = e.target as HTMLElement;
+        const isEditable = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+        if (!isEditable) {
+          e.preventDefault();
+          toggleSidebar();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   useEffect(() => {
     const currentName = userName || "CipherNaut";
 
@@ -565,6 +612,11 @@ function ZenoMainApp() {
       setIsLocalSpeaking(speaking);
     });
 
+    // 2c. Subscribe to live WebRTC Voice Signals (Offer, Answer, ICE, E2EE Voice Key Share)
+    const unlistenVoiceSignalsPromise = subscribeToVoiceSignals(async (signal) => {
+      await audioStreamService.handleVoiceSignal(signal);
+    });
+
     // 3. Subscribe to incoming messages from Rust Relay
     const unlistenMsgPromise = subscribeToIncomingMessages((msg) => {
       // Discard our own broadcast echo
@@ -605,6 +657,7 @@ function ZenoMainApp() {
 
     return () => {
       unlistenVoicePromise.then((unlisten) => unlisten && unlisten());
+      unlistenVoiceSignalsPromise.then((unlisten) => unlisten && unlisten());
       unlistenMsgPromise.then((unlisten) => unlisten && unlisten());
       unsubAudioLevel();
       unsubscribeRelayMsgs();
@@ -755,14 +808,47 @@ function ZenoMainApp() {
   const [gitWidgetTabs, setGitWidgetTabs] = useState<Record<string, string>>({});
 
   // Full IDE State
-  const [ideFiles, setIdeFiles] = useState<IdeFile[]>(defaultWorkspace);
-  const [ideActiveFilePath, setIdeActiveFilePath] = useState<string>("src/main.rs");
-  const [ideOpenTabs, setIdeOpenTabs] = useState<string[]>(["src/main.rs", "Cargo.toml"]);
-  const [ideSidebarTab, setIdeSidebarTab] = useState<"explorer" | "git" | "extensions" | "compilers" | "gitlens">("explorer");
+  const [ideWorkspacePath, setIdeWorkspacePath] = useState<string | null>(() => {
+    return localStorage.getItem("zeno_ide_workspace_path") || null;
+  });
+  const [recentWorkspaces, setRecentWorkspaces] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem("zeno_ide_recent_workspaces");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [ideFiles, setIdeFiles] = useState<IdeFile[]>([]);
+  const [ideActiveFilePath, setIdeActiveFilePath] = useState<string | null>(null);
+  const [ideOpenTabs, setIdeOpenTabs] = useState<string[]>([]);
+  const [ideSidebarTab, setIdeSidebarTab] = useState<"explorer" | "git" | "compilers">("explorer");
   const [ideConsoleOutput, setIdeConsoleOutput] = useState<string>("[Zeno Rust Core] Native Ausführungsumgebung aktiv. Bereit für Code-Ausführung.\n");
   const [isIdeConsoleExpanded, setIsIdeConsoleExpanded] = useState<boolean>(true);
-  const [ideGitChanges, setIdeGitChanges] = useState<string[]>(["src/main.rs"]);
+  const [ideGitChanges, setIdeGitChanges] = useState<string[]>([]);
   const [ideGitMessage, setIdeGitMessage] = useState<string>("");
+
+  // Auto-load saved workspace on startup if present
+  useEffect(() => {
+    if (ideWorkspacePath) {
+      readDirectory(ideWorkspacePath)
+        .then((entries) => {
+          const files: IdeFile[] = entries.map((e) => ({
+            name: e.name,
+            path: e.path,
+            code: "",
+            language: e.language || "",
+            isFolder: e.isFolder
+          }));
+          setIdeFiles(files);
+        })
+        .catch((err) => {
+          console.warn("Konnte gespeicherten Workspace nicht laden:", err);
+          setIdeWorkspacePath(null);
+          localStorage.removeItem("zeno_ide_workspace_path");
+        });
+    }
+  }, []);
   const [isCreateJoinServerModalOpen, setIsCreateJoinServerModalOpen] = useState<boolean>(false);
 
   const handleServerCreated = (newServer: Server) => {
@@ -958,14 +1044,6 @@ function ZenoMainApp() {
   const [ideNewItemName, setIdeNewItemName] = useState<string>("");
   const [ideNewItemParentPath, setIdeNewItemParentPath] = useState<string>("");
 
-  const [ideExtensions, setIdeExtensions] = useState([
-    { id: "rust-analyzer", name: "rust-analyzer", description: "Vollständige Rust IntelliSense, Type Inlays & Macro Expansion", downloads: "2.4M", installed: true, icon: "vscode-icons:file-type-rust" },
-    { id: "python", name: "Python (Pyodide Native)", description: "Python Autocomplete, Refactoring & Inline Repl", downloads: "5.1M", installed: true, icon: "vscode-icons:file-type-python" },
-    { id: "gitlens", name: "GitLens — Git supercharged", description: "Inline Git Blame, History Map & Branch Visualizer", downloads: "18.2M", installed: false, icon: "https://gitlens.amzn.com/icon.png" },
-    { id: "prettier", name: "Prettier - Code Formatter", description: "Automatisches Formatieren von JS, TS, HTML, CSS & JSON", downloads: "34.1M", installed: true, icon: "vscode-icons:file-type-prettier" },
-    { id: "copilot", name: "Zeno Local AI Autocomplete", description: "Vollständig lokales LLM-Snippet Autocomplete (100% Offline)", downloads: "890k", installed: false, icon: "mage:robot" }
-  ]);
-  const [ideExtensionsSearchQuery, setIdeExtensionsSearchQuery] = useState<string>("");
 
   // Live Git Status State
   const [liveGitStatus, setLiveGitStatus] = useState<LiveGitStatus | null>(null);
@@ -1173,9 +1251,11 @@ function ZenoMainApp() {
     setVoiceDuration(0);
     // 1. Initialize real microphone capture & Web Audio VAD
     await audioStreamService.startMicrophone();
-    // 2. Join voice session in native Rust backend
+    // 2. Initialize Frame-by-Frame E2EE Voice Session & broadcast Session Key
+    await audioStreamService.initChannelE2EE(chId);
+    // 3. Join voice session in native Rust backend
     await joinVoiceChannel(chId, chName, userName || "CipherNaut");
-    showToast(`Sprachkanal "${chName}" beigetreten (Echtzeit-Audio & Mikrofon aktiv) 🎙️`);
+    showToast(`Sprachkanal "${chName}" beigetreten (🔒 Frame-by-Frame E2EE aktiv) 🎙️`);
   };
 
   const handleDisconnectVoice = () => {
@@ -1632,7 +1712,185 @@ function ZenoMainApp() {
   };
 
   // Full IDE Actions
-  const handleIdeFileSelect = (path: string) => {
+  const handleOpenFolder = async () => {
+    try {
+      const selectedPath = await openFolderDialog();
+      if (!selectedPath) return;
+
+      const entries = await readDirectory(selectedPath);
+      const files: IdeFile[] = entries.map((e) => ({
+        name: e.name,
+        path: e.path,
+        code: "",
+        language: e.language || "",
+        isFolder: e.isFolder
+      }));
+
+      setIdeWorkspacePath(selectedPath);
+      localStorage.setItem("zeno_ide_workspace_path", selectedPath);
+
+      setRecentWorkspaces((prev) => {
+        const next = [selectedPath, ...prev.filter((p) => p !== selectedPath)].slice(0, 8);
+        try {
+          localStorage.setItem("zeno_ide_recent_workspaces", JSON.stringify(next));
+        } catch (e) {
+          console.error("Failed to save recent workspaces", e);
+        }
+        return next;
+      });
+
+      setIdeFiles(files);
+      setIdeOpenTabs([]);
+      setIdeActiveFilePath(null);
+      const folderName = selectedPath.replace(/\\/g, "/").split("/").pop() || selectedPath;
+      showToast(`Ordner "${folderName}" geöffnet.`);
+    } catch (err: any) {
+      showToast(`Fehler beim Öffnen des Ordners: ${err?.message || err}`);
+    }
+  };
+
+  const handleOpenFile = async () => {
+    try {
+      const selectedPath = await openFileDialog();
+      if (!selectedPath) return;
+
+      const content = await readFileContent(selectedPath);
+      const fileName = selectedPath.replace(/\\/g, "/").split("/").pop() || selectedPath;
+      const lang = detectLanguage(fileName);
+
+      const existingFile = ideFiles.find((f) => f.path === selectedPath);
+      if (!existingFile) {
+        const newFile: IdeFile = {
+          name: fileName,
+          path: selectedPath,
+          code: content,
+          language: lang,
+          isFolder: false
+        };
+        setIdeFiles((prev) => [...prev, newFile]);
+      } else {
+        setIdeFiles((prev) =>
+          prev.map((f) => (f.path === selectedPath ? { ...f, code: content } : f))
+        );
+      }
+
+      if (!ideOpenTabs.includes(selectedPath)) {
+        setIdeOpenTabs((prev) => [...prev, selectedPath]);
+      }
+      setIdeActiveFilePath(selectedPath);
+      showToast(`Datei "${fileName}" geöffnet.`);
+    } catch (err: any) {
+      showToast(`Fehler beim Öffnen der Datei: ${err?.message || err}`);
+    }
+  };
+
+  const handleSelectRecentWorkspace = async (workspacePath: string) => {
+    try {
+      const entries = await readDirectory(workspacePath);
+      const files: IdeFile[] = entries.map((e) => ({
+        name: e.name,
+        path: e.path,
+        code: "",
+        language: e.language || "",
+        isFolder: e.isFolder
+      }));
+
+      setIdeWorkspacePath(workspacePath);
+      localStorage.setItem("zeno_ide_workspace_path", workspacePath);
+
+      setRecentWorkspaces((prev) => {
+        const next = [workspacePath, ...prev.filter((p) => p !== workspacePath)].slice(0, 8);
+        try {
+          localStorage.setItem("zeno_ide_recent_workspaces", JSON.stringify(next));
+        } catch (e) {
+          console.error("Failed to save recent workspaces", e);
+        }
+        return next;
+      });
+
+      setIdeFiles(files);
+      setIdeOpenTabs([]);
+      setIdeActiveFilePath(null);
+      const folderName = workspacePath.replace(/\\/g, "/").split("/").pop() || workspacePath;
+      showToast(`Ordner "${folderName}" geöffnet.`);
+    } catch (err: any) {
+      showToast(`Konnte Ordner "${workspacePath}" nicht laden.`);
+    }
+  };
+
+  const handleCloseWorkspace = () => {
+    setIdeWorkspacePath(null);
+    localStorage.removeItem("zeno_ide_workspace_path");
+    setIdeFiles([]);
+    setIdeOpenTabs([]);
+    setIdeActiveFilePath(null);
+    showToast("Workspace geschlossen.");
+  };
+
+  const handleRefreshWorkspace = async () => {
+    if (!ideWorkspacePath) return;
+    try {
+      const entries = await readDirectory(ideWorkspacePath);
+      setIdeFiles((prev) => {
+        const codeMap = new Map<string, string>();
+        prev.forEach((f) => {
+          if (f.code) codeMap.set(f.path, f.code);
+        });
+        return entries.map((e) => ({
+          name: e.name,
+          path: e.path,
+          code: codeMap.get(e.path) || "",
+          language: e.language || "",
+          isFolder: e.isFolder
+        }));
+      });
+      showToast("Explorer aktualisiert.");
+    } catch (err: any) {
+      showToast("Fehler beim Aktualisieren des Explorers.");
+    }
+  };
+
+  const handleSaveActiveFile = async () => {
+    if (!ideActiveFilePath) return;
+    const file = ideFiles.find((f) => f.path === ideActiveFilePath);
+    if (!file) return;
+
+    try {
+      await writeFileContent(ideActiveFilePath, file.code);
+      setIdeGitChanges((prev) => prev.filter((p) => p !== ideActiveFilePath));
+      showToast(`Gespeichert: ${file.name}`);
+    } catch (err: any) {
+      showToast(`Fehler beim Speichern von "${file.name}": ${err?.message || err}`);
+    }
+  };
+
+  const handleDeleteFile = async (path: string) => {
+    try {
+      await deleteEntry(path);
+      setIdeFiles((prev) => prev.filter((f) => f.path !== path));
+      setIdeOpenTabs((prev) => prev.filter((t) => t !== path));
+      if (ideActiveFilePath === path) {
+        const remainingTabs = ideOpenTabs.filter((t) => t !== path);
+        setIdeActiveFilePath(remainingTabs.length > 0 ? remainingTabs[remainingTabs.length - 1] : null);
+      }
+      showToast(`Eintrag gelöscht: ${path.replace(/\\/g, "/").split("/").pop()}`);
+    } catch (err: any) {
+      showToast(`Fehler beim Löschen: ${err?.message || err}`);
+    }
+  };
+
+  const handleIdeFileSelect = async (path: string) => {
+    const file = ideFiles.find((f) => f.path === path);
+    if (file && !file.isFolder && (!file.code || file.code === "")) {
+      try {
+        const content = await readFileContent(path);
+        setIdeFiles((prev) =>
+          prev.map((f) => (f.path === path ? { ...f, code: content } : f))
+        );
+      } catch (err) {
+        console.warn("Fehler beim Laden des Datei-Inhalts:", err);
+      }
+    }
     setIdeActiveFilePath(path);
     if (!ideOpenTabs.includes(path)) {
       setIdeOpenTabs((prev) => [...prev, path]);
@@ -1643,8 +1901,8 @@ function ZenoMainApp() {
     e.stopPropagation();
     const newTabs = ideOpenTabs.filter((t) => t !== path);
     setIdeOpenTabs(newTabs);
-    if (ideActiveFilePath === path && newTabs.length > 0) {
-      setIdeActiveFilePath(newTabs[newTabs.length - 1]);
+    if (ideActiveFilePath === path) {
+      setIdeActiveFilePath(newTabs.length > 0 ? newTabs[newTabs.length - 1] : null);
     }
   };
 
@@ -1653,7 +1911,7 @@ function ZenoMainApp() {
     setIdeFiles((prev) =>
       prev.map((f) => (f.path === ideActiveFilePath ? { ...f, code } : f))
     );
-    if (!ideGitChanges.includes(ideActiveFilePath)) {
+    if (ideActiveFilePath && !ideGitChanges.includes(ideActiveFilePath)) {
       setIdeGitChanges((prev) => [...prev, ideActiveFilePath]);
     }
   };
@@ -1725,6 +1983,7 @@ function ZenoMainApp() {
       ];
     }
 
+    setIdeWorkspacePath(null);
     setIdeFiles(newFiles);
     setIdeOpenTabs([newFiles[newFiles.length - 1].path]);
     setIdeActiveFilePath(newFiles[newFiles.length - 1].path);
@@ -1732,105 +1991,68 @@ function ZenoMainApp() {
     showToast(`Projektvorlage (${type.toUpperCase()}) generiert.`);
   };
 
-  const handleIdeFileCreate = () => {
+  const handleIdeFileCreate = async () => {
     if (!ideNewItemName.trim()) return;
-    const fullPath = ideNewItemParentPath ? `${ideNewItemParentPath}/${ideNewItemName}` : ideNewItemName;
-    const lang = detectLanguage(ideNewItemName);
-    const newFile: IdeFile = {
-      name: ideNewItemName,
-      path: fullPath,
-      code: `// ${fullPath}\n`,
-      language: lang,
-      isFolder: false
-    };
-    setIdeFiles((prev) => [...prev, newFile]);
-    setIdeOpenTabs((prev) => [...prev, fullPath]);
-    setIdeActiveFilePath(fullPath);
-    setIsIdeNewItemModalOpen(false);
-    setIdeNewItemName("");
-    showToast(`Datei "${fullPath}" erstellt.`);
+    const separator = ideWorkspacePath && (ideWorkspacePath.includes("/") ? "/" : "\\");
+    let fullPath = ideNewItemParentPath
+      ? `${ideNewItemParentPath}${separator || "/"}${ideNewItemName}`
+      : (ideWorkspacePath ? `${ideWorkspacePath}${separator || "/"}${ideNewItemName}` : ideNewItemName);
+
+    try {
+      if (ideWorkspacePath) {
+        await createFileEntry(fullPath);
+      }
+      const lang = detectLanguage(ideNewItemName);
+      const newFile: IdeFile = {
+        name: ideNewItemName,
+        path: fullPath,
+        code: `// ${ideNewItemName}\n`,
+        language: lang,
+        isFolder: false
+      };
+      setIdeFiles((prev) => [...prev, newFile]);
+      setIdeOpenTabs((prev) => [...prev, fullPath]);
+      setIdeActiveFilePath(fullPath);
+      setIsIdeNewItemModalOpen(false);
+      setIdeNewItemName("");
+      showToast(`Datei "${ideNewItemName}" erstellt.`);
+    } catch (err: any) {
+      showToast(`Fehler beim Erstellen der Datei: ${err?.message || err}`);
+    }
   };
 
-  const handleIdeFolderCreate = () => {
+  const handleIdeFolderCreate = async () => {
     if (!ideNewItemName.trim()) return;
-    const fullPath = ideNewItemParentPath ? `${ideNewItemParentPath}/${ideNewItemName}` : ideNewItemName;
-    const newFolder: IdeFile = {
-      name: ideNewItemName,
-      path: fullPath,
-      code: "",
-      language: "",
-      isFolder: true
-    };
-    setIdeFiles((prev) => [...prev, newFolder]);
-    setIsIdeNewItemModalOpen(false);
-    setIdeNewItemName("");
-    showToast(`Ordner "${fullPath}" erstellt.`);
-  };
+    const separator = ideWorkspacePath && (ideWorkspacePath.includes("/") ? "/" : "\\");
+    let fullPath = ideNewItemParentPath
+      ? `${ideNewItemParentPath}${separator || "/"}${ideNewItemName}`
+      : (ideWorkspacePath ? `${ideWorkspacePath}${separator || "/"}${ideNewItemName}` : ideNewItemName);
 
-  const handleExtensionInstall = (id: string) => {
-    setIdeExtensions((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, installed: true } : e))
-    );
-    showToast(`Erweiterung "${id}" installiert.`);
-  };
-
-  const handleExtensionUninstall = (id: string) => {
-    setIdeExtensions((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, installed: false } : e))
-    );
-    showToast(`Erweiterung "${id}" deinstalliert.`);
-  };
-
-  const renderIdeFileTree = () => {
-    return ideFiles.map((file) => {
-      const isFolder = file.isFolder;
-      const isActive = file.path === ideActiveFilePath;
-      return (
-        <div
-          key={file.path}
-          className={`ide-tree-item ${isActive ? "active" : ""}`}
-          onClick={() => !isFolder && handleIdeFileSelect(file.path)}
-          style={{ paddingLeft: `${(file.path.split("/").length - 1) * 12 + 10}px` }}
-        >
-          <Icon
-            icon={
-              isFolder
-                ? "mage:folder-open"
-                : file.language === "rust"
-                ? "vscode-icons:file-type-rust"
-                : file.language === "python"
-                ? "vscode-icons:file-type-python"
-                : file.language === "golang"
-                ? "vscode-icons:file-type-go"
-                : file.language === "csharp"
-                ? "vscode-icons:file-type-csharp"
-                : file.language === "cpp"
-                ? "vscode-icons:file-type-cpp"
-                : file.language === "javascript"
-                ? "vscode-icons:file-type-js"
-                : file.language === "typescript"
-                ? "vscode-icons:file-type-typescript"
-                : file.language === "html"
-                ? "vscode-icons:file-type-html"
-                : file.language === "css"
-                ? "vscode-icons:file-type-css"
-                : file.language === "toml"
-                ? "vscode-icons:file-type-toml"
-                : "mage:file-records"
-            }
-            className="ide-tree-icon"
-          />
-          <span className="ide-tree-name">{file.name}</span>
-        </div>
-      );
-    });
+    try {
+      if (ideWorkspacePath) {
+        await createFolderEntry(fullPath);
+      }
+      const newFolder: IdeFile = {
+        name: ideNewItemName,
+        path: fullPath,
+        code: "",
+        language: "",
+        isFolder: true
+      };
+      setIdeFiles((prev) => [...prev, newFolder]);
+      setIsIdeNewItemModalOpen(false);
+      setIdeNewItemName("");
+      showToast(`Ordner "${ideNewItemName}" erstellt.`);
+    } catch (err: any) {
+      showToast(`Fehler beim Erstellen des Ordners: ${err?.message || err}`);
+    }
   };
 
   const activeIdeFile = ideFiles.find((f) => f.path === ideActiveFilePath);
 
   return (
     <div
-      className={`app-layout ${activeServerId === "home" && homeTab === "ide" ? "in-ide" : ""} ${theme === "light" ? "light light-mode theme-light" : "dark"} ${glassmorphism ? "glassmorphism" : ""}`}
+      className={`app-layout ${isSidebarCollapsed ? "sidebar-collapsed" : ""} ${activeServerId === "home" && homeTab === "ide" ? "in-ide" : ""} ${activeServerId === "home" ? `is-home home-tab-${homeTab}` : "is-server chat-active"} ${isMembersOpen && activeServerId !== "home" ? "members-open" : "members-closed"} ${theme === "light" ? "light light-mode theme-light" : "dark"} ${glassmorphism ? "glassmorphism" : ""}`}
       style={{
         "--canvas-bg": canvasColor,
         "--glow-color": glowColor
@@ -1894,7 +2116,19 @@ function ZenoMainApp() {
           setActiveSettingsTab("voice");
           setIsSettingsOpen(true);
         }}
+        onToggleSidebar={toggleSidebar}
       />
+
+      {/* Floating Restore Button if Sidebar is Collapsed on Dashboard */}
+      {isSidebarCollapsed && activeServerId === "home" && (
+        <button
+          className="sidebar-floating-expand-btn"
+          onClick={toggleSidebar}
+          title="Seitenleiste einblenden (Strg+B)"
+        >
+          <Icon icon="codicon:layout-sidebar-left" />
+        </button>
+      )}
 
       {/* 3. MAIN WORKSPACE VIEW */}
       {activeServerId === "home" ? (
@@ -1961,6 +2195,12 @@ function ZenoMainApp() {
             connectedRelaysCount={relayStatuses.filter((r) => r.status === "connected").length}
             onJoinVoice={(channelId, channelName) => handleJoinVoice(channelId, channelName)}
           />
+        ) : homeTab === "plugins" ? (
+          <div className="zeno-plugins-container" style={{ flex: 1, height: "100%", overflowY: "auto", padding: "20px 24px", boxSizing: "border-box" }}>
+            <PluginsSettingsTab showToast={showToast} />
+          </div>
+        ) : homeTab === "wiki" ? (
+          <KnowledgeHubView showToast={showToast} />
         ) : homeTab === "wasm_hub" ? (
           <WasmHub
             hubCatalog={HUB_RUNTIMES_CATALOG}
@@ -1987,24 +2227,19 @@ function ZenoMainApp() {
             ideActiveFilePath={ideActiveFilePath}
             ideGitChanges={ideGitChanges}
             ideGitMessage={ideGitMessage}
-            ideExtensions={ideExtensions}
-            ideExtensionsSearchQuery={ideExtensionsSearchQuery}
             isIdeConsoleExpanded={isIdeConsoleExpanded}
             ideConsoleOutput={ideConsoleOutput}
             theme={theme}
             activeIdeFile={activeIdeFile}
+            ideWorkspacePath={ideWorkspacePath}
+            recentWorkspaces={recentWorkspaces}
             setIdeSidebarTab={setIdeSidebarTab}
-            setIsSettingsOpen={setIsSettingsOpen}
             setIdeNewItemType={setIdeNewItemType}
             setIdeNewItemParentPath={setIdeNewItemParentPath}
             setIsIdeNewItemModalOpen={setIsIdeNewItemModalOpen}
             setIsIdeProjectWizardOpen={setIsIdeProjectWizardOpen}
-            renderIdeFileTree={renderIdeFileTree}
             setIdeGitMessage={setIdeGitMessage}
             handleIdeGitCommit={handleIdeGitCommit}
-            setIdeExtensionsSearchQuery={setIdeExtensionsSearchQuery}
-            handleExtensionInstall={handleExtensionInstall}
-            handleExtensionUninstall={handleExtensionUninstall}
             handleIdeFileSelect={handleIdeFileSelect}
             handleIdeFileClose={handleIdeFileClose}
             handleIdeRun={handleIdeRun}
@@ -2014,6 +2249,13 @@ function ZenoMainApp() {
             setIdeConsoleOutput={setIdeConsoleOutput}
             onReturnToDashboard={() => setHomeTab("dashboard")}
             showToast={showToast}
+            onOpenFolder={handleOpenFolder}
+            onOpenFile={handleOpenFile}
+            onCloseWorkspace={handleCloseWorkspace}
+            onRefreshWorkspace={handleRefreshWorkspace}
+            onSelectRecentWorkspace={handleSelectRecentWorkspace}
+            onSaveActiveFile={handleSaveActiveFile}
+            onDeleteFile={handleDeleteFile}
           />
         )
       ) : (
@@ -2063,6 +2305,8 @@ function ZenoMainApp() {
           onAcceptRules={handleAcceptRules}
           hasAcceptedRules={hasAcceptedRules}
           onDeleteMessage={handleDeleteChatMessage}
+          isSidebarCollapsed={isSidebarCollapsed}
+          onToggleSidebar={toggleSidebar}
         />
       )}
 
@@ -2291,6 +2535,9 @@ function ZenoMainApp() {
         handleIdeFileCreate={handleIdeFileCreate}
         handleIdeFolderCreate={handleIdeFolderCreate}
       />
+
+      {/* STARTUP SPLASH SCREEN */}
+      <SplashScreen />
 
       {/* TOAST NOTIFICATION CONTAINER */}
       <div className="toast-container">

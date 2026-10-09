@@ -1,6 +1,6 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use std::process::Command;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::fs;
 use tauri::Manager;
 
@@ -592,11 +592,235 @@ fn delete_workspace_file(name: String) -> Result<(), String> {
         .map_err(|e| format!("Fehler beim Löschen der Datei: {}", e))
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct IdeEntry {
+    pub name: String,
+    pub path: String,
+    pub is_folder: bool,
+    pub language: String,
+    pub size: Option<u64>,
+}
+
+#[tauri::command]
+fn ide_open_folder_dialog() -> Result<Option<String>, String> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+        let script = r#"
+            Add-Type -AssemblyName System.Windows.Forms
+            $f = New-Object System.Windows.Forms.FolderBrowserDialog
+            $f.Description = "Wähle einen Projektordner für Zeno IDE"
+            $f.ShowNewFolderButton = $true
+            if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+                Write-Output $f.SelectedPath
+            }
+        "#;
+        let output = Command::new("powershell")
+            .args(["-NoProfile", "-Command", script])
+            .output()
+            .map_err(|e| format!("Fehler beim Öffnen des Ordner-Dialogs: {}", e))?;
+        let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if path.is_empty() { Ok(None) } else { Ok(Some(path)) }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Ok(None)
+    }
+}
+
+#[tauri::command]
+fn ide_open_file_dialog() -> Result<Option<String>, String> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+        let script = r#"
+            Add-Type -AssemblyName System.Windows.Forms
+            $f = New-Object System.Windows.Forms.OpenFileDialog
+            $f.Title = "Datei in Zeno IDE öffnen"
+            $f.Filter = "Alle Dateien (*.*)|*.*|Quellcode (*.rs;*.ts;*.js;*.py;*.json;*.md;*.html;*.css;*.toml)|*.rs;*.ts;*.js;*.py;*.json;*.md;*.html;*.css;*.toml"
+            if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+                Write-Output $f.FileName
+            }
+        "#;
+        let output = Command::new("powershell")
+            .args(["-NoProfile", "-Command", script])
+            .output()
+            .map_err(|e| format!("Fehler beim Öffnen des Datei-Dialogs: {}", e))?;
+        let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if path.is_empty() { Ok(None) } else { Ok(Some(path)) }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Ok(None)
+    }
+}
+
+fn collect_ide_entries_recursive(
+    dir: &Path,
+    max_depth: usize,
+    current_depth: usize,
+    entries: &mut Vec<IdeEntry>,
+) {
+    if current_depth > max_depth || entries.len() >= 2000 {
+        return;
+    }
+    let read_res = match fs::read_dir(dir) {
+        Ok(r) => r,
+        Err(_) => return,
+    };
+
+    let mut local_items: Vec<(PathBuf, String, bool)> = Vec::new();
+    for item in read_res.flatten() {
+        let p = item.path();
+        let name = item.file_name().to_string_lossy().to_string();
+        if name.starts_with('.')
+            || name == "node_modules"
+            || name == "target"
+            || name == "dist"
+            || name == ".git"
+            || name == ".venv"
+            || name == "__pycache__"
+            || name == "build"
+            || name == ".vscode"
+            || name == ".idea"
+        {
+            continue;
+        }
+        let is_dir = p.is_dir();
+        local_items.push((p, name, is_dir));
+    }
+
+    // Folders first, then alphabetically
+    local_items.sort_by(|a, b| {
+        if a.2 && !b.2 {
+            std::cmp::Ordering::Less
+        } else if !a.2 && b.2 {
+            std::cmp::Ordering::Greater
+        } else {
+            a.1.to_lowercase().cmp(&b.1.to_lowercase())
+        }
+    });
+
+    for (p, name, is_dir) in local_items {
+        let ext = p
+            .extension()
+            .map(|e| e.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+        let language = if is_dir {
+            String::new()
+        } else {
+            match ext.as_str() {
+                "rs" => "rust",
+                "py" => "python",
+                "js" | "mjs" | "cjs" => "javascript",
+                "ts" | "tsx" => "typescript",
+                "json" => "json",
+                "md" => "markdown",
+                "css" => "css",
+                "html" => "html",
+                "toml" => "toml",
+                "yaml" | "yml" => "yaml",
+                "sql" => "sql",
+                "sh" | "bash" => "shell",
+                "go" => "golang",
+                "c" | "cpp" | "h" | "hpp" => "cpp",
+                "cs" => "csharp",
+                "png" | "jpg" | "jpeg" | "gif" | "svg" | "webp" => "image",
+                _ => "plaintext",
+            }
+            .to_string()
+        };
+        let size = if !is_dir {
+            p.metadata().ok().map(|m| m.len())
+        } else {
+            None
+        };
+
+        entries.push(IdeEntry {
+            name,
+            path: p.to_string_lossy().replace('\\', "/"),
+            is_folder: is_dir,
+            language,
+            size,
+        });
+
+        if is_dir {
+            collect_ide_entries_recursive(&p, max_depth, current_depth + 1, entries);
+        }
+    }
+}
+
+#[tauri::command]
+fn ide_read_directory(dir_path: String) -> Result<Vec<IdeEntry>, String> {
+    let root = PathBuf::from(&dir_path);
+    if !root.exists() || !root.is_dir() {
+        return Err(format!("Verzeichnis '{}' existiert nicht.", dir_path));
+    }
+    
+    let mut entries = Vec::new();
+    collect_ide_entries_recursive(&root, 6, 1, &mut entries);
+    Ok(entries)
+}
+
+#[tauri::command]
+fn ide_read_file(file_path: String) -> Result<String, String> {
+    let p = PathBuf::from(&file_path);
+    fs::read_to_string(&p)
+        .map_err(|e| format!("Fehler beim Lesen der Datei '{}': {}", file_path, e))
+}
+
+#[tauri::command]
+fn ide_write_file(file_path: String, content: String) -> Result<(), String> {
+    let p = PathBuf::from(&file_path);
+    if let Some(parent) = p.parent() {
+        if !parent.exists() {
+            let _ = fs::create_dir_all(parent);
+        }
+    }
+    fs::write(&p, content)
+        .map_err(|e| format!("Fehler beim Schreiben der Datei '{}': {}", file_path, e))
+}
+
+#[tauri::command]
+fn ide_create_file(file_path: String) -> Result<(), String> {
+    let p = PathBuf::from(&file_path);
+    if let Some(parent) = p.parent() {
+        if !parent.exists() {
+            let _ = fs::create_dir_all(parent);
+        }
+    }
+    fs::write(&p, "")
+        .map_err(|e| format!("Fehler beim Erstellen der Datei '{}': {}", file_path, e))
+}
+
 #[tauri::command]
 fn ide_create_folder(folder_path: String) -> Result<(), String> {
-    let safe_path = get_safe_path(&folder_path)?;
-    fs::create_dir_all(&safe_path)
+    let p = if Path::new(&folder_path).is_absolute() {
+        PathBuf::from(&folder_path)
+    } else {
+        get_safe_path(&folder_path)?
+    };
+    fs::create_dir_all(&p)
         .map_err(|e| format!("Ordner konnte nicht erstellt werden: {}", e))
+}
+
+#[tauri::command]
+fn ide_delete_entry(path: String) -> Result<(), String> {
+    let p = PathBuf::from(&path);
+    if p.is_dir() {
+        fs::remove_dir_all(&p).map_err(|e| format!("Fehler beim Löschen des Ordners '{}': {}", path, e))
+    } else {
+        fs::remove_file(&p).map_err(|e| format!("Fehler beim Löschen der Datei '{}': {}", path, e))
+    }
+}
+
+#[tauri::command]
+fn ide_rename_entry(old_path: String, new_path: String) -> Result<(), String> {
+    let from = PathBuf::from(&old_path);
+    let to = PathBuf::from(&new_path);
+    fs::rename(from, to)
+        .map_err(|e| format!("Fehler beim Umbenennen von '{}' nach '{}': {}", old_path, new_path, e))
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
@@ -625,8 +849,48 @@ pub struct SystemCompilersStatus {
     pub go_version: Option<String>,
 }
 
+fn resolve_toolchain_binary(cmd: &str) -> PathBuf {
+    let filename = if cfg!(windows) {
+        format!("{}.exe", cmd)
+    } else {
+        cmd.to_string()
+    };
+
+    // 1. Check relative to current executable: exe_dir/bin/<cmd>, exe_dir/runtimes/<cmd>/<cmd>, exe_dir/runtimes/rust/bin/<cmd>
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            let bin_candidate = exe_dir.join("bin").join(&filename);
+            if bin_candidate.is_file() {
+                return bin_candidate;
+            }
+            let runtime_candidate = exe_dir.join("runtimes").join(cmd).join(&filename);
+            if runtime_candidate.is_file() {
+                return runtime_candidate;
+            }
+            let cargo_candidate = exe_dir.join("runtimes").join("rust").join("bin").join(&filename);
+            if cargo_candidate.is_file() {
+                return cargo_candidate;
+            }
+        }
+    }
+
+    // 2. Check current working directory: ./bin/<cmd>, ./runtimes/<cmd>/<cmd>
+    let cwd_bin = PathBuf::from("bin").join(&filename);
+    if cwd_bin.is_file() {
+        return cwd_bin;
+    }
+    let cwd_runtime = PathBuf::from("runtimes").join(cmd).join(&filename);
+    if cwd_runtime.is_file() {
+        return cwd_runtime;
+    }
+
+    // 3. Fallback to system PATH
+    PathBuf::from(cmd)
+}
+
 fn check_cli_version(cmd: &str, args: &[&str]) -> (bool, Option<String>) {
-    match Command::new(cmd).args(args).output() {
+    let resolved = resolve_toolchain_binary(cmd);
+    match Command::new(&resolved).args(args).output() {
         Ok(out) if out.status.success() => {
             let ver = String::from_utf8_lossy(&out.stdout).trim().to_string();
             let first_line = ver.lines().next().unwrap_or("").to_string();
@@ -661,7 +925,11 @@ fn ide_get_system_compilers() -> Result<SystemCompilersStatus, String> {
 #[tauri::command]
 fn ide_run_code_native(file_path: String, code: Option<String>) -> Result<NativeExecutionResult, String> {
     let start = std::time::Instant::now();
-    let safe_file = get_safe_path(&file_path)?;
+    let safe_file = if Path::new(&file_path).is_absolute() {
+        PathBuf::from(&file_path)
+    } else {
+        get_safe_path(&file_path).unwrap_or_else(|_| PathBuf::from(&file_path))
+    };
 
     // If unsaved code was passed, save it first safely
     if let Some(c) = code {
@@ -674,7 +942,7 @@ fn ide_run_code_native(file_path: String, code: Option<String>) -> Result<Native
     }
 
     let ext = safe_file.extension().and_then(|s| s.to_str()).unwrap_or("").to_lowercase();
-    let root = get_project_root();
+    let root = safe_file.parent().unwrap_or(Path::new(".")).to_path_buf();
 
     let (cmd_name, args, runner_desc): (String, Vec<String>, &str) = match ext.as_str() {
         "rs" => {
@@ -717,7 +985,8 @@ fn ide_run_code_native(file_path: String, code: Option<String>) -> Result<Native
         }
     };
 
-    let mut command = Command::new(&cmd_name);
+    let resolved_cmd = resolve_toolchain_binary(&cmd_name);
+    let mut command = Command::new(&resolved_cmd);
     command.args(&args).current_dir(&root);
 
     let output = match command.output() {
@@ -740,7 +1009,7 @@ fn ide_run_code_native(file_path: String, code: Option<String>) -> Result<Native
             return Ok(NativeExecutionResult {
                 success: false,
                 stdout: String::new(),
-                stderr: format!("Natives Ausführungstool '{}' ({}) wurde auf dem System nicht gefunden: {}\n\n💡 Tipp: Installiere '{}' oder überprüfe die System-PATH-Umgebungsvariable.", cmd_name, runner_desc, e, cmd_name),
+                stderr: format!("Natives Ausführungstool '{}' ({}) wurde auf dem System nicht gefunden: {}\n\n💡 Tipp: Zeno unterstützt portable Toolchains im Ordner 'bin/' oder 'runtimes/{}/' (z.B. node.exe, cargo.exe) sowie globale System-Installationen.", cmd_name, runner_desc, e, cmd_name),
                 exit_code: Some(127),
                 duration_ms: start.elapsed().as_millis() as u64,
                 runner: runner_desc.to_string(),
@@ -1102,6 +1371,14 @@ pub fn run() {
             write_workspace_file,
             delete_workspace_file,
             ide_create_folder,
+            ide_open_folder_dialog,
+            ide_open_file_dialog,
+            ide_read_directory,
+            ide_read_file,
+            ide_write_file,
+            ide_create_file,
+            ide_delete_entry,
+            ide_rename_entry,
             ide_get_system_compilers,
             ide_run_code_native,
             load_settings,

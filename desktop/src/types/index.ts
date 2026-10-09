@@ -189,6 +189,17 @@ export interface IdeFile {
   code: string;
   language: string;
   isFolder: boolean;
+  children?: IdeFile[];
+  size?: number;
+  isOpen?: boolean;
+}
+
+export interface IdeEntry {
+  name: string;
+  path: string;
+  isFolder: boolean;
+  language: string;
+  size?: number;
 }
 
 export interface HubRuntimeItem {

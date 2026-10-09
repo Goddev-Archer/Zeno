@@ -3,7 +3,7 @@
 //   Standard: 3-Dateien-Modell (manifest.json, main.js/plugin.wasm, styles.css)
 // ============================================================================
 
-export type PluginCategory = "transport" | "audio" | "theme" | "integration" | "mesh" | "utility";
+export type PluginCategory = "transport" | "audio" | "theme" | "appearance" | "integration" | "mesh" | "utility";
 
 export type PluginPermission = 
   | "network"        // Externe Netzwerkanfragen / Relays / Sockets
@@ -25,6 +25,7 @@ export interface PluginManifest {
   isDesktopOnly?: boolean;  // Benötigt native Desktop-Ressourcen (Rust/Tauri)
   permissions?: PluginPermission[];
   icon?: string;            // Iconify Icon-Name
+  logoUrl?: string;         // Optionaler Pfad/URL zum Plugin-Logo (SVG/PNG)
   category?: PluginCategory;
 }
 
@@ -50,10 +51,31 @@ export interface CommunityPluginEntry {
   stars?: number;
   downloads?: number;
   icon: string;
+  logoUrl?: string;
   category: PluginCategory;
   tags?: string[];
   permissions: PluginPermission[];
   verified?: boolean;
+}
+
+export interface ProfileThemeDefinition {
+  id: string;
+  name: string;
+  author?: string;
+  description?: string;
+  previewColor?: string;
+  badgeIcon?: string;
+  cssClass?: string;
+}
+
+export interface PluginDockItem {
+  id: string;
+  pluginId: string;
+  title: string;
+  icon: string; // Iconify icon name or image url
+  badge?: string | number;
+  active?: boolean;
+  onClick: () => void;
 }
 
 // --- HOST EXTENSION APIS ---
@@ -130,7 +152,15 @@ export interface ZenoPluginApi {
     delete: (key: string) => Promise<void>;
   };
 
-  // 7. System-Benachrichtigungen
+  // 7. Profil- & Design-Erweiterungen
+  registerProfileTheme?: (theme: ProfileThemeDefinition) => void;
+  unregisterProfileTheme?: (id: string) => void;
+
+  // 8. Serverleiste / Plugin-Dock Items
+  registerDockItem?: (item: PluginDockItem) => void;
+  unregisterDockItem?: (id: string) => void;
+
+  // 9. System-Benachrichtigungen
   showNotice: (message: string, durationMs?: number) => void;
 }
 

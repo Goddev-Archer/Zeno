@@ -118,7 +118,7 @@ export const PluginsSettingsTab: React.FC<PluginsSettingsTabProps> = ({ showToas
   ];
 
   return (
-    <div className="settings-tab-content" id="tab-plugins">
+    <div className="settings-tab-content" id="tab-plugins" style={{ paddingBottom: "80px" }}>
       {/* Header & Concept */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "18px" }}>
         <div>
@@ -254,9 +254,19 @@ export const PluginsSettingsTab: React.FC<PluginsSettingsTabProps> = ({ showToas
                       alignItems: "center",
                       justifyContent: "center",
                       fontSize: "22px",
-                      flexShrink: 0
+                      flexShrink: 0,
+                      overflow: "hidden"
                     }}>
-                      <Icon icon={plugin.manifest.icon || "mage:puzzle"} />
+                      {plugin.manifest.logoUrl ? (
+                        <img 
+                          src={plugin.manifest.logoUrl} 
+                          alt={plugin.manifest.name} 
+                          style={{ width: "28px", height: "28px", objectFit: "contain" }}
+                          onError={(e) => { (e.currentTarget.style.display = "none"); }}
+                        />
+                      ) : (
+                        <Icon icon={plugin.manifest.icon || "mage:puzzle"} />
+                      )}
                     </div>
 
                     <div>
@@ -443,9 +453,19 @@ export const PluginsSettingsTab: React.FC<PluginsSettingsTabProps> = ({ showToas
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
-                            fontSize: "20px"
+                            fontSize: "20px",
+                            overflow: "hidden"
                           }}>
-                            <Icon icon={entry.icon} />
+                            {entry.logoUrl ? (
+                              <img 
+                                src={entry.logoUrl} 
+                                alt={entry.name} 
+                                style={{ width: "24px", height: "24px", objectFit: "contain" }}
+                                onError={(e) => { (e.currentTarget.style.display = "none"); }}
+                              />
+                            ) : (
+                              <Icon icon={entry.icon} />
+                            )}
                           </div>
                           <div>
                             <h4 style={{ margin: 0, fontSize: "13px", fontWeight: "700", color: "var(--text-primary)" }}>

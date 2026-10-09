@@ -1,6 +1,8 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
 import { Server } from "../../types";
+import { pluginManager } from "../../services/pluginManagerService";
+import { PluginDockItem } from "../../types/pluginTypes";
 
 interface ServerSidebarProps {
   servers: Server[];
@@ -23,6 +25,15 @@ export const ServerSidebar: React.FC<ServerSidebarProps> = ({
   onAddServerClick,
   onOpenInstanceBrowser
 }) => {
+  const [dockItems, setDockItems] = useState<PluginDockItem[]>(() => pluginManager.getDockItems());
+
+  useEffect(() => {
+    const unsub = pluginManager.onPluginChange(() => {
+      setDockItems(pluginManager.getDockItems());
+    });
+    return unsub;
+  }, []);
+
   return (
     <aside className="server-sidebar">
       <button 
@@ -62,6 +73,52 @@ export const ServerSidebar: React.FC<ServerSidebarProps> = ({
         >
           <Icon icon="mage:compass" style={{ fontSize: "20px" }} />
         </button>
+
+        {dockItems.length > 0 && (
+          <>
+            <div 
+              className="server-separator plugin-dock-separator" 
+              role="separator" 
+              style={{ margin: "10px auto 4px auto", opacity: 0.65 }} 
+              title="Plugin-Anwendungen"
+            />
+            <div className="plugin-dock-list" style={{ display: "flex", flexDirection: "column", gap: "8px", alignItems: "center" }}>
+              {dockItems.map((item) => (
+                <button
+                  key={item.id}
+                  className={`server-icon plugin-dock-icon ${item.active ? "active" : ""}`}
+                  onClick={item.onClick}
+                  title={item.title}
+                  style={{ position: "relative" }}
+                >
+                  {item.icon.startsWith("http") || item.icon.startsWith("/") ? (
+                    <img src={item.icon} alt={item.title} style={{ width: "22px", height: "22px", borderRadius: "4px" }} />
+                  ) : (
+                    <Icon icon={item.icon} style={{ fontSize: "22px" }} />
+                  )}
+                  {item.badge !== undefined && (
+                    <span
+                      style={{
+                        position: "absolute",
+                        top: "-3px",
+                        right: "-3px",
+                        background: "var(--accent-color, #3574f0)",
+                        color: "#fff",
+                        borderRadius: "10px",
+                        padding: "1px 5px",
+                        fontSize: "9px",
+                        fontWeight: "700",
+                        boxShadow: "0 2px 4px rgba(0,0,0,0.3)"
+                      }}
+                    >
+                      {item.badge}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </nav>
     </aside>
   );

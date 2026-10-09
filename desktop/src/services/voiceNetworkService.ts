@@ -23,7 +23,7 @@ export interface VoiceSignalPayload {
   channelId: string;
   sender: string;
   target?: string;
-  signalType: "offer" | "answer" | "ice_candidate" | "speaking" | "user_joined" | "user_left";
+  signalType: "offer" | "answer" | "ice_candidate" | "speaking" | "user_joined" | "user_left" | "voice_key_share";
   data: string;
 }
 

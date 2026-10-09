@@ -1,0 +1,134 @@
+name: Release Zeno Desktop
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name for release (e.g. v0.1.0-alpha)'
+        required: true
+        default: 'v0.1.0-alpha'
+
+permissions:
+  contents: write
+
+jobs:
+  build-release-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: 'desktop/package-lock.json'
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        working-directory: ./desktop
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: ./desktop
+        run: npm run build
+
+      - name: Build Tauri Desktop Executable
+        working-directory: ./desktop
+        run: npx @tauri-apps/cli build --no-bundle
+
+      - name: Package Standalone Portable Zip
+        id: package
+        shell: pwsh
+        run: |
+          $tag = if ($env:GITHUB_REF_NAME) { $env:GITHUB_REF_NAME } else { "${{ github.event.inputs.tag_name }}" }
+          $staging = "dist-release/zeno-$tag-windows-x64-portable"
+          New-Item -ItemType Directory -Path "$staging/bin" -Force
+
+          # Copy standalone binary
+          Copy-Item "desktop/src-tauri/target/release/zeno.exe" "$staging/zeno.exe"
+
+          # Copy public key if available
+          if (Test-Path "zeno-release-public-key.asc") {
+            Copy-Item "zeno-release-public-key.asc" "$staging/zeno-release-public-key.asc"
+          }
+
+          # Copy host node.exe as portable runtime
+          $nodePath = (Get-Command node).Source
+          if ($nodePath -and (Test-Path $nodePath)) {
+            Copy-Item $nodePath "$staging/bin/node.exe"
+          }
+
+          # Create README
+          @"
+          ================================================================================
+                              ZENO MESSENGER & WORKSPACE ($tag)
+                               Standalone Release for Windows
+          ================================================================================
+
+          1. Ausfuehren:
+             Starten Sie 'zeno.exe'. Keine Installation von Node.js oder Rust erforderlich!
+
+          2. Zeno IDE Toolchains:
+             Im Ordner 'bin/' befindet sich eine portable node.exe fuer JavaScript/TypeScript.
+             Fuer Rust unterstuetzt Zeno sowohl portable 'bin/cargo.exe' als auch rustup im System-PATH.
+
+          3. Authentizitaet pruefen (GPG):
+             gpg --import zeno-release-public-key.asc
+             gpg --verify zeno.exe.asc zeno.exe
+          "@ | Out-File -FilePath "$staging/README.txt" -Encoding utf8
+
+          # Optional GPG Import and Sign
+          if ("${{ secrets.GPG_PRIVATE_KEY }}" -ne "") {
+            Write-Host "Importing GPG Private Key..."
+            "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+            gpg --batch --yes --armor --detach-sign -o "$staging/zeno.exe.asc" "$staging/zeno.exe"
+          }
+
+          # Checksums
+          $hashes = @()
+          Get-ChildItem -Path $staging -Recurse -File | Where-Object { $_.Name -ne "SHA256SUMS" -and $_.Name -ne "SHA256SUMS.asc" } | ForEach-Object {
+            $rel = $_.FullName.Substring((Resolve-Path $staging).Path.Length + 1).Replace('\', '/')
+            $h = (Get-FileHash -Path $_.FullName -Algorithm SHA256).Hash.ToLower()
+            $hashes += "$h  $rel"
+          }
+          $hashes -join "`r`n" | Out-File -FilePath "$staging/SHA256SUMS" -Encoding ascii
+
+          if ("${{ secrets.GPG_PRIVATE_KEY }}" -ne "") {
+            gpg --batch --yes --armor --detach-sign -o "$staging/SHA256SUMS.asc" "$staging/SHA256SUMS"
+          }
+
+          # Compress to zip
+          $zipName = "zeno-$tag-windows-x64-portable.zip"
+          Compress-Archive -Path "$staging/*" -DestinationPath "dist-release/$zipName" -CompressionLevel Optimal
+          
+          if ("${{ secrets.GPG_PRIVATE_KEY }}" -ne "") {
+            gpg --batch --yes --armor --detach-sign -o "dist-release/$zipName.asc" "dist-release/$zipName"
+          }
+
+          echo "TAG=$tag" >> $env:GITHUB_ENV
+          echo "ZIP_NAME=$zipName" >> $env:GITHUB_ENV
+
+      - name: Create GitHub Release and Upload Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: Zeno ${{ env.TAG }}
+          prerelease: true
+          draft: false
+          generate_release_notes: true
+          files: |
+            dist-release/${{ env.ZIP_NAME }}
+            dist-release/${{ env.ZIP_NAME }}.asc
+            dist-release/zeno-*/zeno.exe
+            dist-release/zeno-*/zeno.exe.asc
+            dist-release/zeno-*/SHA256SUMS
+            dist-release/zeno-*/SHA256SUMS.asc
+            dist-release/zeno-*/zeno-release-public-key.asc
+

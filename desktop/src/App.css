@@ -127,6 +127,11 @@ ul, ol {
   padding: 8px 8px 8px 0; /* Server sidebar flush to the left/top/bottom canvas */
   background-color: transparent;
   overflow: hidden;
+  transition: grid-template-columns 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.app-layout.sidebar-collapsed {
+  grid-template-columns: 72px 0px 1fr auto;
 }
 
 .app-layout.in-ide {
@@ -268,6 +273,7 @@ ul, ol {
 
 /* ============================================================
    2. CHANNEL SIDEBAR
+   2. CHANNEL SIDEBAR (Dock-Design)
    ============================================================ */
 .channel-sidebar {
   grid-column: 2;
@@ -275,12 +281,109 @@ ul, ol {
   background-image: var(--noise-texture);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
+  border-right: 1px solid var(--border-color);
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
   display: flex;
   flex-direction: column;
   z-index: 5;
   margin-right: 8px; /* Gap between islands */
+  margin-right: 0; /* Docked flush against chat block / main dock */
   position: relative; /* Context for absolute positioning of children like customizer */
-  transition: background-color var(--transition-normal), backdrop-filter var(--transition-normal);
+  width: 240px;
+  min-width: 240px;
+  overflow: hidden;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease, margin 0.25s ease, background-color var(--transition-normal), backdrop-filter var(--transition-normal);
+}
+
+/* Standalone card look only when on Dashboard view with floating widgets */
+.app-layout.home-tab-dashboard .channel-sidebar {
+  margin-right: 8px;
+  border-radius: var(--radius-lg);
+}
+
+.app-layout.sidebar-collapsed .channel-sidebar {
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  margin-right: 0 !important;
+  border-width: 0 !important;
+  padding: 0 !important;
+}
+
+.sidebar-collapse-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.sidebar-collapse-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+  border-color: var(--accent-color);
+  box-shadow: 0 0 10px rgba(53, 116, 240, 0.3);
+}
+
+.chat-header-sidebar-toggle {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  margin-right: 10px;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.chat-header-sidebar-toggle:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--accent-color);
+  border-color: var(--accent-color);
+  transform: scale(1.05);
+}
+
+.sidebar-floating-expand-btn {
+  position: fixed;
+  left: 78px;
+  top: 14px;
+  z-index: 50;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.35);
+  font-size: 16px;
+  transition: all 0.2s ease;
+}
+
+.sidebar-floating-expand-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+  transform: scale(1.08);
 }
 
 .glass-effect .channel-sidebar {
@@ -313,8 +416,25 @@ ul, ol {
 }
 
 .server-dropdown-toggle {
-  color: var(--text-muted);
-  font-size: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.server-dropdown-toggle:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+  border-color: var(--accent-color);
 }
 
 .channel-list {
@@ -792,16 +912,38 @@ ul, ol {
 
 /* ============================================================
    3. CHAT AREA
+   3. CHAT AREA (Dock-Design)
    ============================================================ */
 .chat-area {
   grid-column: 3;
   background-color: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
+  border-left: none; /* Seamless dock against channel-sidebar right border */
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-top-right-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   transition: background-color var(--transition-normal), backdrop-filter var(--transition-normal);
+  transition: border-radius 0.25s ease, border-left 0.25s ease, border-right 0.25s ease, background-color var(--transition-normal), backdrop-filter var(--transition-normal);
+}
+
+/* When members sidebar is open, dock right side flush to members sidebar */
+.app-layout.members-open .chat-area,
+.app-layout:has(.members-sidebar:not(.collapsed)) .chat-area {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-right: none;
+}
+
+/* When channel sidebar is collapsed, restore left border and rounded corners */
+.app-layout.sidebar-collapsed .chat-area {
+  border-left: 1px solid var(--border-color);
+  border-top-left-radius: var(--radius-lg);
+  border-bottom-left-radius: var(--radius-lg);
 }
 
 .glass-effect .chat-area {
@@ -1181,6 +1323,7 @@ pre.code-block {
 
 /* ============================================================
    4. MEMBERS SIDEBAR
+   4. MEMBERS SIDEBAR (Dock-Design)
    ============================================================ */
 .members-sidebar {
   grid-column: 4;
@@ -1188,6 +1331,11 @@ pre.code-block {
   background-image: var(--noise-texture);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
+  border-left: 1px solid var(--border-color);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-top-right-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
   display: flex;
   flex-direction: column;
   padding: 12px 6px;
@@ -1196,6 +1344,14 @@ pre.code-block {
   width: 220px;
   margin-left: 8px; /* Gap between islands */
   transition: background-color var(--transition-normal), backdrop-filter var(--transition-normal);
+  margin-left: 0; /* Docked flush against chat block */
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+              opacity 0.2s ease, 
+              margin 0.3s ease, 
+              padding 0.3s ease, 
+              border 0.3s ease,
+              background-color var(--transition-normal), 
+              backdrop-filter var(--transition-normal);
 }
 
 .glass-effect .members-sidebar {
@@ -1879,10 +2035,11 @@ input:checked + .slider:before {
   justify-content: center; /* Center-align settings panels with max-width */
 }
 
-/* Container inside content to hold settings content max-width */
+/* Container inside content to hold settings content max-width with safe bottom breathing room */
 .settings-content > div {
   width: 100%;
   max-width: 680px;
+  padding-bottom: 80px;
 }
 
 /* Discord close button on the right */
@@ -3253,6 +3410,7 @@ body.light-mode .layout-banner_overlay .profile-card-body {
    10. ZENO WASM RUNTIME HUB (STARTSEITE SUBMENU)
    ============================================================ */
 .wasm-hub-view {
+  grid-column: 3;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -3261,6 +3419,18 @@ body.light-mode .layout-banner_overlay .profile-card-body {
   padding: 30px;
   background-color: var(--bg-primary);
   background-image: var(--noise-texture);
+  border: 1px solid var(--border-color);
+  border-left: none;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-top-right-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
+}
+
+.app-layout.sidebar-collapsed .wasm-hub-view {
+  border-left: 1px solid var(--border-color);
+  border-top-left-radius: var(--radius-lg);
+  border-bottom-left-radius: var(--radius-lg);
 }
 
 .wasm-hub-header {
@@ -3636,12 +3806,15 @@ body.light-mode .layout-banner_overlay .profile-card-body {
    11. ZENO FULL-IDE WORKSPACE
    ============================================================ */
 .zeno-ide-workspace {
+  grid-column: 2;
   display: flex;
   flex: 1;
   height: 100%;
   overflow: hidden;
   background-color: var(--bg-primary);
   color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
 }
 
 /* IDE Sidebar styles */
@@ -4550,6 +4723,134 @@ body.light-mode .layout-banner_overlay .profile-card-body {
   text-transform: uppercase;
 }
 
+/* LIGHT MODE OVERRIDES FOR BOXED MESSAGES & MARKDOWN */
+body.light-mode .boxed-message-card,
+.app-layout.light-mode .boxed-message-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(147, 51, 234, 0.3);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08), 0 0 10px rgba(168, 85, 247, 0.08);
+}
+
+body.light-mode .boxed-message-card:hover,
+.app-layout.light-mode .boxed-message-card:hover {
+  border-color: rgba(147, 51, 234, 0.6);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12), 0 0 16px rgba(168, 85, 247, 0.15);
+}
+
+body.light-mode .boxed-message-header,
+.app-layout.light-mode .boxed-message-header {
+  background: rgba(168, 85, 247, 0.08);
+  border-bottom: 1px solid rgba(168, 85, 247, 0.2);
+}
+
+body.light-mode .boxed-message-badge,
+.app-layout.light-mode .boxed-message-badge {
+  color: #7E22CE;
+}
+
+body.light-mode .boxed-copy-btn,
+.app-layout.light-mode .boxed-copy-btn {
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  color: #1F2937;
+}
+
+body.light-mode .boxed-copy-btn:hover,
+.app-layout.light-mode .boxed-copy-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: #000000;
+}
+
+body.light-mode .zeno-markdown-body pre,
+.app-layout.light-mode .zeno-markdown-body pre {
+  background-color: #F6F8FA;
+  border: 1px solid #D0D7DE;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+body.light-mode .zeno-markdown-body pre code,
+.app-layout.light-mode .zeno-markdown-body pre code {
+  color: #24292F;
+}
+
+body.light-mode .zeno-markdown-body code:not(pre code),
+.app-layout.light-mode .zeno-markdown-body code:not(pre code) {
+  background-color: rgba(175, 184, 193, 0.2);
+  border: 1px solid rgba(175, 184, 193, 0.4);
+  color: #0969DA;
+}
+
+body.light-mode .zeno-markdown-body table th,
+.app-layout.light-mode .zeno-markdown-body table th {
+  background-color: #F6F8FA;
+  border: 1px solid #D0D7DE;
+  color: #1F2937;
+}
+
+body.light-mode .zeno-markdown-body table td,
+.app-layout.light-mode .zeno-markdown-body table td {
+  border: 1px solid #D0D7DE;
+  color: #24292F;
+}
+
+body.light-mode .zeno-markdown-body table tr:nth-child(2n),
+.app-layout.light-mode .zeno-markdown-body table tr:nth-child(2n) {
+  background-color: #F6F8FA;
+}
+
+body.light-mode .zeno-markdown-body blockquote:not(.gfm-alert),
+.app-layout.light-mode .zeno-markdown-body blockquote:not(.gfm-alert) {
+  background: rgba(56, 189, 248, 0.08);
+  border-left-color: #0284C7;
+  color: #374151;
+}
+
+body.light-mode .gfm-alert,
+.app-layout.light-mode .gfm-alert {
+  background: #F8FAFC;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+body.light-mode .gfm-alert-note,
+.app-layout.light-mode .gfm-alert-note {
+  border-color: #0284C7;
+  background: rgba(2, 132, 199, 0.05);
+}
+
+body.light-mode .gfm-alert-tip,
+.app-layout.light-mode .gfm-alert-tip {
+  border-color: #16A34A;
+  background: rgba(22, 163, 74, 0.05);
+}
+
+body.light-mode .gfm-alert-important,
+.app-layout.light-mode .gfm-alert-important {
+  border-color: #9333EA;
+  background: rgba(147, 51, 234, 0.05);
+}
+
+body.light-mode .gfm-alert-warning,
+.app-layout.light-mode .gfm-alert-warning {
+  border-color: #D97706;
+  background: rgba(217, 119, 6, 0.05);
+}
+
+body.light-mode .gfm-alert-caution,
+.app-layout.light-mode .gfm-alert-caution {
+  border-color: #DC2626;
+  background: rgba(220, 38, 38, 0.05);
+}
+
+body.light-mode .gfm-alert-title,
+.app-layout.light-mode .gfm-alert-title {
+  color: #111827;
+}
+
+body.light-mode .gfm-alert-content,
+.app-layout.light-mode .gfm-alert-content {
+  color: #374151;
+}
+
 .rules-channel {
   border-left: 2px solid #A855F7 !important;
 }
@@ -4648,6 +4949,97 @@ textarea.message-input::placeholder {
   color: var(--text-muted);
 }
 
+.git-owner-bar {
+  color: #C084FC;
+  background-color: rgba(168, 85, 247, 0.08);
+  border-top: 1px solid rgba(168, 85, 247, 0.2);
+}
 
+body.light-mode .git-owner-bar,
+.app-layout.light-mode .git-owner-bar {
+  color: #6B21A8 !important;
+  background-color: rgba(168, 85, 247, 0.08) !important;
+  border-top: 1px solid rgba(168, 85, 247, 0.25) !important;
+}
 
+/* ============================================================
+   14. SMOOTH VIEW TRANSITIONS, MODALS & SPLASH SCREEN
+   ============================================================ */
 
+/* Splash Screen Ring Animations */
+@keyframes splashRingPulse {
+  0%, 100% {
+    transform: scale(0.96);
+    opacity: 0.4;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 0.8;
+  }
+}
+
+@keyframes splashRingRotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Smooth View Transitions */
+@keyframes zenoViewFade {
+  0% {
+    opacity: 0;
+    transform: translateY(4px) scale(0.995);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.zeno-dashboard,
+.zeno-ide-workspace,
+.chat-area,
+.wasm-hub-container,
+.zeno-knowledge-hub-view,
+.zeno-plugins-container {
+  animation: zenoViewFade 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Modal Animations */
+@keyframes zenoBackdropFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes zenoModalPopIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.modal-overlay {
+  animation: zenoBackdropFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.modal-overlay .zeno-dialog-modal,
+.modal-overlay .code-editor-modal,
+.modal-overlay .marketplace-modal,
+.modal-overlay .sovereign-modal-card {
+  animation: zenoModalPopIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.settings-modal {
+  animation: zenoBackdropFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

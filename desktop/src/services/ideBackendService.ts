@@ -82,41 +82,128 @@ export async function getSystemCompilers(): Promise<SystemCompilersStatus> {
   }
 }
 
+import { IdeEntry } from "../types";
+
 /**
- * Creates a folder in the workspace safely via Rust backend.
+ * Opens a native OS Folder Picker dialog via the Rust backend.
+ * Returns the selected absolute path, or null if canceled.
  */
-export async function createWorkspaceFolder(folderPath: string): Promise<void> {
+export async function openFolderDialog(): Promise<string | null> {
+  if (!isTauriEnvironment()) {
+    // Web simulation fallback
+    const mockPath = prompt("Projektordner-Pfad eingeben (z. B. C:\\dev\\MeinProjekt):", "C:\\dev\\MeinProjekt");
+    return mockPath || null;
+  }
+  try {
+    const path = await invoke<string | null>("ide_open_folder_dialog");
+    return path;
+  } catch (e) {
+    console.warn("Fehler beim Öffnen des Ordner-Dialogs:", e);
+    return null;
+  }
+}
+
+/**
+ * Opens a native OS File Picker dialog via the Rust backend.
+ * Returns the selected absolute path, or null if canceled.
+ */
+export async function openFileDialog(): Promise<string | null> {
+  if (!isTauriEnvironment()) {
+    const mockFile = prompt("Dateipfad eingeben (z. B. C:\\dev\\script.py):", "C:\\dev\\script.py");
+    return mockFile || null;
+  }
+  try {
+    const path = await invoke<string | null>("ide_open_file_dialog");
+    return path;
+  } catch (e) {
+    console.warn("Fehler beim Öffnen des Datei-Dialogs:", e);
+    return null;
+  }
+}
+
+/**
+ * Reads directory entries directly from disk via Rust.
+ */
+export async function readDirectory(dirPath: string): Promise<IdeEntry[]> {
+  if (!isTauriEnvironment()) {
+    return [
+      { name: "main.rs", path: `${dirPath}/main.rs`, isFolder: false, language: "rust", size: 120 },
+      { name: "README.md", path: `${dirPath}/README.md`, isFolder: false, language: "markdown", size: 450 },
+      { name: "src", path: `${dirPath}/src`, isFolder: true, language: "" }
+    ];
+  }
+  return await invoke<IdeEntry[]>("ide_read_directory", { dirPath });
+}
+
+/**
+ * Reads a file's raw content directly from disk.
+ */
+export async function readFileContent(filePath: string): Promise<string> {
+  if (!isTauriEnvironment()) {
+    return `// Simulierte Datei geladen von ${filePath}\nconsole.log("Hello from Zeno Web!");\n`;
+  }
+  return await invoke<string>("ide_read_file", { filePath });
+}
+
+/**
+ * Writes content to a file directly on disk.
+ */
+export async function writeFileContent(filePath: string, content: string): Promise<void> {
+  if (!isTauriEnvironment()) return;
+  await invoke("ide_write_file", { filePath, content });
+}
+
+/**
+ * Creates a new empty file on disk.
+ */
+export async function createFileEntry(filePath: string): Promise<void> {
+  if (!isTauriEnvironment()) return;
+  await invoke("ide_create_file", { filePath });
+}
+
+/**
+ * Creates a new directory on disk.
+ */
+export async function createFolderEntry(folderPath: string): Promise<void> {
   if (!isTauriEnvironment()) return;
   await invoke("ide_create_folder", { folderPath });
 }
 
 /**
- * Reads a workspace file safely via Rust backend.
+ * Deletes a file or directory on disk.
  */
+export async function deleteEntry(path: string): Promise<void> {
+  if (!isTauriEnvironment()) return;
+  await invoke("ide_delete_entry", { path });
+}
+
+/**
+ * Renames a file or directory on disk.
+ */
+export async function renameEntry(oldPath: string, newPath: string): Promise<void> {
+  if (!isTauriEnvironment()) return;
+  await invoke("ide_rename_entry", { oldPath, newPath });
+}
+
+/**
+ * Legacy Workspace Support
+ */
+export async function createWorkspaceFolder(folderPath: string): Promise<void> {
+  await createFolderEntry(folderPath);
+}
+
 export async function readWorkspaceFile(name: string): Promise<string> {
-  if (!isTauriEnvironment()) return `// Web simulation for ${name}`;
-  return await invoke<string>("read_workspace_file", { name });
+  return await readFileContent(name);
 }
 
-/**
- * Writes/saves a workspace file safely via Rust backend.
- */
 export async function writeWorkspaceFile(name: string, content: string): Promise<void> {
-  if (!isTauriEnvironment()) return;
-  await invoke("write_workspace_file", { name, content });
+  await writeFileContent(name, content);
 }
 
-/**
- * Deletes a workspace file safely via Rust backend.
- */
 export async function deleteWorkspaceFile(name: string): Promise<void> {
-  if (!isTauriEnvironment()) return;
-  await invoke("delete_workspace_file", { name });
+  await deleteEntry(name);
 }
 
-/**
- * Lists workspace files safely via Rust backend.
- */
 export async function listWorkspaceFiles(): Promise<Array<{ name: string; language: string }>> {
   if (!isTauriEnvironment()) return [];
   return await invoke<Array<{ name: string; language: string }>>("list_workspace_files");

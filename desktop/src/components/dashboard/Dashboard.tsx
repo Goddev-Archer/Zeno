@@ -85,6 +85,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   userIdentity,
   servers = [],
   connectedRelaysCount = 3,
+  theme = "dark",
   onJoinVoice
 }) => {
   const [copiedAin, setCopiedAin] = useState<boolean>(false);
@@ -123,17 +124,18 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
   const textChannels = primaryServer?.categories?.find((c) => c.type === "text")?.channels || [];
   const voiceChannels = primaryServer?.categories?.find((c) => c.type === "voice")?.channels || [];
 
-  // Common floating island card style with transparent glassmorphism
+  const isLight = theme === "light";
+
+  // Common floating island card style adapting seamlessly to dark and light mode
   const islandStyle: React.CSSProperties = {
-    backgroundColor: "rgba(35, 37, 42, 0.75)",
-    backdropFilter: "blur(14px)",
-    border: "1px solid rgba(255, 255, 255, 0.08)",
+    backgroundColor: "var(--bg-secondary)",
+    border: "1px solid var(--border-color)",
     borderRadius: "12px",
     padding: "16px",
     display: "flex",
     flexDirection: "column",
     gap: "12px",
-    boxShadow: "0 8px 30px rgba(0, 0, 0, 0.28)",
+    boxShadow: isLight ? "0 4px 16px rgba(0, 0, 0, 0.06)" : "0 8px 30px rgba(0, 0, 0, 0.28)",
     boxSizing: "border-box"
   };
 
@@ -228,8 +230,8 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
           <div
             onClick={handleCopyAin}
             style={{
-              backgroundColor: "rgba(24, 25, 27, 0.7)",
-              border: "1px solid rgba(255, 255, 255, 0.06)",
+              backgroundColor: "var(--bg-tertiary)",
+              border: "1px solid var(--border-color)",
               borderRadius: "var(--radius-sm)",
               padding: "7px 10px",
               display: "flex",
@@ -256,8 +258,8 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
           {/* SQLite DB Chip */}
           <div
             style={{
-              backgroundColor: "rgba(24, 25, 27, 0.7)",
-              border: "1px solid rgba(255, 255, 255, 0.06)",
+              backgroundColor: "var(--bg-tertiary)",
+              border: "1px solid var(--border-color)",
               borderRadius: "var(--radius-sm)",
               padding: "7px 10px",
               display: "flex",
@@ -279,8 +281,8 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
           {/* Relays Chip */}
           <div
             style={{
-              backgroundColor: "rgba(24, 25, 27, 0.7)",
-              border: "1px solid rgba(255, 255, 255, 0.06)",
+              backgroundColor: "var(--bg-tertiary)",
+              border: "1px solid var(--border-color)",
               borderRadius: "var(--radius-sm)",
               padding: "7px 10px",
               display: "flex",
@@ -303,8 +305,8 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
           <div
             onClick={onOpenGitSyncModal}
             style={{
-              backgroundColor: "rgba(24, 25, 27, 0.7)",
-              border: "1px solid rgba(255, 255, 255, 0.06)",
+              backgroundColor: "var(--bg-tertiary)",
+              border: "1px solid var(--border-color)",
               borderRadius: "var(--radius-sm)",
               padding: "7px 10px",
               display: "flex",
@@ -346,7 +348,7 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
           
           {/* Project Files */}
           <div style={{ ...islandStyle, flex: 1, minHeight: 0 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: "8px", flexWrap: "wrap", gap: "6px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-color)", paddingBottom: "8px", flexWrap: "wrap", gap: "6px" }}>
               <span style={{ fontSize: "12px", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px", color: "var(--text-primary)" }}>
                 <Icon icon="mage:folder-open" style={{ color: "#38BDF8" }} /> PROJEKT-DATEIEN &amp; WORKSPACE
               </span>
@@ -370,9 +372,9 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
                     alignItems: "center",
                     justifyContent: "space-between",
                     padding: "7px 10px",
-                    backgroundColor: "rgba(24, 25, 27, 0.7)",
+                    backgroundColor: "var(--bg-tertiary)",
                     borderRadius: "var(--radius-sm)",
-                    border: "1px solid rgba(255, 255, 255, 0.05)",
+                    border: "1px solid var(--border-color)",
                     cursor: "pointer",
                     transition: "all var(--transition-fast)"
                   }}
@@ -409,7 +411,7 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
 
           {/* Git Source Control Feed */}
           <div style={{ ...islandStyle }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: "8px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-color)", paddingBottom: "8px" }}>
               <span style={{ fontSize: "12px", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px" }}>
                 <Icon icon="mage:git-commit" style={{ color: "var(--accent-color)" }} /> GIT SOURCE CONTROL
               </span>
@@ -426,7 +428,7 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
 
             <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
               {liveGitCommits.slice(0, 3).map((commit, idx) => (
-                <div key={idx} style={{ padding: "6px 8px", backgroundColor: "rgba(24, 25, 27, 0.7)", borderRadius: "var(--radius-sm)", border: "1px solid rgba(255, 255, 255, 0.05)" }}>
+                <div key={idx} style={{ padding: "6px 8px", backgroundColor: "var(--bg-tertiary)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-color)" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2px" }}>
                     <span style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: "var(--accent-color)", fontWeight: "700" }}>
                       {commit.hash}
@@ -453,7 +455,7 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
           
           {/* Text Channels */}
           <div style={{ ...islandStyle }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: "8px", flexWrap: "wrap", gap: "6px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-color)", paddingBottom: "8px", flexWrap: "wrap", gap: "6px" }}>
               <span style={{ fontSize: "12px", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px", color: "var(--text-primary)" }}>
                 <Icon icon="mage:message-conversation" style={{ color: "var(--accent-color)" }} /> SCHNELLZUGRIFF KANÄLE
               </span>
@@ -468,8 +470,8 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
                   key={chn.id}
                   onClick={() => primaryServer && onNavigateToChannel && onNavigateToChannel(primaryServer, chn)}
                   style={{
-                    backgroundColor: "rgba(24, 25, 27, 0.7)",
-                    border: "1px solid rgba(255, 255, 255, 0.05)",
+                    backgroundColor: "var(--bg-tertiary)",
+                    border: "1px solid var(--border-color)",
                     borderRadius: "var(--radius-sm)",
                     padding: "7px 10px",
                     display: "flex",
@@ -495,7 +497,7 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
 
           {/* Voice Lounge Card */}
           <div style={{ ...islandStyle }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: "8px", flexWrap: "wrap", gap: "6px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-color)", paddingBottom: "8px", flexWrap: "wrap", gap: "6px" }}>
               <span style={{ fontSize: "12px", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px", color: "var(--text-primary)" }}>
                 <Icon icon="mage:microphone" style={{ color: "#00FF87" }} /> SPRACHLOUNGE &amp; AUDIO
               </span>
@@ -506,7 +508,7 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
 
             {voiceChannels.length > 0 ? (
               voiceChannels.map((vChn) => (
-                <div key={vChn.id} style={{ backgroundColor: "rgba(24, 25, 27, 0.7)", border: "1px solid rgba(255, 255, 255, 0.05)", borderRadius: "var(--radius-sm)", padding: "10px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                <div key={vChn.id} style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-sm)", padding: "10px", display: "flex", flexDirection: "column", gap: "8px" }}>
                   <div>
                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                       <Icon icon="mage:volume-up" style={{ color: "var(--accent-color)" }} />
@@ -537,7 +539,7 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
             </span>
             <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
               {servers.map((srv) => (
-                <div key={srv.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 8px", backgroundColor: "rgba(24, 25, 27, 0.7)", borderRadius: "var(--radius-sm)", border: "1px solid rgba(255, 255, 255, 0.05)" }}>
+                <div key={srv.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 8px", backgroundColor: "var(--bg-tertiary)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-color)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
                     <span style={{ fontSize: "13px" }}>{srv.iconLetter || "🛡️"}</span>
                     <span style={{ fontSize: "11px", fontWeight: "500" }}>{srv.name}</span>
@@ -555,7 +557,7 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
           
           {/* Multi-Relay Transport Status */}
           <div style={{ ...islandStyle }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: "8px", flexWrap: "wrap", gap: "6px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-color)", paddingBottom: "8px", flexWrap: "wrap", gap: "6px" }}>
               <span style={{ fontSize: "12px", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px" }}>
                 <Icon icon="mage:globe" style={{ color: "#00FF87" }} /> RELAY-TRANSPORT
               </span>
@@ -570,7 +572,7 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
                 { name: "nos.lol", type: "Nostr WebSocket", ping: "42ms" },
                 { name: "relay.snort.social", type: "Nostr WebSocket", ping: "35ms" }
               ].map((r, i) => (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 8px", backgroundColor: "rgba(24, 25, 27, 0.7)", borderRadius: "var(--radius-sm)", border: "1px solid rgba(255, 255, 255, 0.05)" }}>
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 8px", backgroundColor: "var(--bg-tertiary)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-color)" }}>
                   <div>
                     <span style={{ fontWeight: "600", display: "block" }}>{r.name}</span>
                     <span style={{ fontSize: "9px", color: "var(--text-muted)" }}>{r.type}</span>

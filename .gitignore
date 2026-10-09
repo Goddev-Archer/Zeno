@@ -31,3 +31,10 @@ lerna-debug.log*
 # Tauri specific ignores
 desktop/src-tauri/target/
 desktop/src-tauri/binaries/
+
+# Cryptographic keys and local release output
+*.key
+*.pem
+*-private-key*.asc
+releases/
+dist-release/

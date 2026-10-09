@@ -374,6 +374,73 @@ export const AudioSettingsTab: React.FC<AudioSettingsTabProps> = ({ showToast })
           />
         </label>
       </div>
+
+      {/* PHASE 4: TREIBERFREIE VOICE-PIPELINE & FRAME-BY-FRAME E2EE */}
+      <div style={{ backgroundColor: "#0D0E12", border: "1px solid #1E222D", borderRadius: "10px", padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ fontSize: "12px", fontWeight: "700", color: "#00FF87", textTransform: "uppercase", letterSpacing: "0.5px", display: "flex", alignItems: "center", gap: "6px" }}>
+            <Icon icon="octicon:shield-lock-16" style={{ fontSize: "14px" }} />
+            <span>Treiberfreie Voice-Engine &amp; Frame-by-Frame E2EE (Phase 4)</span>
+          </div>
+          <span style={{ fontSize: "10px", backgroundColor: "rgba(0, 255, 135, 0.12)", color: "#00FF87", border: "1px solid rgba(0, 255, 135, 0.3)", borderRadius: "4px", padding: "2px 6px", fontWeight: "700" }}>
+            AES-256-GCM / 20ms Frames
+          </span>
+        </div>
+
+        <p style={{ margin: 0, fontSize: "11px", color: "#94A3B8", lineHeight: "1.5" }}>
+          Glasklares, unterbrechungsfreies Audio ohne externe Windows-Treiber oder Codec-Packs. Sprache wird in autarke 20ms Opus-Frames zerlegt und einzeln verschlüsselt. Bei Paketverlust greift In-Band Packet Loss Concealment (PLC), ohne dass die Verschlüsselung abreißt.
+        </p>
+
+        {/* Live E2EE Stats Chips */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", marginTop: "4px" }}>
+          <div style={{ backgroundColor: "#161922", border: "1px solid #262933", borderRadius: "6px", padding: "8px 10px", display: "flex", flexDirection: "column" }}>
+            <span style={{ fontSize: "10px", color: "#64748B", textTransform: "uppercase" }}>Architektur</span>
+            <span style={{ fontSize: "12px", fontWeight: "700", color: "#38BDF8" }}>Direct P2P UDP</span>
+            <span style={{ fontSize: "9px", color: "#00FF87" }}>0% Relay-Audio-Last</span>
+          </div>
+
+          <div style={{ backgroundColor: "#161922", border: "1px solid #262933", borderRadius: "6px", padding: "8px 10px", display: "flex", flexDirection: "column" }}>
+            <span style={{ fontSize: "10px", color: "#64748B", textTransform: "uppercase" }}>Opus Frame Rate</span>
+            <span style={{ fontSize: "12px", fontWeight: "700", color: "#FFF" }}>50 fps (20ms)</span>
+            <span style={{ fontSize: "9px", color: "#94A3B8" }}>48 kHz High-Fidelity</span>
+          </div>
+
+          <div style={{ backgroundColor: "#161922", border: "1px solid #262933", borderRadius: "6px", padding: "8px 10px", display: "flex", flexDirection: "column" }}>
+            <span style={{ fontSize: "10px", color: "#64748B", textTransform: "uppercase" }}>Verlustschutz</span>
+            <span style={{ fontSize: "12px", fontWeight: "700", color: "#00FF87" }}>In-Band FEC</span>
+            <span style={{ fontSize: "9px", color: "#94A3B8" }}>Packet Loss Concealment</span>
+          </div>
+        </div>
+
+        {/* E2EE Options */}
+        <div style={{ borderTop: "1px solid #1E222D", paddingTop: "10px", display: "flex", flexDirection: "column", gap: "8px" }}>
+          <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "12px", color: "#CBD5E1", cursor: "pointer" }}>
+            <div>
+              <span style={{ fontWeight: "600" }}>Frame-by-Frame AEAD Verschlüsselung</span>
+              <div style={{ fontSize: "10px", color: "#64748B" }}>Verschlüsselt jeden 20ms Audioblock autark via WebRTC Insertable Streams</div>
+            </div>
+            <input
+              type="checkbox"
+              defaultChecked={true}
+              onChange={(e) => audioStreamService.setE2eeActive(e.target.checked)}
+              style={{ width: "16px", height: "16px", accentColor: "#00FF87" }}
+            />
+          </label>
+
+          <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "12px", color: "#CBD5E1", cursor: "pointer" }}>
+            <div>
+              <span style={{ fontWeight: "600" }}>Opus In-Band Forward Error Correction (FEC)</span>
+              <div style={{ fontSize: "10px", color: "#64748B" }}>Sendet redundante Reparaturdaten bei instabilem Internet oder UDP-Jitter</div>
+            </div>
+            <input
+              type="checkbox"
+              defaultChecked={true}
+              onChange={(e) => audioStreamService.setFecEnabled(e.target.checked)}
+              style={{ width: "16px", height: "16px", accentColor: "#00FF87" }}
+            />
+          </label>
+        </div>
+      </div>
     </div>
   );
 };

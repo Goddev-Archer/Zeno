@@ -6,7 +6,7 @@ import { PluginSlotRenderer } from "../plugins/PluginSlotRenderer";
 
 interface ChannelSidebarProps {
   activeServerId: string;
-  homeTab: "dashboard" | "wasm_hub" | "ide";
+  homeTab: "dashboard" | "wasm_hub" | "ide" | "plugins" | "wiki";
   activeServer: Server;
   activeChannel: Channel;
   collapsedCategories: Record<string, boolean>;
@@ -16,7 +16,7 @@ interface ChannelSidebarProps {
   muted: boolean;
   deafened: boolean;
   mockProfiles: Record<string, Profile>;
-  setHomeTab: (tab: "dashboard" | "wasm_hub" | "ide") => void;
+  setHomeTab: (tab: "dashboard" | "wasm_hub" | "ide" | "plugins" | "wiki") => void;
   toggleCategory: (categoryName: string) => void;
   setActiveChannel: (channel: Channel) => void;
   handleJoinVoice: (channelId: string, channelName: string) => void;
@@ -40,6 +40,7 @@ interface ChannelSidebarProps {
   activeVoiceSpeakers?: string[];
   voicePing?: number;
   onOpenVoiceSettings?: () => void;
+  onToggleSidebar?: () => void;
 }
 
 export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
@@ -77,7 +78,8 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   localAudioLevel = 0,
   activeVoiceSpeakers = [],
   voicePing = 14,
-  onOpenVoiceSettings
+  onOpenVoiceSettings,
+  onToggleSidebar
 }) => {
   const [serverMenuOpen, setServerMenuOpen] = useState(false);
   const [hoveredChannelId, setHoveredChannelId] = useState<string | null>(null);
@@ -88,9 +90,20 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
     <aside className="channel-sidebar">
       {activeServerId === "home" ? (
         <>
-          <header className="server-header">
-            <h1 className="server-name">Zeno Home</h1>
-            <Icon icon="mage:home" style={{ fontSize: "16px", color: "var(--text-muted)" }} />
+          <header className="server-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <Icon icon="mage:home" style={{ fontSize: "16px", color: "var(--text-muted)" }} />
+              <h1 className="server-name" style={{ margin: 0 }}>Zeno Home</h1>
+            </div>
+            {onToggleSidebar && (
+              <button 
+                className="sidebar-collapse-btn" 
+                onClick={onToggleSidebar} 
+                title="Seitenleiste einklappen (Strg+B)"
+              >
+                <Icon icon="codicon:layout-sidebar-left-off" />
+              </button>
+            )}
           </header>
           <div className="channel-list">
             <section className="channel-category">
@@ -105,6 +118,24 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                   >
                     <span className="channel-icon"><Icon icon="mage:dashboard" /></span>
                     <span className="channel-name">Dashboard</span>
+                  </button>
+                </li>
+                <li>
+                  <button 
+                    className={`channel-item ${homeTab === "plugins" ? "active" : ""}`}
+                    onClick={() => setHomeTab("plugins")}
+                  >
+                    <span className="channel-icon"><Icon icon="mage:puzzle" style={{ color: "#C084FC" }} /></span>
+                    <span className="channel-name">Community-Plugins</span>
+                  </button>
+                </li>
+                <li>
+                  <button 
+                    className={`channel-item ${homeTab === "wiki" ? "active" : ""}`}
+                    onClick={() => setHomeTab("wiki")}
+                  >
+                    <span className="channel-icon"><Icon icon="mage:book-open" style={{ color: "#F59E0B" }} /></span>
+                    <span className="channel-name">Knowledge Hub &amp; Wiki</span>
                   </button>
                 </li>
                 <li>
@@ -129,40 +160,65 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
       ) : (
         <>
           <header className="server-header" style={{ position: "relative" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", overflow: "hidden" }}>
-              <h1 className="server-name" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <div 
+              onClick={() => setServerMenuOpen(!serverMenuOpen)}
+              style={{ 
+                display: "flex", 
+                alignItems: "center", 
+                gap: "6px", 
+                flex: 1, 
+                minWidth: 0, 
+                cursor: "pointer",
+                paddingRight: "8px"
+              }}
+              title={activeServer?.name}
+            >
+              <h1 className="server-name" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", margin: 0, fontSize: "14px", fontWeight: "700" }}>
                 {activeServer?.name || "Server"}
               </h1>
+              <Icon 
+                icon={serverMenuOpen ? "mage:chevron-up" : "mage:chevron-down"} 
+                style={{ fontSize: "14px", color: "var(--text-muted)", flexShrink: 0 }} 
+              />
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
               <button
                 className="git-sync-header-badge"
-                onClick={onOpenGitSyncModal}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenGitSyncModal?.();
+                }}
                 title="Git Server Manifest Synchronisation"
                 style={{
-                  background: "rgba(53, 116, 240, 0.15)",
-                  border: "1px solid rgba(53, 116, 240, 0.35)",
-                  borderRadius: "10px",
-                  color: "#3574F0",
+                  background: "rgba(53, 116, 240, 0.12)",
+                  border: "1px solid rgba(53, 116, 240, 0.3)",
+                  borderRadius: "6px",
+                  color: "var(--accent-color)",
                   fontSize: "11px",
                   fontWeight: "600",
-                  padding: "2px 6px",
+                  padding: "3px 7px",
                   display: "flex",
                   alignItems: "center",
                   gap: "4px",
-                  cursor: "pointer",
-                  flexShrink: 0
+                  cursor: "pointer"
                 }}
               >
                 <Icon icon="octicon:git-branch-16" />
                 <span>Git</span>
               </button>
+              {onToggleSidebar && (
+                <button
+                  className="sidebar-collapse-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleSidebar();
+                  }}
+                  title="Seitenleiste einklappen (Strg+B)"
+                >
+                  <Icon icon="codicon:layout-sidebar-left-off" />
+                </button>
+              )}
             </div>
-            <button
-              className="server-dropdown-toggle"
-              onClick={() => setServerMenuOpen(!serverMenuOpen)}
-              title="Server-Menü"
-            >
-              <Icon icon={serverMenuOpen ? "mage:chevron-up" : "mage:chevron-down"} />
-            </button>
 
             {/* Server Dropdown Popover */}
             {serverMenuOpen && (
@@ -466,6 +522,26 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                 />
                 <span className="voice-dock-status-label">
                   RTC Verbunden
+                </span>
+                <span 
+                  className="voice-dock-e2ee-pill" 
+                  title="Frame-by-Frame E2EE aktiv (20ms Opus • AES-256-GCM / ChaCha20 • P2P Mesh • Zero Relay Load)"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "3px",
+                    background: "rgba(0, 255, 135, 0.12)",
+                    border: "1px solid rgba(0, 255, 135, 0.35)",
+                    borderRadius: "4px",
+                    padding: "1px 5px",
+                    fontSize: "9px",
+                    fontWeight: "700",
+                    color: "#00FF87",
+                    cursor: "help"
+                  }}
+                >
+                  <Icon icon="octicon:lock-16" style={{ fontSize: "10px" }} />
+                  <span>E2EE</span>
                 </span>
                 <span className="voice-dock-ping-pill" title="Latenz">
                   <span className="voice-dock-ping-dot" />

@@ -40,6 +40,8 @@ interface ChatAreaProps {
   onAcceptRules?: (serverId: string, channelId: string) => void;
   hasAcceptedRules?: boolean;
   onDeleteMessage?: (channelId: string, messageId?: string, messageText?: string) => void;
+  isSidebarCollapsed?: boolean;
+  onToggleSidebar?: () => void;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -77,7 +79,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   isServerOwner = true,
   onAcceptRules,
   hasAcceptedRules = false,
-  onDeleteMessage
+  onDeleteMessage,
+  isSidebarCollapsed = false,
+  onToggleSidebar
 }) => {
   const isRulesChannel = activeChannel?.type === "rules" || activeChannel?.name?.toLowerCase() === "regelwerk";
 
@@ -85,6 +89,15 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     <main className="chat-area">
       <header className="chat-header">
         <div className="chat-header-left chat-header-info">
+          {isSidebarCollapsed && onToggleSidebar && (
+            <button
+              className="chat-header-sidebar-toggle"
+              onClick={onToggleSidebar}
+              title="Seitenleiste einblenden (Strg+B)"
+            >
+              <Icon icon="codicon:layout-sidebar-left" />
+            </button>
+          )}
           <span className="chat-header-icon" style={{ color: isRulesChannel ? "#A855F7" : undefined }}>
             <Icon icon={isRulesChannel ? "mage:shield-check" : activeChannel?.type === "voice" ? "mage:volume-up" : "mage:hashtag"} />
           </span>
@@ -507,15 +520,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           <>
             {isRulesChannel && isServerOwner && (
               <div
+                className="git-owner-bar"
                 style={{
                   padding: "6px 16px",
                   fontSize: "11px",
-                  color: "#C084FC",
                   display: "flex",
                   alignItems: "center",
-                  gap: "6px",
-                  backgroundColor: "rgba(168, 85, 247, 0.08)",
-                  borderTop: "1px solid rgba(168, 85, 247, 0.2)"
+                  gap: "6px"
                 }}
               >
                 <Icon icon="octicon:git-branch-16" />
