@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Icon } from "@iconify/react";
 import Editor from "@monaco-editor/react";
-import { IdeFile, SystemCompilersStatus } from "../../types";
+import { IdeFile, SystemCompilersStatus, IdeWorkspaceGitStatus, IdeGitFileChange } from "../../types";
 import { getSystemCompilers } from "../../services/ideBackendService";
 import { GfmChatRenderer } from "../chat/GfmChatRenderer";
 
@@ -41,6 +41,12 @@ export interface ZenoIdeProps {
   onSelectRecentWorkspace: (path: string) => void;
   onSaveActiveFile: () => void;
   onDeleteFile?: (path: string) => void;
+  ideGitStatus?: IdeWorkspaceGitStatus | null;
+  onRefreshGitStatus?: () => void;
+  onStageGitFile?: (path?: string) => void;
+  onUnstageGitFile?: (path?: string) => void;
+  onDiscardGitFile?: (path: string, isUntracked?: boolean) => void;
+  onSyncGit?: () => void;
 }
 
 export const ZenoIde: React.FC<ZenoIdeProps> = ({
@@ -77,13 +83,134 @@ export const ZenoIde: React.FC<ZenoIdeProps> = ({
   onCloseWorkspace,
   onRefreshWorkspace,
   onSelectRecentWorkspace,
-  onSaveActiveFile
+  onSaveActiveFile,
+  onDeleteFile,
+  ideGitStatus,
+  onRefreshGitStatus,
+  onStageGitFile,
+  onUnstageGitFile,
+  onDiscardGitFile,
+  onSyncGit
 }) => {
   const [activeBottomTab, setActiveBottomTab] = useState<"terminal" | "compilers" | "problems">("terminal");
   const [compilersStatus, setCompilersStatus] = useState<SystemCompilersStatus | null>(null);
   const [isLoadingCompilers, setIsLoadingCompilers] = useState<boolean>(false);
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
   const [mdViewMode, setMdViewMode] = useState<"code" | "split" | "preview">("split");
+
+  // VS Code Git Source Control State
+  const [stagedFiles, setStagedFiles] = useState<string[]>([]);
+  const [isStagedCollapsed, setIsStagedCollapsed] = useState<boolean>(false);
+  const [isChangesCollapsed, setIsChangesCollapsed] = useState<boolean>(false);
+  const [syncStatus, setSyncStatus] = useState<{ ahead: number; behind: number }>({ ahead: 0, behind: 0 });
+
+  const activeBranch = ideGitStatus?.isRepo ? (ideGitStatus.branch || "main") : "main";
+  const effectiveAhead = ideGitStatus?.ahead ?? syncStatus.ahead;
+  const effectiveBehind = ideGitStatus?.behind ?? syncStatus.behind;
+
+  // Staged files list
+  const stagedList: IdeGitFileChange[] = useMemo(() => {
+    if (ideGitStatus && ideGitStatus.isRepo) {
+      return ideGitStatus.staged;
+    }
+    return stagedFiles.map((p) => ({ path: p, status: "M", isStaged: true }));
+  }, [ideGitStatus, stagedFiles]);
+
+  // Unstaged files list
+  const unstagedList: IdeGitFileChange[] = useMemo(() => {
+    if (ideGitStatus && ideGitStatus.isRepo) {
+      return ideGitStatus.unstaged;
+    }
+    return ideGitChanges
+      .filter((f) => !stagedFiles.includes(f))
+      .map((p) => ({ path: p, status: "M", isStaged: false }));
+  }, [ideGitStatus, ideGitChanges, stagedFiles]);
+
+  const totalChangesCount = stagedList.length + unstagedList.length;
+
+  const handleStageFile = (filePath: string) => {
+    if (onStageGitFile) {
+      onStageGitFile(filePath);
+    } else {
+      setStagedFiles((prev) => [...prev, filePath]);
+    }
+  };
+
+  const handleUnstageFile = (filePath: string) => {
+    if (onUnstageGitFile) {
+      onUnstageGitFile(filePath);
+    } else {
+      setStagedFiles((prev) => prev.filter((f) => f !== filePath));
+    }
+  };
+
+  const handleStageAll = () => {
+    if (onStageGitFile) {
+      onStageGitFile();
+    } else {
+      setStagedFiles([...ideGitChanges]);
+    }
+  };
+
+  const handleUnstageAll = () => {
+    if (onUnstageGitFile) {
+      onUnstageGitFile();
+    } else {
+      setStagedFiles([]);
+    }
+  };
+
+  const handleDiscardFile = (filePath: string, isUntracked: boolean = false) => {
+    if (onDiscardGitFile) {
+      onDiscardGitFile(filePath, isUntracked);
+    } else {
+      const fileName = filePath.replace(/\\/g, "/").split("/").pop() || filePath;
+      if (window.confirm(`Möchtest du alle Änderungen an "${fileName}" verwerfen?`)) {
+        setStagedFiles((prev) => prev.filter((f) => f !== filePath));
+        showToast(`Änderungen an "${fileName}" verworfen.`);
+      }
+    }
+  };
+
+  const handleDiscardAll = () => {
+    if (unstagedList.length === 0) return;
+    if (window.confirm("Möchtest du wirklich ALLE ungespeicherten Änderungen verwerfen?")) {
+      unstagedList.forEach((f) => {
+        if (onDiscardGitFile) {
+          onDiscardGitFile(f.path, f.status === "U" || f.status === "??");
+        }
+      });
+      if (!onDiscardGitFile) {
+        setStagedFiles([]);
+        showToast("Alle Änderungen verworfen.");
+      }
+    }
+  };
+
+  const handleVSCodeCommit = () => {
+    if (!ideGitMessage.trim()) {
+      showToast("Bitte gib eine Commit-Nachricht ein.");
+      return;
+    }
+    handleIdeGitCommit();
+  };
+
+  const handleSyncRemote = () => {
+    if (onSyncGit) {
+      onSyncGit();
+    } else {
+      setSyncStatus({ ahead: 0, behind: 0 });
+      showToast("Git Push & Pull synchronisiert (origin/main ist aktuell) ✓");
+    }
+  };
+
+  const handleRefreshGitStatus = () => {
+    if (onRefreshGitStatus) {
+      onRefreshGitStatus();
+    } else {
+      showToast("Git-Status aktualisiert ✓");
+    }
+  };
 
   // Build true hierarchical tree nodes from the recursive file entries
   const treeNodes = useMemo(() => {
@@ -298,15 +425,7 @@ export const ZenoIde: React.FC<ZenoIdeProps> = ({
 
           <div style={{ display: "flex", alignItems: "center", gap: "4px", backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-sm)", padding: "2px 8px", fontSize: "10px", color: "var(--text-muted)" }}>
             <Icon icon="octicon:git-branch-16" style={{ color: "var(--accent-color)" }} />
-            <span>main</span>
-          </div>
-        </div>
-
-        {/* Center: Status Indicator */}
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", color: "var(--text-secondary)", backgroundColor: "rgba(0, 255, 135, 0.08)", padding: "2px 8px", borderRadius: "10px", border: "1px solid rgba(0, 255, 135, 0.2)" }}>
-            <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: "#00FF87", display: "inline-block" }} />
-            <span>Rust Core Backend (100% Nativ)</span>
+            <span>{activeBranch}</span>
           </div>
         </div>
 
@@ -352,12 +471,14 @@ export const ZenoIde: React.FC<ZenoIdeProps> = ({
             <button
               className={`ide-activity-btn ${ideSidebarTab === "git" ? "active" : ""}`}
               onClick={() => setIdeSidebarTab("git")}
-              title="Source Control (Git)"
+              title={`Source Control (Git) - ${totalChangesCount} Änderungen`}
               style={{ width: "34px", height: "34px", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", border: "none", cursor: "pointer", position: "relative", background: ideSidebarTab === "git" ? "rgba(53, 116, 240, 0.16)" : "transparent", color: ideSidebarTab === "git" ? "var(--accent-color)" : "var(--text-muted)" }}
             >
               <Icon icon="codicon:source-control" style={{ fontSize: "18px" }} />
-              {ideGitChanges.length > 0 && (
-                <span style={{ position: "absolute", top: "5px", right: "5px", width: "6px", height: "6px", backgroundColor: "var(--accent-color)", borderRadius: "50%" }} />
+              {totalChangesCount > 0 && (
+                <span style={{ position: "absolute", top: "4px", right: "4px", minWidth: "14px", height: "14px", padding: "0 3px", boxSizing: "border-box", backgroundColor: "var(--accent-oxide)", color: "#FFFFFF", borderRadius: "7px", fontSize: "9px", fontWeight: "700", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: "14px" }}>
+                  {totalChangesCount}
+                </span>
               )}
             </button>
 
@@ -499,9 +620,23 @@ export const ZenoIde: React.FC<ZenoIdeProps> = ({
                                 <Icon icon={getFileIcon(node.name)} style={{ fontSize: "14px", flexShrink: 0 }} />
                               </>
                             )}
-                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
                               {node.name}
                             </span>
+                            {!isFolder && onDeleteFile && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (window.confirm(`"${node.name}" wirklich von Festplatte löschen?`)) {
+                                    onDeleteFile(node.path);
+                                  }
+                                }}
+                                style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: "2px", display: "flex", alignItems: "center", opacity: 0.7 }}
+                                title="Datei löschen"
+                              >
+                                <Icon icon="codicon:trash" style={{ fontSize: "11px" }} />
+                              </button>
+                            )}
                           </div>
 
                           {isFolder && isExpanded && node.children && node.children.map((child: any) => renderNode(child))}
@@ -516,41 +651,288 @@ export const ZenoIde: React.FC<ZenoIdeProps> = ({
             </div>
           )}
 
-          {/* TAB 2: GIT SOURCE CONTROL */}
+          {/* TAB 2: GIT SOURCE CONTROL (VS CODE STYLE) */}
           {ideSidebarTab === "git" && (
-            <div style={{ display: "flex", flexDirection: "column", height: "100%", padding: "14px" }}>
-              <span style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--text-muted)", marginBottom: "10px" }}>
-                SOURCE CONTROL (GIT)
-              </span>
-              <textarea
-                placeholder="Commit-Nachricht eingeben..."
-                value={ideGitMessage}
-                onChange={(e) => setIdeGitMessage(e.target.value)}
-                style={{ width: "100%", height: "64px", backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-sm)", padding: "8px", fontSize: "11px", color: "var(--text-primary)", outline: "none", marginBottom: "8px", resize: "none", boxSizing: "border-box" }}
-              />
-              <button
-                onClick={handleIdeGitCommit}
-                className="settings-btn primary"
-                style={{ width: "100%", fontSize: "11px", padding: "6px", marginBottom: "14px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
-              >
-                <Icon icon="octicon:git-commit-16" /> Commit &amp; Sync
-              </button>
-
-              <div style={{ fontSize: "10px", color: "var(--text-muted)", fontWeight: "700", marginBottom: "6px", textTransform: "uppercase" }}>
-                Geänderte Dateien ({ideGitChanges.length})
-              </div>
-              <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "4px" }}>
-                {ideGitChanges.map((change, idx) => (
-                  <div key={idx} style={{ fontSize: "11px", color: "#00FF87", padding: "4px 8px", backgroundColor: "var(--bg-tertiary)", borderRadius: "var(--radius-sm)", display: "flex", alignItems: "center", gap: "6px", border: "1px solid var(--border-color)" }}>
-                    <span style={{ fontWeight: "700" }}>M</span>
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{change}</span>
-                  </div>
-                ))}
-                {ideGitChanges.length === 0 && (
-                  <span style={{ fontSize: "11px", color: "var(--text-muted)", fontStyle: "italic", textAlign: "center", padding: "14px" }}>
-                    Arbeitsverzeichnis ist sauber.
+            <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", backgroundColor: "var(--bg-secondary)" }}>
+              {/* 1. Header with Branch & Action Toolbar */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px 8px 12px", borderBottom: "1px solid var(--border-color)", flexShrink: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--text-primary)" }}>
+                    Source Control
                   </span>
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: "3px", backgroundColor: "var(--bg-tertiary)", padding: "1px 6px", borderRadius: "4px", fontSize: "10px", color: "var(--accent-oxide)", fontWeight: 600 }} title="Aktueller Git Branch">
+                    <Icon icon="octicon:git-branch-16" style={{ fontSize: "11px" }} />
+                    <span>{activeBranch}</span>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
+                  <button
+                    onClick={handleRefreshGitStatus}
+                    style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: "4px", borderRadius: "4px", display: "flex", alignItems: "center" }}
+                    title="Status aktualisieren (Refresh)"
+                  >
+                    <Icon icon="codicon:refresh" style={{ fontSize: "13px" }} />
+                  </button>
+                  <button
+                    onClick={handleSyncRemote}
+                    style={{ background: "none", border: "none", color: effectiveAhead > 0 ? "var(--accent-oxide)" : "var(--text-muted)", cursor: "pointer", padding: "4px", borderRadius: "4px", display: "flex", alignItems: "center", gap: "2px" }}
+                    title={`Mit Remote synchronisieren (${effectiveBehind}↓ ${effectiveAhead}↑)`}
+                  >
+                    <Icon icon="codicon:sync" style={{ fontSize: "13px" }} />
+                    {effectiveAhead > 0 && <span style={{ fontSize: "9px", fontWeight: "700" }}>{effectiveAhead}↑</span>}
+                  </button>
+                  <button
+                    onClick={handleStageAll}
+                    style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: "4px", borderRadius: "4px", display: "flex", alignItems: "center" }}
+                    title="Alle Änderungen bereitstellen (+)"
+                  >
+                    <Icon icon="codicon:add" style={{ fontSize: "13px" }} />
+                  </button>
+                </div>
+              </div>
+
+              {/* 2. Commit Message Box & Primary Action */}
+              <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-island)", flexShrink: 0 }}>
+                <textarea
+                  placeholder="Commit-Nachricht (Strg+Enter)..."
+                  value={ideGitMessage}
+                  onChange={(e) => setIdeGitMessage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                      e.preventDefault();
+                      handleVSCodeCommit();
+                    }
+                  }}
+                  style={{
+                    width: "100%",
+                    height: "56px",
+                    backgroundColor: "var(--bg-canvas)",
+                    border: "1px solid var(--border-color)",
+                    borderRadius: "4px",
+                    padding: "6px 8px",
+                    fontSize: "11px",
+                    color: "var(--text-primary)",
+                    outline: "none",
+                    marginBottom: "8px",
+                    resize: "none",
+                    boxSizing: "border-box",
+                    fontFamily: "var(--font-sans)"
+                  }}
+                />
+                <button
+                  onClick={handleVSCodeCommit}
+                  style={{
+                    width: "100%",
+                    backgroundColor: "var(--accent-oxide)",
+                    color: "#FFFFFF",
+                    border: "none",
+                    borderRadius: "4px",
+                    fontSize: "11px",
+                    fontWeight: 600,
+                    padding: "6px 10px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px",
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.2)"
+                  }}
+                >
+                  <Icon icon="codicon:check" /> Commit {stagedList.length > 0 ? `(${stagedList.length} bereitgestellt)` : `& Sync (${unstagedList.length})`}
+                </button>
+              </div>
+
+              {/* 3. Sections: Staged Changes & Working Tree Changes */}
+              <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column" }}>
+                {/* 3a. STAGED CHANGES */}
+                {stagedList.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", borderBottom: "1px solid var(--border-color)" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "6px 12px",
+                        backgroundColor: "var(--bg-tertiary)",
+                        fontSize: "10px",
+                        fontWeight: 700,
+                        color: "var(--text-muted)",
+                        cursor: "pointer",
+                        userSelect: "none"
+                      }}
+                      onClick={() => setIsStagedCollapsed(!isStagedCollapsed)}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                        <Icon icon={isStagedCollapsed ? "codicon:chevron-right" : "codicon:chevron-down"} />
+                        <span>STAGED CHANGES</span>
+                        <span style={{ backgroundColor: "var(--bg-island)", padding: "1px 5px", borderRadius: "8px", fontSize: "9px", color: "var(--text-secondary)" }}>
+                          {stagedList.length}
+                        </span>
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleUnstageAll(); }}
+                        style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: "2px", display: "flex", alignItems: "center" }}
+                        title="Alle Änderungen zurücknehmen (-)"
+                      >
+                        <Icon icon="codicon:remove" style={{ fontSize: "12px" }} />
+                      </button>
+                    </div>
+
+                    {!isStagedCollapsed && (
+                      <div style={{ display: "flex", flexDirection: "column" }}>
+                        {stagedList.map((item) => {
+                          const parts = item.path.replace(/\\/g, "/").split("/");
+                          const fileName = parts.pop() || item.path;
+                          const dirPath = parts.join("/");
+                          const statusColor = item.status === "A" ? "#73C991" : item.status === "D" ? "#F14C4C" : "#E5A93C";
+                          return (
+                            <div
+                              key={item.path}
+                              onClick={() => handleIdeFileSelect(item.path)}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                padding: "4px 12px",
+                                fontSize: "11px",
+                                cursor: "pointer",
+                                borderBottom: "1px solid rgba(255,255,255,0.03)"
+                              }}
+                              className="ide-file-item"
+                            >
+                              <div style={{ display: "flex", alignItems: "center", gap: "6px", overflow: "hidden", minWidth: 0 }}>
+                                <Icon icon={getFileIcon(fileName)} style={{ fontSize: "13px", flexShrink: 0 }} />
+                                <span style={{ color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fileName}</span>
+                                {dirPath && (
+                                  <span style={{ fontSize: "10px", color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{dirPath}</span>
+                                )}
+                              </div>
+                              <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+                                <span style={{ color: statusColor, fontWeight: 700, fontSize: "10px" }} title={`Staged (${item.status})`}>
+                                  {item.status}
+                                </span>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleUnstageFile(item.path); }}
+                                  style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: "2px", display: "flex", alignItems: "center" }}
+                                  title="Aus Staging entfernen (-)"
+                                >
+                                  <Icon icon="codicon:remove" style={{ fontSize: "11px" }} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 )}
+
+                {/* 3b. WORKING TREE CHANGES */}
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "6px 12px",
+                      backgroundColor: "var(--bg-tertiary)",
+                      fontSize: "10px",
+                      fontWeight: 700,
+                      color: "var(--text-muted)",
+                      cursor: "pointer",
+                      userSelect: "none"
+                    }}
+                    onClick={() => setIsChangesCollapsed(!isChangesCollapsed)}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                      <Icon icon={isChangesCollapsed ? "codicon:chevron-right" : "codicon:chevron-down"} />
+                      <span>CHANGES</span>
+                      <span style={{ backgroundColor: "var(--bg-island)", padding: "1px 5px", borderRadius: "8px", fontSize: "9px", color: "var(--text-secondary)" }}>
+                        {unstagedList.length}
+                      </span>
+                    </div>
+                    {unstagedList.length > 0 && (
+                      <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDiscardAll(); }}
+                          style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: "2px", display: "flex", alignItems: "center" }}
+                          title="Alle Änderungen verwerfen (Discard All)"
+                        >
+                          <Icon icon="codicon:discard" style={{ fontSize: "12px" }} />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleStageAll(); }}
+                          style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: "2px", display: "flex", alignItems: "center" }}
+                          title="Alle Änderungen bereitstellen (+)"
+                        >
+                          <Icon icon="codicon:add" style={{ fontSize: "12px" }} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {!isChangesCollapsed && (
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                      {unstagedList.map((item) => {
+                        const parts = item.path.replace(/\\/g, "/").split("/");
+                        const fileName = parts.pop() || item.path;
+                        const dirPath = parts.join("/");
+                        const isUntracked = item.status === "U" || item.status === "??";
+                        const statusColor = isUntracked ? "#4EC9B0" : item.status === "D" ? "#F14C4C" : "#E5A93C";
+                        return (
+                          <div
+                            key={item.path}
+                            onClick={() => handleIdeFileSelect(item.path)}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              padding: "4px 12px",
+                              fontSize: "11px",
+                              cursor: "pointer",
+                              borderBottom: "1px solid rgba(255,255,255,0.03)"
+                            }}
+                            className="ide-file-item"
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px", overflow: "hidden", minWidth: 0 }}>
+                              <Icon icon={getFileIcon(fileName)} style={{ fontSize: "13px", flexShrink: 0 }} />
+                              <span style={{ color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fileName}</span>
+                              {dirPath && (
+                                <span style={{ fontSize: "10px", color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{dirPath}</span>
+                              )}
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+                              <span style={{ color: statusColor, fontWeight: 700, fontSize: "10px" }} title={isUntracked ? "Untracked" : item.status === "D" ? "Deleted" : "Modified"}>
+                                {item.status}
+                              </span>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleDiscardFile(item.path, isUntracked); }}
+                                style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: "2px", display: "flex", alignItems: "center" }}
+                                title="Änderungen verwerfen"
+                              >
+                                <Icon icon="codicon:discard" style={{ fontSize: "11px" }} />
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleStageFile(item.path); }}
+                                style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: "2px", display: "flex", alignItems: "center" }}
+                                title="Bereitstellen (+)"
+                              >
+                                <Icon icon="codicon:add" style={{ fontSize: "11px" }} />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {unstagedList.length === 0 && stagedList.length === 0 && (
+                        <div style={{ fontSize: "11px", color: "var(--text-muted)", fontStyle: "italic", textAlign: "center", padding: "20px 14px", display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
+                          <Icon icon="codicon:check-all" style={{ fontSize: "20px", color: "var(--accent-oxide)", opacity: 0.8 }} />
+                          <span>Arbeitsverzeichnis ist sauber.</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -697,7 +1079,7 @@ export const ZenoIde: React.FC<ZenoIdeProps> = ({
                 );
               })}
               {activeIdeFile && (activeIdeFile.language === "markdown" || activeIdeFile.name.toLowerCase().endsWith(".md")) && (
-                <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "3px", paddingRight: "8px" }}>
+                <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "4px", paddingRight: "10px", alignSelf: "center", marginBottom: "5px" }}>
                   <button
                     onClick={() => setMdViewMode("code")}
                     title="Nur Code anzeigen"

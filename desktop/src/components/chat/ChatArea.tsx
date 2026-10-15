@@ -42,6 +42,7 @@ interface ChatAreaProps {
   onDeleteMessage?: (channelId: string, messageId?: string, messageText?: string) => void;
   isSidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
+  onPatchSnippet?: (code: string, language: string, filename: string, messageId?: string, author?: string) => void;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -71,9 +72,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   setIsEditorOpen,
   detectLanguage,
   showToast,
-  connectedRelaysCount = 0,
-  relayTooltip = "Multi-Relay Transport Status",
-  onShowRelayDetails,
+  connectedRelaysCount: _connectedRelaysCount = 0,
+  relayTooltip: _relayTooltip = "Multi-Relay Transport Status",
+  onShowRelayDetails: _onShowRelayDetails,
   currentUserAin,
   currentUserName = "CipherNaut",
   isServerOwner = true,
@@ -81,7 +82,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   hasAcceptedRules = false,
   onDeleteMessage,
   isSidebarCollapsed = false,
-  onToggleSidebar
+  onToggleSidebar,
+  onPatchSnippet
 }) => {
   const isRulesChannel = activeChannel?.type === "rules" || activeChannel?.name?.toLowerCase() === "regelwerk";
 
@@ -129,38 +131,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               ? `Offizielles Server-Regelwerk für ${activeServer?.name || "Server"} (Git-synchronisiert)`
               : `Kanal für ${activeChannel?.name || "allgemein"} in ${activeServer?.name || "Server"}`}
           </p>
-
-          {/* Live Multi-Relay Status Badge */}
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "6px",
-              padding: "2px 8px",
-              borderRadius: "12px",
-              backgroundColor: connectedRelaysCount > 0 ? "rgba(0, 255, 135, 0.12)" : "rgba(239, 68, 68, 0.12)",
-              border: `1px solid ${connectedRelaysCount > 0 ? "rgba(0, 255, 135, 0.3)" : "rgba(239, 68, 68, 0.3)"}`,
-              fontSize: "10px",
-              fontWeight: "600",
-              color: connectedRelaysCount > 0 ? "#00FF87" : "#EF4444",
-              marginLeft: "10px",
-              flexShrink: 0,
-              cursor: onShowRelayDetails ? "pointer" : "default"
-            }}
-            onClick={onShowRelayDetails}
-            title={relayTooltip}
-          >
-            <span
-              style={{
-                width: "6px",
-                height: "6px",
-                borderRadius: "50%",
-                backgroundColor: connectedRelaysCount > 0 ? "#00FF87" : "#EF4444",
-                boxShadow: connectedRelaysCount > 0 ? "0 0 6px #00FF87" : "none"
-              }}
-            />
-            <span>{connectedRelaysCount > 0 ? `${connectedRelaysCount} Relays aktiv` : "Relay verbindet..."}</span>
-          </div>
         </div>
         <div className="chat-header-actions">
           <button 
@@ -254,6 +224,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     time={msg.time}
                     onOpenPrivacyBrowser={openInPrivacyBrowser}
                     showToast={showToast}
+                    onPatchSnippet={(code, lang, fname) => {
+                      if (onPatchSnippet) {
+                        onPatchSnippet(code, lang, fname, msg.id, msg.author);
+                      }
+                    }}
                     onDelete={canDelete ? () => {
                       if (window.confirm("Möchtest du diesen Eintrag wirklich löschen?")) {
                         onDeleteMessage && onDeleteMessage(activeChannel?.id || "allgemein", msg.id, msg.text);
@@ -301,17 +276,49 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     </div>
                   )}
                   
-                  {/* Embedded Code Block */}
-                  {msg.code && (
+                  {/* Embedded Code Block (Only shown if text does not already contain a fenced markdown code block) */}
+                  {msg.code && !msg.text?.includes("```") && (
                     <div className="code-block-wrapper" data-language="rust">
                       <header className="code-block-header">
                         <span className="code-block-language">Rust</span>
-                        <div className="code-block-actions">
+                        <div className="code-block-actions" style={{ display: "flex", gap: "6px" }}>
+                          <button 
+                            className="code-action-btn btn-patch-snippet"
+                            style={{ 
+                              display: "inline-flex", 
+                              alignItems: "center", 
+                              gap: "4px", 
+                              backgroundColor: "var(--accent-oxide)", 
+                              color: "#FFFFFF",
+                              border: "none",
+                              padding: "3px 8px",
+                              borderRadius: "6px",
+                              fontSize: "11px",
+                              fontWeight: 600
+                            }}
+                            onClick={() => {
+                              if (onPatchSnippet) {
+                                onPatchSnippet(msg.code || "", detectLanguage(msg.code || ""), "snippet.rs", msg.id, msg.author);
+                              } else {
+                                setEditorCode(msg.code || "");
+                                setEditorFilename("snippet.rs");
+                                setEditorLanguage(detectLanguage(msg.code || ""));
+                                setEditorWorkflowStep("editor");
+                                setIsEditorOpen(true);
+                              }
+                            }}
+                            title="Code im In-Chat Monaco Editor patchen"
+                          >
+                            <Icon icon="mage:code" style={{ fontSize: "13px" }} />
+                            <span>Im In-Chat-Editor patchen</span>
+                          </button>
+
                           <button 
                             className="code-action-btn btn-open-editor" 
                             onClick={() => { setEditorCode(msg.code || ""); setEditorFilename("snippet.rs"); setEditorLanguage(detectLanguage(msg.code || "")); setEditorWorkflowStep("editor"); setIsEditorOpen(true); }}
+                            title="Im Vollbild-Editor öffnen"
                           >
-                            Open in Editor
+                            IDE
                           </button>
                         </div>
                       </header>

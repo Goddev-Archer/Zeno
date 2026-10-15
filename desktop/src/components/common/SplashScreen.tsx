@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
+import { ZenoLogo } from "./ZenoLogo";
 
 interface SplashScreenProps {
   onComplete?: () => void;
@@ -125,19 +126,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
             transform: "scale(1.2)"
           }}
         />
-        <img
-          src="/zeno_logo.svg"
-          alt="Zeno Logo"
-          style={{
-            width: "72px",
-            height: "72px",
-            borderRadius: "16px",
-            position: "relative",
-            zIndex: 1,
-            boxShadow: "0 10px 30px rgba(0, 0, 0, 0.6)",
-            border: "1px solid rgba(255, 255, 255, 0.15)"
-          }}
-        />
+        <ZenoLogo size={80} withFrame colorMode="brand" />
       </div>
 
       <h1

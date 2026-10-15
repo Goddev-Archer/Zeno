@@ -3,6 +3,7 @@ import { Icon } from "@iconify/react";
 import { Server } from "../../types";
 import { pluginManager } from "../../services/pluginManagerService";
 import { PluginDockItem } from "../../types/pluginTypes";
+import { ZenoLogo } from "../common/ZenoLogo";
 
 interface ServerSidebarProps {
   servers: Server[];
@@ -34,6 +35,14 @@ export const ServerSidebar: React.FC<ServerSidebarProps> = ({
     return unsub;
   }, []);
 
+  const getProtocolBadge = (srv: Server) => {
+    if (srv.protocol) return srv.protocol;
+    if (srv.id === "zeno-dev" || srv.isOfficial) return "P2P";
+    if (srv.relays && srv.relays.some(r => r.includes("onion"))) return "Relay";
+    if (srv.relays && srv.relays.length > 0) return "WS";
+    return "P2P";
+  };
+
   return (
     <aside className="server-sidebar">
       <button 
@@ -41,22 +50,28 @@ export const ServerSidebar: React.FC<ServerSidebarProps> = ({
         onClick={onGoHome} 
         title="Zeno Home"
       >
-        <img src="/zeno_logo.svg" alt="Zeno Logo" style={{ width: "30px", height: "30px", borderRadius: "6px" }} />
+        <span className="server-icon-pill" />
+        <ZenoLogo size={32} withFrame colorMode="brand" />
       </button>
 
       <div className="server-separator" role="separator" />
 
       <nav className="server-list" aria-label="Server-Liste">
-        {servers.map((srv) => (
-          <button
-            key={srv.id}
-            className={`server-icon ${activeServer.id === srv.id && activeServerId !== "home" ? "active" : ""} ${animatingServerId === srv.id ? "indicator-animate" : ""}`}
-            onClick={() => onSelectServer(srv)}
-            title={srv.name}
-          >
-            <span className="server-icon-letter">{srv.iconLetter}</span>
-          </button>
-        ))}
+        {servers.map((srv) => {
+          const proto = getProtocolBadge(srv);
+          return (
+            <button
+              key={srv.id}
+              className={`server-icon ${activeServer.id === srv.id && activeServerId !== "home" ? "active" : ""} ${animatingServerId === srv.id ? "indicator-animate" : ""}`}
+              onClick={() => onSelectServer(srv)}
+              title={`${srv.name} (${proto})`}
+            >
+              <span className="server-icon-pill" />
+              <span className="server-icon-letter">{srv.iconLetter}</span>
+              <span className={`server-protocol-badge badge-${proto.toLowerCase().replace(/\s+/g, '-')}`}>{proto}</span>
+            </button>
+          );
+        })}
         <button 
           className="server-icon" 
           id="btn-add-server" 

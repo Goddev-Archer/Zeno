@@ -10,6 +10,7 @@ export interface GfmChatRendererProps {
   onOpenPrivacyBrowser?: (url: string) => void;
   showToast?: (msg: string) => void;
   onDelete?: () => void;
+  onPatchSnippet?: (code: string, language: string, filename: string) => void;
 }
 
 // Transform GitHub Flavored Markdown (GFM) Alerts: > [!NOTE], > [!TIP], etc.
@@ -54,16 +55,19 @@ function transformGithubAlerts(rawHtml: string): string {
   );
 }
 
-// Transform Code Blocks to include header banner and copy button
+// Transform Code Blocks to include header banner and action buttons
 function transformCodeBlocks(html: string): string {
   return html.replace(
     /<pre><code(?:\s+class="language-([a-zA-Z0-9_-]+)")?>([\s\S]*?)<\/code><\/pre>/gi,
     (_, lang, codeContent) => {
       const displayLang = (lang || "code").toUpperCase();
-      return `<div class="code-block-wrapper">
+      return `<div class="code-block-wrapper" data-language="${lang || 'text'}">
         <div class="code-block-header">
           <span class="code-block-lang">${displayLang}</span>
-          <button class="code-copy-btn" type="button" title="Code kopieren">Kopieren</button>
+          <div class="code-block-actions" style="display: inline-flex; align-items: center; gap: 6px;">
+            <button class="code-patch-btn" type="button" title="Im In-Chat-Editor patchen">Im In-Chat-Editor patchen</button>
+            <button class="code-copy-btn" type="button" title="Code kopieren">Kopieren</button>
+          </div>
         </div>
         <pre><code class="${lang ? `language-${lang}` : ""}">${codeContent}</code></pre>
       </div>`;
@@ -78,7 +82,8 @@ export const GfmChatRenderer: React.FC<GfmChatRendererProps> = ({
   time,
   onOpenPrivacyBrowser,
   showToast,
-  onDelete
+  onDelete,
+  onPatchSnippet
 }) => {
   // Check if explicitly commanded via "/boxed"
   const hasBoxedCommand = (text || "").trim().startsWith("/boxed");
@@ -108,11 +113,26 @@ export const GfmChatRenderer: React.FC<GfmChatRendererProps> = ({
     }
   }, [rawSource]);
 
-  // Delegated clicks for code copy and links
+  // Delegated clicks for code copy, patcher, and links
   const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
 
-    // 1. Delegated code copy button
+    // 1. Delegated In-Chat Patch button
+    const patchBtn = target.closest(".code-patch-btn") as HTMLButtonElement | null;
+    if (patchBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const codeWrapper = patchBtn.closest(".code-block-wrapper");
+      const codeEl = codeWrapper?.querySelector("code");
+      const lang = codeWrapper?.getAttribute("data-language") || "rust";
+      const ext = lang === "rust" ? "rs" : lang === "python" ? "py" : lang === "javascript" ? "js" : lang === "typescript" ? "ts" : "txt";
+      if (codeEl && onPatchSnippet) {
+        onPatchSnippet(codeEl.innerText, lang, `snippet.${ext}`);
+      }
+      return;
+    }
+
+    // 2. Delegated code copy button
     const copyBtn = target.closest(".code-copy-btn") as HTMLButtonElement | null;
     if (copyBtn) {
       e.preventDefault();
@@ -130,7 +150,7 @@ export const GfmChatRenderer: React.FC<GfmChatRendererProps> = ({
       return;
     }
 
-    // 2. Delegated link handling (Privacy Browser)
+    // 3. Delegated link handling (Privacy Browser)
     const linkEl = target.closest("a") as HTMLAnchorElement | null;
     if (linkEl && linkEl.href) {
       e.preventDefault();

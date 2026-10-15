@@ -674,16 +674,19 @@ fn collect_ide_entries_recursive(
     for item in read_res.flatten() {
         let p = item.path();
         let name = item.file_name().to_string_lossy().to_string();
-        if name.starts_with('.')
+        // Ignore internal VCS, build, dependency and cache artifacts
+        if name == ".git"
             || name == "node_modules"
             || name == "target"
             || name == "dist"
-            || name == ".git"
-            || name == ".venv"
-            || name == "__pycache__"
             || name == "build"
+            || name == ".venv"
+            || name == "venv"
+            || name == "__pycache__"
             || name == ".vscode"
             || name == ".idea"
+            || name == ".DS_Store"
+            || name == "Thumbs.db"
         {
             continue;
         }
@@ -821,6 +824,204 @@ fn ide_rename_entry(old_path: String, new_path: String) -> Result<(), String> {
     let to = PathBuf::from(&new_path);
     fs::rename(from, to)
         .map_err(|e| format!("Fehler beim Umbenennen von '{}' nach '{}': {}", old_path, new_path, e))
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct IdeGitFileChange {
+    pub path: String,
+    pub status: String,
+    pub is_staged: bool,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct IdeWorkspaceGitStatus {
+    pub is_repo: bool,
+    pub branch: String,
+    pub staged: Vec<IdeGitFileChange>,
+    pub unstaged: Vec<IdeGitFileChange>,
+    pub ahead: usize,
+    pub behind: usize,
+}
+
+#[tauri::command]
+fn ide_get_git_status(dir_path: String) -> Result<IdeWorkspaceGitStatus, String> {
+    let root = PathBuf::from(&dir_path);
+    if !root.exists() || !root.is_dir() {
+        return Ok(IdeWorkspaceGitStatus {
+            is_repo: false,
+            branch: String::new(),
+            staged: Vec::new(),
+            unstaged: Vec::new(),
+            ahead: 0,
+            behind: 0,
+        });
+    }
+
+    let branch_res = run_git_in_dir(&root, &["rev-parse", "--abbrev-ref", "HEAD"]);
+    let branch = match branch_res {
+        Ok(b) if !b.trim().is_empty() => b.trim().to_string(),
+        _ => {
+            return Ok(IdeWorkspaceGitStatus {
+                is_repo: false,
+                branch: String::new(),
+                staged: Vec::new(),
+                unstaged: Vec::new(),
+                ahead: 0,
+                behind: 0,
+            });
+        }
+    };
+
+    let status_raw = run_git_in_dir(&root, &["status", "--porcelain", "-u"]).unwrap_or_default();
+    let mut staged = Vec::new();
+    let mut unstaged = Vec::new();
+
+    for line in status_raw.lines() {
+        if line.len() < 3 {
+            continue;
+        }
+        let x = line.chars().nth(0).unwrap_or(' ');
+        let y = line.chars().nth(1).unwrap_or(' ');
+        let raw_path = &line[3..].trim();
+        let file_path = raw_path.trim_matches('"').replace('\\', "/");
+
+        if x == '?' && y == '?' {
+            unstaged.push(IdeGitFileChange {
+                path: file_path,
+                status: "U".to_string(),
+                is_staged: false,
+            });
+            continue;
+        }
+
+        if x != ' ' && x != '?' {
+            let status_code = match x {
+                'M' => "M",
+                'A' => "A",
+                'D' => "D",
+                'R' => "R",
+                _ => "M",
+            };
+            staged.push(IdeGitFileChange {
+                path: file_path.clone(),
+                status: status_code.to_string(),
+                is_staged: true,
+            });
+        }
+
+        if y != ' ' && y != '?' {
+            let status_code = match y {
+                'M' => "M",
+                'D' => "D",
+                _ => "M",
+            };
+            unstaged.push(IdeGitFileChange {
+                path: file_path,
+                status: status_code.to_string(),
+                is_staged: false,
+            });
+        }
+    }
+
+    let (ahead, behind) = match run_git_in_dir(&root, &["rev-list", "--left-right", "--count", "HEAD...@{u}"]) {
+        Ok(out) => {
+            let parts: Vec<&str> = out.split_whitespace().collect();
+            if parts.len() >= 2 {
+                let a = parts[0].parse::<usize>().unwrap_or(0);
+                let b = parts[1].parse::<usize>().unwrap_or(0);
+                (a, b)
+            } else {
+                (0, 0)
+            }
+        }
+        _ => (0, 0),
+    };
+
+    Ok(IdeWorkspaceGitStatus {
+        is_repo: true,
+        branch,
+        staged,
+        unstaged,
+        ahead,
+        behind,
+    })
+}
+
+#[tauri::command]
+fn ide_git_stage(dir_path: String, file_path: Option<String>) -> Result<(), String> {
+    let root = PathBuf::from(&dir_path);
+    if let Some(f) = file_path {
+        run_git_in_dir(&root, &["add", &f])?;
+    } else {
+        run_git_in_dir(&root, &["add", "."])?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn ide_git_unstage(dir_path: String, file_path: Option<String>) -> Result<(), String> {
+    let root = PathBuf::from(&dir_path);
+    if let Some(f) = file_path {
+        if run_git_in_dir(&root, &["restore", "--staged", &f]).is_err() {
+            let _ = run_git_in_dir(&root, &["reset", "HEAD", &f]);
+        }
+    } else {
+        if run_git_in_dir(&root, &["restore", "--staged", "."]).is_err() {
+            let _ = run_git_in_dir(&root, &["reset", "HEAD"]);
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn ide_git_discard(dir_path: String, file_path: String, is_untracked: bool) -> Result<(), String> {
+    let root = PathBuf::from(&dir_path);
+    if is_untracked {
+        let target = root.join(&file_path);
+        if target.is_dir() {
+            let _ = fs::remove_dir_all(&target);
+        } else if target.is_file() {
+            let _ = fs::remove_file(&target);
+        }
+    } else {
+        if run_git_in_dir(&root, &["restore", &file_path]).is_err() {
+            let _ = run_git_in_dir(&root, &["checkout", "--", &file_path]);
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn ide_git_commit(dir_path: String, message: String) -> Result<String, String> {
+    let root = PathBuf::from(&dir_path);
+    let msg = message.trim();
+    if msg.is_empty() {
+        return Err("Commit-Nachricht darf nicht leer sein.".to_string());
+    }
+    run_git_in_dir(&root, &["commit", "-m", msg])
+}
+
+#[tauri::command]
+fn ide_git_sync(dir_path: String) -> Result<String, String> {
+    let root = PathBuf::from(&dir_path);
+    let pull_res = run_git_in_dir(&root, &["pull", "--rebase"]);
+    let push_res = run_git_in_dir(&root, &["push"]);
+    
+    let mut summary = String::new();
+    if let Ok(p) = pull_res {
+        summary.push_str(&p);
+    }
+    if let Ok(pu) = push_res {
+        if !summary.is_empty() {
+            summary.push_str("\n");
+        }
+        summary.push_str(&pu);
+    } else if let Err(e) = push_res {
+        return Err(format!("Git Push fehlgeschlagen: {}", e));
+    }
+    Ok(summary)
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
@@ -1379,6 +1580,12 @@ pub fn run() {
             ide_create_file,
             ide_delete_entry,
             ide_rename_entry,
+            ide_get_git_status,
+            ide_git_stage,
+            ide_git_unstage,
+            ide_git_discard,
+            ide_git_commit,
+            ide_git_sync,
             ide_get_system_compilers,
             ide_run_code_native,
             load_settings,

@@ -4,7 +4,7 @@
 // keeping file handling, code compilation, and tool execution secured in Rust.
 
 import { invoke } from "@tauri-apps/api/core";
-import { NativeExecutionResult, SystemCompilersStatus } from "../types";
+import { NativeExecutionResult, SystemCompilersStatus, IdeWorkspaceGitStatus } from "../types";
 import { isTauriEnvironment } from "./cryptoService";
 
 /**
@@ -208,3 +208,68 @@ export async function listWorkspaceFiles(): Promise<Array<{ name: string; langua
   if (!isTauriEnvironment()) return [];
   return await invoke<Array<{ name: string; language: string }>>("list_workspace_files");
 }
+
+/**
+ * Gets real Git status (branch, modified/untracked/staged files, ahead/behind) for a workspace directory.
+ */
+export async function getWorkspaceGitStatus(dirPath: string): Promise<IdeWorkspaceGitStatus> {
+  if (!isTauriEnvironment()) {
+    return {
+      isRepo: true,
+      branch: "main",
+      staged: [],
+      unstaged: [
+        { path: "src/App.tsx", status: "M", isStaged: false },
+        { path: "README.md", status: "M", isStaged: false }
+      ],
+      ahead: 0,
+      behind: 0
+    };
+  }
+  return await invoke<IdeWorkspaceGitStatus>("ide_get_git_status", { dirPath });
+}
+
+/**
+ * Stages a specific file or all files in git.
+ */
+export async function stageWorkspaceGitFile(dirPath: string, filePath?: string): Promise<void> {
+  if (!isTauriEnvironment()) return;
+  await invoke("ide_git_stage", { dirPath, filePath: filePath || null });
+}
+
+/**
+ * Unstages a specific file or all files in git.
+ */
+export async function unstageWorkspaceGitFile(dirPath: string, filePath?: string): Promise<void> {
+  if (!isTauriEnvironment()) return;
+  await invoke("ide_git_unstage", { dirPath, filePath: filePath || null });
+}
+
+/**
+ * Discards changes in a file (restores tracked file or deletes untracked file).
+ */
+export async function discardWorkspaceGitFile(
+  dirPath: string,
+  filePath: string,
+  isUntracked: boolean = false
+): Promise<void> {
+  if (!isTauriEnvironment()) return;
+  await invoke("ide_git_discard", { dirPath, filePath, isUntracked });
+}
+
+/**
+ * Commits staged changes with a commit message.
+ */
+export async function commitWorkspaceGit(dirPath: string, message: string): Promise<string> {
+  if (!isTauriEnvironment()) return "simulated-commit-hash";
+  return await invoke<string>("ide_git_commit", { dirPath, message });
+}
+
+/**
+ * Syncs with remote (git pull --rebase && git push).
+ */
+export async function syncWorkspaceGit(dirPath: string): Promise<string> {
+  if (!isTauriEnvironment()) return "Already up to date.";
+  return await invoke<string>("ide_git_sync", { dirPath });
+}
+

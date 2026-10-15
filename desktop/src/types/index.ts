@@ -103,6 +103,7 @@ export interface Server {
   bannerGradient?: string;
   memberCount?: number;
   isOfficial?: boolean;
+  protocol?: "P2P" | "WS" | "Relay" | "Packet Radio";
   tags?: string[];
   members?: Profile[];
   rulesReadBy?: string[];
@@ -200,6 +201,21 @@ export interface IdeEntry {
   isFolder: boolean;
   language: string;
   size?: number;
+}
+
+export interface IdeGitFileChange {
+  path: string;
+  status: "M" | "A" | "D" | "U" | "R" | string;
+  isStaged: boolean;
+}
+
+export interface IdeWorkspaceGitStatus {
+  isRepo: boolean;
+  branch: string;
+  staged: IdeGitFileChange[];
+  unstaged: IdeGitFileChange[];
+  ahead: number;
+  behind: number;
 }
 
 export interface HubRuntimeItem {

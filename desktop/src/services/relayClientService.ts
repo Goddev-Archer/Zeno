@@ -163,20 +163,31 @@ class ZenoRelayClient {
   }
 
   /**
-   * Nostr NIP-01 Subscription filter for ephemeral chat & profile events
+   * Nostr NIP-01 Subscription filter for ephemeral chat & Zeno events.
+   * Scoped to the active server/channel to prevent global firehose ingestion.
    */
   private subscribeNostrRelay(ws: WebSocket, url: string): void {
     if (ws.readyState !== WebSocket.OPEN) return;
     try {
       const subId = `zeno-sub-${Date.now()}`;
-      // NIP-01 REQ for kind 20000 (Ephemeral events), kind 42 (Channel messages), kind 0 (Metadata/Profile)
+      // Subscribe ONLY to Zeno ephemeral events (20000) and channel messages (42)
+      // DO NOT subscribe to global Kind 0 without filter, as that pulls thousands of random internet bots
+      const filter: Record<string, any> = {
+        kinds: [20000, 42],
+        limit: 50
+      };
+
+      if (this.activeServerId) {
+        filter["#p"] = [this.activeServerId];
+      }
+      if (this.activeChannelId) {
+        filter["#e"] = [this.activeChannelId];
+      }
+
       const reqMessage = JSON.stringify([
         "REQ",
         subId,
-        {
-          kinds: [0, 20000, 42],
-          limit: 50
-        }
+        filter
       ]);
       ws.send(reqMessage);
     } catch (e) {
@@ -202,14 +213,8 @@ class ZenoRelayClient {
       if (Array.isArray(parsed) && parsed[0] === "EVENT" && parsed[2]) {
         const nostrEvent = parsed[2];
 
-        // Kind 0: Profile Metadata
+        // Discard raw global Kind 0 events (Nostr profile flood)
         if (nostrEvent.kind === 0) {
-          try {
-            const prof = JSON.parse(nostrEvent.content);
-            if (prof.name) {
-              this.dispatchProfile(prof);
-            }
-          } catch {}
           return;
         }
 

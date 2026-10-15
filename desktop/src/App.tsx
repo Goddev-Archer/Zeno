@@ -18,7 +18,8 @@ import {
   WidgetConfig,
   LiveGitStatus,
   LiveGitCommit,
-  UserIdentity
+  UserIdentity,
+  IdeWorkspaceGitStatus
 } from "./types";
 import {
   getActiveIdentityFromDb
@@ -34,7 +35,13 @@ import {
   writeFileContent,
   createFileEntry,
   createFolderEntry,
-  deleteEntry
+  deleteEntry,
+  getWorkspaceGitStatus,
+  stageWorkspaceGitFile,
+  unstageWorkspaceGitFile,
+  discardWorkspaceGitFile,
+  commitWorkspaceGit,
+  syncWorkspaceGit
 } from "./services/ideBackendService";
 import {
   saveServerToDb,
@@ -69,7 +76,7 @@ import {
 import { ZenoErrorBoundary } from "./components/common/ErrorBoundary";
 import { ServerSidebar } from "./components/sidebar/ServerSidebar";
 import { ChannelSidebar } from "./components/sidebar/ChannelSidebar";
-import { MembersSidebar } from "./components/sidebar/MembersSidebar";
+import { RightPanelIsland, PatchedSnippetData } from "./components/sidebar/RightPanelIsland";
 import { ChatArea } from "./components/chat/ChatArea";
 import { Dashboard } from "./components/dashboard/Dashboard";
 import { WasmHub } from "./components/wasm/WasmHub";
@@ -827,6 +834,27 @@ function ZenoMainApp() {
   const [isIdeConsoleExpanded, setIsIdeConsoleExpanded] = useState<boolean>(true);
   const [ideGitChanges, setIdeGitChanges] = useState<string[]>([]);
   const [ideGitMessage, setIdeGitMessage] = useState<string>("");
+  const [ideWorkspaceGitStatus, setIdeWorkspaceGitStatus] = useState<IdeWorkspaceGitStatus | null>(null);
+
+  const refreshGitStatus = async (dirPath?: string) => {
+    const target = dirPath || ideWorkspacePath;
+    if (!target) {
+      setIdeWorkspaceGitStatus(null);
+      setIdeGitChanges([]);
+      return;
+    }
+    try {
+      const status = await getWorkspaceGitStatus(target);
+      setIdeWorkspaceGitStatus(status);
+      const allChangedPaths = [
+        ...status.staged.map((f) => f.path),
+        ...status.unstaged.map((f) => f.path)
+      ];
+      setIdeGitChanges(Array.from(new Set(allChangedPaths)));
+    } catch (e) {
+      console.warn("Git status refresh failed:", e);
+    }
+  };
 
   // Auto-load saved workspace on startup if present
   useEffect(() => {
@@ -841,6 +869,7 @@ function ZenoMainApp() {
             isFolder: e.isFolder
           }));
           setIdeFiles(files);
+          refreshGitStatus(ideWorkspacePath);
         })
         .catch((err) => {
           console.warn("Konnte gespeicherten Workspace nicht laden:", err);
@@ -1471,20 +1500,59 @@ function ZenoMainApp() {
     }
   };
 
+  // In-Chat Monaco Snippet Patching State
+  const [activePatchedSnippet, setActivePatchedSnippet] = useState<PatchedSnippetData | null>(null);
+
+  const handlePatchSnippet = (code: string, language: string, filename: string, messageId?: string, author?: string) => {
+    setActivePatchedSnippet({
+      code,
+      language,
+      filename,
+      originalMessageId: messageId,
+      senderName: author
+    });
+    setIsMembersOpen(true);
+    showToast(`In-Chat Monaco IDE: Snippet "${filename}" geladen.`);
+  };
+
+  const handleSendPatchedSnippet = (code: string, language: string, filename: string) => {
+    const formatted = `**[Gepatchtes Code-Snippet: \`${filename}\`]**\n\`\`\`${language}\n${code}\n\`\`\``;
+    const time = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const msgId = `zeno-msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    const newMsg: Message = {
+      id: msgId,
+      author: userName || "CipherNaut",
+      text: formatted,
+      time,
+      color: "purple",
+      code,
+      isBoxed: false
+    };
+    appendUniqueChatMessage(activeChannel.id, newMsg);
+    saveMessageToDb(activeChannel.id, newMsg);
+    broadcastNetworkMessage(activeChannel.id, newMsg.author, newMsg.text, newMsg.color, newMsg.time, newMsg.code);
+    setActivePatchedSnippet(null);
+    showToast("🚀 Gepatchtes Snippet als Antwort im Kanal geteilt!");
+  };
+
   // Theme toggle
   useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    document.body.setAttribute("data-theme", theme);
     if (theme === "light") {
       document.body.classList.add("light-mode");
+      document.body.classList.remove("dark-mode");
     } else {
       document.body.classList.remove("light-mode");
+      document.body.classList.add("dark-mode");
     }
   }, [theme]);
 
   const handleThemeToggle = () => {
     const nextTheme = theme === "dark" ? "light" : "dark";
     setTheme(nextTheme);
-    setCanvasColor(nextTheme === "light" ? "#E3E4E8" : "#18191B");
-    showToast(`Theme gewechselt: ${nextTheme === "light" ? "Light Mode" : "Dark Mode"}`);
+    setCanvasColor(nextTheme === "light" ? "#DFD9CE" : "#08080B");
+    showToast(`Design gewechselt: ${nextTheme === "light" ? "Warm Parchment" : "Carbon & Oxide"}`);
   };
 
   // Editor Actions
@@ -1742,6 +1810,7 @@ function ZenoMainApp() {
       setIdeFiles(files);
       setIdeOpenTabs([]);
       setIdeActiveFilePath(null);
+      refreshGitStatus(selectedPath);
       const folderName = selectedPath.replace(/\\/g, "/").split("/").pop() || selectedPath;
       showToast(`Ordner "${folderName}" geöffnet.`);
     } catch (err: any) {
@@ -1811,6 +1880,7 @@ function ZenoMainApp() {
       setIdeFiles(files);
       setIdeOpenTabs([]);
       setIdeActiveFilePath(null);
+      refreshGitStatus(workspacePath);
       const folderName = workspacePath.replace(/\\/g, "/").split("/").pop() || workspacePath;
       showToast(`Ordner "${folderName}" geöffnet.`);
     } catch (err: any) {
@@ -1824,6 +1894,8 @@ function ZenoMainApp() {
     setIdeFiles([]);
     setIdeOpenTabs([]);
     setIdeActiveFilePath(null);
+    setIdeWorkspaceGitStatus(null);
+    setIdeGitChanges([]);
     showToast("Workspace geschlossen.");
   };
 
@@ -1844,7 +1916,8 @@ function ZenoMainApp() {
           isFolder: e.isFolder
         }));
       });
-      showToast("Explorer aktualisiert.");
+      refreshGitStatus(ideWorkspacePath);
+      showToast("Explorer & Git-Status aktualisiert.");
     } catch (err: any) {
       showToast("Fehler beim Aktualisieren des Explorers.");
     }
@@ -1857,8 +1930,10 @@ function ZenoMainApp() {
 
     try {
       await writeFileContent(ideActiveFilePath, file.code);
-      setIdeGitChanges((prev) => prev.filter((p) => p !== ideActiveFilePath));
       showToast(`Gespeichert: ${file.name}`);
+      if (ideWorkspacePath) {
+        refreshGitStatus(ideWorkspacePath);
+      }
     } catch (err: any) {
       showToast(`Fehler beim Speichern von "${file.name}": ${err?.message || err}`);
     }
@@ -1874,26 +1949,53 @@ function ZenoMainApp() {
         setIdeActiveFilePath(remainingTabs.length > 0 ? remainingTabs[remainingTabs.length - 1] : null);
       }
       showToast(`Eintrag gelöscht: ${path.replace(/\\/g, "/").split("/").pop()}`);
+      if (ideWorkspacePath) {
+        refreshGitStatus(ideWorkspacePath);
+      }
     } catch (err: any) {
       showToast(`Fehler beim Löschen: ${err?.message || err}`);
     }
   };
 
   const handleIdeFileSelect = async (path: string) => {
-    const file = ideFiles.find((f) => f.path === path);
-    if (file && !file.isFolder && (!file.code || file.code === "")) {
+    let resolvedPath = path;
+    if (ideWorkspacePath && !path.includes(":") && !path.startsWith("/")) {
+      const normalizedRoot = ideWorkspacePath.replace(/\\/g, "/").replace(/\/$/, "");
+      resolvedPath = `${normalizedRoot}/${path.replace(/\\/g, "/")}`;
+    }
+
+    let file = ideFiles.find((f) => f.path === resolvedPath || f.path === path);
+    if (!file) {
       try {
-        const content = await readFileContent(path);
+        const content = await readFileContent(resolvedPath);
+        const fileName = resolvedPath.replace(/\\/g, "/").split("/").pop() || resolvedPath;
+        const newFile: IdeFile = {
+          name: fileName,
+          path: resolvedPath,
+          code: content,
+          language: detectLanguage(fileName),
+          isFolder: false
+        };
+        setIdeFiles((prev) => [...prev, newFile]);
+        file = newFile;
+      } catch (err) {
+        console.warn("Fehler beim Laden der Datei:", err);
+      }
+    } else if (!file.isFolder && (!file.code || file.code === "")) {
+      try {
+        const content = await readFileContent(file.path);
         setIdeFiles((prev) =>
-          prev.map((f) => (f.path === path ? { ...f, code: content } : f))
+          prev.map((f) => (f.path === file!.path ? { ...f, code: content } : f))
         );
       } catch (err) {
         console.warn("Fehler beim Laden des Datei-Inhalts:", err);
       }
     }
-    setIdeActiveFilePath(path);
-    if (!ideOpenTabs.includes(path)) {
-      setIdeOpenTabs((prev) => [...prev, path]);
+
+    const finalPath = file ? file.path : resolvedPath;
+    setIdeActiveFilePath(finalPath);
+    if (!ideOpenTabs.includes(finalPath)) {
+      setIdeOpenTabs((prev) => [...prev, finalPath]);
     }
   };
 
@@ -1947,14 +2049,85 @@ function ZenoMainApp() {
     }
   };
 
-  const handleIdeGitCommit = () => {
+  const handleStageGitFile = async (filePath?: string) => {
+    if (!ideWorkspacePath) return;
+    try {
+      await stageWorkspaceGitFile(ideWorkspacePath, filePath);
+      await refreshGitStatus(ideWorkspacePath);
+      showToast(filePath ? `Bereitgestellt: ${filePath.split("/").pop()}` : "Alle Änderungen bereitgestellt (+)");
+    } catch (e: any) {
+      showToast(`Fehler beim Bereitstellen: ${e?.message || e}`);
+    }
+  };
+
+  const handleUnstageGitFile = async (filePath?: string) => {
+    if (!ideWorkspacePath) return;
+    try {
+      await unstageWorkspaceGitFile(ideWorkspacePath, filePath);
+      await refreshGitStatus(ideWorkspacePath);
+      showToast(filePath ? `Aus Staging entfernt: ${filePath.split("/").pop()}` : "Alle Änderungen zurückgesetzt (-)");
+    } catch (e: any) {
+      showToast(`Fehler beim Zurücksetzen: ${e?.message || e}`);
+    }
+  };
+
+  const handleDiscardGitFile = async (filePath: string, isUntracked: boolean = false) => {
+    if (!ideWorkspacePath) return;
+    const fileName = filePath.replace(/\\/g, "/").split("/").pop() || filePath;
+    if (window.confirm(`Möchtest du alle Änderungen an "${fileName}" verwerfen?`)) {
+      try {
+        await discardWorkspaceGitFile(ideWorkspacePath, filePath, isUntracked);
+        await refreshGitStatus(ideWorkspacePath);
+        const normalizedTarget = `${ideWorkspacePath.replace(/\\/g, "/").replace(/\/$/, "")}/${filePath.replace(/\\/g, "/")}`;
+        if (ideActiveFilePath === normalizedTarget || ideActiveFilePath === filePath) {
+          try {
+            const freshContent = await readFileContent(normalizedTarget);
+            setIdeFiles((prev) => prev.map((f) => (f.path === ideActiveFilePath ? { ...f, code: freshContent } : f)));
+          } catch {
+            setIdeFiles((prev) => prev.filter((f) => f.path !== ideActiveFilePath));
+            setIdeOpenTabs((prev) => prev.filter((t) => t !== ideActiveFilePath));
+            setIdeActiveFilePath(null);
+          }
+        }
+        showToast(`Änderungen an "${fileName}" verworfen.`);
+      } catch (e: any) {
+        showToast(`Fehler beim Verwerfen: ${e?.message || e}`);
+      }
+    }
+  };
+
+  const handleIdeGitCommit = async () => {
     if (!ideGitMessage.trim()) {
       showToast("Bitte gib eine Commit-Nachricht ein.");
       return;
     }
-    showToast(`Git Commit "${ideGitMessage}" erfolgreich ausgeführt.`);
-    setIdeGitChanges([]);
-    setIdeGitMessage("");
+    if (!ideWorkspacePath) {
+      showToast("Kein Workspace-Pfad geöffnet.");
+      return;
+    }
+    try {
+      if (ideWorkspaceGitStatus && ideWorkspaceGitStatus.staged.length === 0 && ideWorkspaceGitStatus.unstaged.length > 0) {
+        await stageWorkspaceGitFile(ideWorkspacePath);
+      }
+      await commitWorkspaceGit(ideWorkspacePath, ideGitMessage);
+      showToast(`Git Commit "${ideGitMessage}" erfolgreich ausgeführt ✓`);
+      setIdeGitMessage("");
+      await refreshGitStatus(ideWorkspacePath);
+    } catch (e: any) {
+      showToast(`Fehler beim Git-Commit: ${e?.message || e}`);
+    }
+  };
+
+  const handleSyncGit = async () => {
+    if (!ideWorkspacePath) return;
+    try {
+      showToast("Synchronisiere mit Remote (Git Pull & Push)...");
+      await syncWorkspaceGit(ideWorkspacePath);
+      await refreshGitStatus(ideWorkspacePath);
+      showToast("Git-Synchronisation abgeschlossen ✓");
+    } catch (e: any) {
+      showToast(`Synchronisation fehlgeschlagen: ${e?.message || e}`);
+    }
   };
 
   const handleIdeGenerateProject = (type: "rust" | "go" | "python" | "web") => {
@@ -2256,6 +2429,12 @@ function ZenoMainApp() {
             onSelectRecentWorkspace={handleSelectRecentWorkspace}
             onSaveActiveFile={handleSaveActiveFile}
             onDeleteFile={handleDeleteFile}
+            ideGitStatus={ideWorkspaceGitStatus}
+            onRefreshGitStatus={() => refreshGitStatus(ideWorkspacePath || undefined)}
+            onStageGitFile={handleStageGitFile}
+            onUnstageGitFile={handleUnstageGitFile}
+            onDiscardGitFile={handleDiscardGitFile}
+            onSyncGit={handleSyncGit}
           />
         )
       ) : (
@@ -2307,19 +2486,25 @@ function ZenoMainApp() {
           onDeleteMessage={handleDeleteChatMessage}
           isSidebarCollapsed={isSidebarCollapsed}
           onToggleSidebar={toggleSidebar}
+          onPatchSnippet={handlePatchSnippet}
         />
       )}
 
-      {/* 4. MEMBERS SIDEBAR */}
-      <MembersSidebar
+      {/* 4. MONACO IN-CHAT-IDE & MEMBER ISLAND (RECHTS) */}
+      <RightPanelIsland
         activeServerId={activeServerId}
         activeServer={activeServer}
-        isMembersOpen={isMembersOpen}
+        isOpen={isMembersOpen}
         currentUserName={userName || "CipherNaut"}
         currentUserAin={userIdentity?.ain}
         isServerOwner={isCurrentUserServerOwner}
         mockProfiles={profiles}
         onSelectProfile={setSelectedUserProfile}
+        activeSnippet={activePatchedSnippet}
+        onSendPatchedSnippet={handleSendPatchedSnippet}
+        onCloseSnippetPatcher={() => setActivePatchedSnippet(null)}
+        theme={theme}
+        onClosePanel={() => setIsMembersOpen(false)}
       />
 
       {/* 5. MODALS & DIALOGS */}
