@@ -1,10 +1,23 @@
 # Zeno — Secure Developer Collaboration Hub
 
-[![Apache 2.0 License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Tauri Version](https://img.shields.io/badge/Tauri-v2.0-orange.svg)](https://tauri.app/)
-[![Monaco Editor Support](https://img.shields.io/badge/Editor-Monaco-blueviolet.svg)](https://microsoft.github.io/monaco-editor/)
+<p align="center">
+  <strong>Dezentrale, serverlose Kommunikationsplattform &amp; Entwickler-Workspace.</strong><br>
+  Entwickelt mit Rust (Tauri v2) &amp; React 19 • Extrem leichtgewichtig (~64 MB RAM) • Ende-zu-Ende verschlüsselt
+</p>
 
-**Zeno** ist eine dezentrale Kommunikations- und Entwicklungsplattform, die speziell für Entwickler, Teams und Berufsgeheimnisträger konzipiert wurde. Zeno kombiniert Echtzeit-Chats und Voice-Streaming mit einer direkt integrierten, clientseitigen Monaco-Code-Sandbox und einer kompromisslosen Zero-Knowledge-Architektur.
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="Apache 2.0 License"></a>
+  <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Tauri-v2.0-orange.svg" alt="Tauri v2.0"></a>
+  <a href="https://microsoft.github.io/monaco-editor/"><img src="https://img.shields.io/badge/Editor-Monaco-blueviolet.svg" alt="Monaco Editor"></a>
+  <a href="https://github.com/Goddev-Archer/Zeno/releases"><img src="https://img.shields.io/badge/Release-v0.2.1--alpha-emerald.svg" alt="Neuester Release"></a>
+  <a href="SECURITY.md"><img src="https://img.shields.io/badge/Security-Policy-success.svg" alt="Sicherheitsrichtlinie"></a>
+</p>
+
+<p align="center">
+  🌍 <strong>Sprachen / Languages:</strong>
+  <a href="README.md">🇩🇪 <strong>Deutsch</strong></a> • 
+  <a href="README.en.md">🇬🇧 English</a>
+</p>
 
 ---
 
@@ -23,9 +36,11 @@ Die Privatsphäre und das verfassungsmäßige Fernmeldegeheimnis (**Art. 10 GG**
 
 * **BYOS (Bring Your Own Storage):** Vollständige Entkopplung von Chat-Dienst und Dateispeicherung. Verbinde Nextcloud oder AWS S3 im Handumdrehen.
 * **Integrierter Monaco-Editor:** Der offizielle VS-Code-Editor direkt im Chat, inklusive automatischer Syntaxerkennung basierend auf Dateiendungen.
-* **On-Demand Laufzeitumgebungen:** Installiere oder lösche Laufzeitumgebungen (Python WASM/Pyodide, .NET Simulator für C#, Rust Simulator, C++ WASM Simulator) direkt über die Benutzereinstellungen.
+* **Native Git-Source-Control:** Dateien prüfen, zeilenweise Diffs vergleichen, Stagen, Unstagen, Committen und Branches verwalten – direkt in Zeno.
+* **On-Demand Laufzeitumgebungen:** Portables Node.js direkt im Release enthalten; erweiterbar um Python (Pyodide WASM), Rust oder .NET.
 * **Social Recovery (3-Stufen-Modell):** Wiederherstellung deiner Identität über Shamir's Secret Sharing, verteilt auf 5 Vertrauenspersonen – komplett ohne zentrale Passwörter.
-* **Ultra-Performant & Leichtgewichtig:** Geschrieben in Rust (Tauri v2) und React 19.
+* **Ultra-Performant & Leichtgewichtig:** Geschrieben in Rust (Tauri v2) und React 19 (~64 MB RAM Footprint).
+* **Kryptografisch verifizierte Releases:** Alle Binaries und Release-Archive sind mit dem offiziellen GPG-Schlüssel (`A3ACEB626EBFB7EC`) signiert.
 
 ---
 
@@ -71,6 +86,31 @@ Um Ressourcen zu sparen und die App-Dateigröße minimal zu halten, wird standar
 #### Ist der ausgeführte Code sicher?
 Ja, die gesamte Ausführung findet clientseitig in einer isolierten Sandbox (Web Worker oder WebAssembly-Kontext) statt. Der Code hat keinen Zugriff auf deine Tauri-Rust-API oder das lokale Dateisystem, sofern du es nicht explizit erlaubst.
 </details>
+
+---
+
+## 🔒 Kryptografische Verifikation (GPG)
+
+Alle offiziellen Releases werden mit folgendem GPG-Schlüssel signiert:
+* **Key ID:** `A3ACEB626EBFB7EC`
+* **Name:** `Goddev Archer (Zeno Release Signing Key)`
+* **Öffentlicher Schlüssel:** In jedem Release-Archiv als `zeno-release-public-key.asc` enthalten.
+
+```bash
+# 1. Öffentlichen Zeno-Schlüssel importieren
+gpg --import zeno-release-public-key.asc
+
+# 2. Echtheit der Release-Binary prüfen
+gpg --verify zeno.exe.asc zeno.exe
+```
+
+---
+
+## 🛡️ Sicherheit & Responsible Disclosure
+
+Sicherheit steht bei Zeno an erster Stelle. Bitte melde gefundene Schwachstellen vertraulich an:
+* **Kontakt:** [goddevarcher@outlook.com](mailto:goddevarcher@outlook.com)
+* **Details & Richtlinie:** Siehe unsere offizielle [SECURITY.md](SECURITY.md).
 
 ---
 

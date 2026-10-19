@@ -263,7 +263,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                           onClick={() => openInPrivacyBrowser(foundUrl)} 
                           style={{ fontSize: "11px", padding: "4px 10px", display: "flex", alignItems: "center", gap: "4px" }}
                         >
-                          <Icon icon="mage:global" /> Im Browser öffnen
+                          <Icon icon="lucide:globe" /> Im Browser öffnen
                         </button>
                         <button 
                           className="settings-btn" 
@@ -309,7 +309,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                             }}
                             title="Code im In-Chat Monaco Editor patchen"
                           >
-                            <Icon icon="mage:code" style={{ fontSize: "13px" }} />
+                            <Icon icon="lucide:code" style={{ fontSize: "13px" }} />
                             <span>Im In-Chat-Editor patchen</span>
                           </button>
 
@@ -585,7 +585,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               </div>
               <div className="input-actions-right">
                 <button className="input-action-btn" type="button" onClick={() => { setEditorCode(""); setEditorWorkflowStep("select_action"); setIsEditorOpen(true); }} title="Codeblock teilen">
-                  <Icon icon="mage:code" />
+                  <Icon icon="lucide:code" style={{ fontSize: "16px" }} />
                 </button>
                 <button
                   className="input-action-btn send-btn"
@@ -593,7 +593,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   title="Senden (Enter)"
                   style={{ color: inputText.trim() ? "var(--accent-color, #38BDF8)" : undefined }}
                 >
-                  <Icon icon="mage:send" />
+                  <Icon icon="lucide:send" style={{ fontSize: "16px" }} />
                 </button>
               </div>
             </form>

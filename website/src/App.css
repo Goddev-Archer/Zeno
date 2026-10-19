@@ -716,3 +716,7 @@ button {
   font-size: 13px;
   color: var(--text-muted);
 }
+
+.footer-email-link:hover {
+  color: var(--accent-oxide) !important;
+}

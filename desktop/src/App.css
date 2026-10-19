@@ -135,13 +135,225 @@ ul, ol {
 }
 
 /* ── App Grid Layout ───────────────────────────────────────── */
+/* ── App Wrapper & Custom Frameless Titlebar (Discord / JetBrains Style) ── */
+.zeno-app-wrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--bg-canvas);
+}
+
+.zeno-custom-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 32px;
+  min-height: 32px;
+  max-height: 32px;
+  width: 100vw;
+  background: var(--bg-canvas);
+  border-bottom: 1px solid var(--border-island);
+  user-select: none;
+  z-index: 9999;
+  padding: 0 0 0 12px;
+  box-sizing: border-box;
+  app-region: drag;
+}
+
+[data-tauri-drag-region] {
+  app-region: drag;
+  -webkit-app-region: drag;
+}
+
+.zeno-custom-titlebar button,
+.zeno-custom-titlebar .titlebar-right,
+.zeno-custom-titlebar .titlebar-window-controls {
+  app-region: no-drag;
+  -webkit-app-region: no-drag;
+}
+
+.titlebar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+  flex-shrink: 0;
+}
+
+.titlebar-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  filter: drop-shadow(0 0 6px rgba(249, 115, 22, 0.4));
+}
+
+.titlebar-app-name {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--text-primary);
+  opacity: 0.9;
+}
+
+.titlebar-breadcrumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.titlebar-divider {
+  opacity: 0.4;
+  font-weight: 300;
+}
+
+.titlebar-subtitle {
+  color: var(--text-secondary);
+  font-weight: 500;
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.titlebar-popout-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(249, 115, 22, 0.15);
+  border: 1px solid rgba(249, 115, 22, 0.35);
+  color: var(--accent-oxide);
+}
+
+.titlebar-center {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 0 16px;
+  overflow: hidden;
+}
+
+.titlebar-title-text {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.02em;
+}
+
+.titlebar-right {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  flex-shrink: 0;
+}
+
+.titlebar-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: var(--text-muted);
+  border-radius: 4px;
+  transition: color 0.15s ease, background-color 0.15s ease;
+  cursor: pointer;
+}
+
+.titlebar-tool-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.titlebar-window-controls {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.titlebar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 32px;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.titlebar-btn:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.titlebar-btn.btn-close:hover {
+  background-color: #E81123 !important;
+  color: #FFFFFF !important;
+}
+
+.titlebar-btn.btn-close:active {
+  background-color: #C40E1E !important;
+  color: #FFFFFF !important;
+}
+
+/* ── DM Popout Window Layout ── */
+.zeno-popout-layout {
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--bg-canvas);
+}
+
+.zeno-popout-content {
+  flex: 1;
+  min-height: 0;
+  height: calc(100vh - 32px);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 8px;
+  box-sizing: border-box;
+}
+
+.zeno-popout-content .chat-area {
+  flex: 1;
+  height: 100%;
+  min-height: 0;
+  border-radius: var(--island-radius);
+  border: 1px solid var(--border-island);
+  background: var(--bg-island);
+}
+
 .app-layout {
   display: grid;
   grid-template-columns: 72px 240px 1fr auto;
   grid-template-rows: 100%;
-  height: 100vh;
+  flex: 1;
+  min-height: 0;
+  height: calc(100vh - 32px);
   width: 100vw;
-  padding: 8px 8px 8px 0; /* Server sidebar flush to the left/top/bottom canvas */
+  padding: 6px 8px 8px 0;
   background-color: transparent;
   overflow: hidden;
   transition: grid-template-columns 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -434,7 +646,7 @@ ul, ol {
 .sidebar-floating-expand-btn {
   position: fixed;
   left: 78px;
-  top: 14px;
+  top: 42px;
   z-index: 50;
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);

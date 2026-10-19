@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 import { Icon } from "@iconify/react";
-import { Server, Channel, Profile } from "../../types";
+import { Server, Channel, Profile, DmConversation } from "../../types";
 import { ZeitschattenVoiceHalo } from "../common/ZeitschattenVoiceHalo";
 import { PluginSlotRenderer } from "../plugins/PluginSlotRenderer";
 
 interface ChannelSidebarProps {
   activeServerId: string;
-  homeTab: "dashboard" | "wasm_hub" | "ide" | "plugins" | "wiki";
+  homeTab: "dashboard" | "wasm_hub" | "ide" | "plugins" | "wiki" | "dm";
   activeServer: Server;
   activeChannel: Channel;
   collapsedCategories: Record<string, boolean>;
@@ -16,7 +16,7 @@ interface ChannelSidebarProps {
   muted: boolean;
   deafened: boolean;
   mockProfiles: Record<string, Profile>;
-  setHomeTab: (tab: "dashboard" | "wasm_hub" | "ide" | "plugins" | "wiki") => void;
+  setHomeTab: (tab: "dashboard" | "wasm_hub" | "ide" | "plugins" | "wiki" | "dm") => void;
   toggleCategory: (categoryName: string) => void;
   setActiveChannel: (channel: Channel) => void;
   handleJoinVoice: (channelId: string, channelName: string) => void;
@@ -41,6 +41,10 @@ interface ChannelSidebarProps {
   voicePing?: number;
   onOpenVoiceSettings?: () => void;
   onToggleSidebar?: () => void;
+  dmConversations?: DmConversation[];
+  activeDmPeerAin?: string | null;
+  onSelectDm?: (peerAin: string) => void;
+  onStartNewDm?: () => void;
 }
 
 export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
@@ -79,7 +83,11 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   activeVoiceSpeakers = [],
   voicePing = 14,
   onOpenVoiceSettings,
-  onToggleSidebar
+  onToggleSidebar,
+  dmConversations = [],
+  activeDmPeerAin = null,
+  onSelectDm,
+  onStartNewDm
 }) => {
   const [serverMenuOpen, setServerMenuOpen] = useState(false);
   const [hoveredChannelId, setHoveredChannelId] = useState<string | null>(null);
@@ -153,6 +161,97 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                     <span className="channel-name">Einstellungen</span>
                   </button>
                 </li>
+              </ul>
+            </section>
+
+            {/* DIREKTNACHRICHTEN (PEERS) */}
+            <section className="channel-category" style={{ marginTop: "16px" }}>
+              <div 
+                className="category-header" 
+                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "default" }}
+              >
+                <span className="category-name">DIREKTNACHRICHTEN</span>
+                {onStartNewDm && (
+                  <button
+                    type="button"
+                    className="add-channel-btn"
+                    onClick={onStartNewDm}
+                    title="Neuen Chat starten (per AIN)"
+                    style={{ background: "transparent", border: "none", color: "var(--text-muted)", cursor: "pointer", display: "flex", alignItems: "center", padding: "2px" }}
+                  >
+                    <Icon icon="mage:plus" style={{ fontSize: "14px" }} />
+                  </button>
+                )}
+              </div>
+
+              <ul className="category-channels dm-peer-list">
+                {dmConversations.map((dm) => {
+                  const isActive = homeTab === "dm" && activeDmPeerAin === dm.peerAin;
+                  return (
+                    <li key={dm.peerAin}>
+                      <button
+                        type="button"
+                        className={`channel-item dm-peer-item ${isActive ? "active" : ""}`}
+                        onClick={() => onSelectDm && onSelectDm(dm.peerAin)}
+                        title={dm.isSelfChat ? `${dm.peerName}\nPrivates Notizboard (Nur lokal auf diesem Gerät)` : `${dm.peerName} (${dm.peerAin})\nStatus: ${dm.connectionStatus === "p2p_direct" ? "🟢 Direkt P2P" : dm.connectionStatus === "relay" ? "🟡 Relay-Routing" : "⚪ Offline"}`}
+                        style={{ display: "flex", alignItems: "center", gap: "8px", position: "relative" }}
+                      >
+                        <span className="dm-avatar-wrap" style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <span 
+                            className="dm-avatar-initials" 
+                            style={{ 
+                              width: "20px", 
+                              height: "20px", 
+                              borderRadius: "50%", 
+                              background: dm.isSelfChat ? "rgba(249, 115, 22, 0.15)" : "var(--bg-elevated)", 
+                              border: dm.isSelfChat ? "1px solid rgba(249, 115, 22, 0.4)" : "1px solid var(--border-island)", 
+                              display: "flex", 
+                              alignItems: "center", 
+                              justifyContent: "center", 
+                              fontSize: dm.isSelfChat ? "11px" : "10px", 
+                              fontWeight: "700" 
+                            }}
+                          >
+                            {dm.peerAvatar || dm.peerName.substring(0, 1).toUpperCase()}
+                          </span>
+                          {!dm.isSelfChat && (
+                            <span
+                              className={`dm-status-dot status-${dm.connectionStatus}`}
+                              style={{
+                                position: "absolute",
+                                bottom: "-2px",
+                                right: "-2px",
+                                width: "7px",
+                                height: "7px",
+                                borderRadius: "50%",
+                                border: "1px solid var(--bg-island)",
+                                backgroundColor: dm.connectionStatus === "p2p_direct" ? "#10B981" : dm.connectionStatus === "relay" ? "#F59E0B" : "var(--text-muted)"
+                              }}
+                            />
+                          )}
+                        </span>
+                        <span className="channel-name" style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {dm.peerName}
+                        </span>
+                        {dm.isSelfChat && (
+                          <span style={{ fontSize: "9px", color: "var(--accent-oxide)", background: "rgba(249, 115, 22, 0.12)", padding: "1px 5px", borderRadius: "4px", fontWeight: "600" }}>
+                            NOTIZEN
+                          </span>
+                        )}
+                        {dm.unreadCount > 0 && (
+                          <span className="unread-badge" style={{ fontSize: "10px", padding: "1px 6px", borderRadius: "10px", background: "var(--accent-oxide)", color: "#fff", fontWeight: "700" }}>
+                            {dm.unreadCount}
+                          </span>
+                        )}
+                        {!dm.isSelfChat && dm.connectionStatus === "p2p_direct" && dm.pingMs && (
+                          <span style={{ fontSize: "9px", color: "var(--status-verified)", fontFamily: "var(--font-mono)" }}>
+                            {dm.pingMs}ms
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             </section>
           </div>

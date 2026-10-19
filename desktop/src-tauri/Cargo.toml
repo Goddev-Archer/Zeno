@@ -1,6 +1,6 @@
 [package]
 name = "zeno"
-version = "0.2.0"
+version = "0.2.1"
 description = "Zeno – A secure developer communication platform"
 authors = ["Zeno Contributors"]
 edition = "2021"

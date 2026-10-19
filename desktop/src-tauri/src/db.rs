@@ -107,6 +107,15 @@ fn init_schema(conn: &Connection) -> SqlResult<()> {
             is_active INTEGER DEFAULT 1,
             created_at TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS account_servers (
+            account_ain TEXT NOT NULL,
+            server_id TEXT NOT NULL,
+            joined_at TEXT NOT NULL,
+            is_owner INTEGER DEFAULT 0,
+            PRIMARY KEY (account_ain, server_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_account_servers_ain ON account_servers(account_ain);
         ",
     )?;
 
@@ -126,7 +135,7 @@ fn init_schema(conn: &Connection) -> SqlResult<()> {
 
 // --- SERVER OPERATIONS ---
 
-pub fn insert_or_update_server(conn: &Connection, srv: &DbServerRecord) -> Result<(), String> {
+pub fn insert_or_update_server(conn: &Connection, srv: &DbServerRecord, account_ain: Option<&str>) -> Result<(), String> {
     conn.execute(
         "INSERT INTO servers (id, name, icon_letter, icon, description, encrypted, owner_ain, manifest_url, git_repo_json, categories_json, created_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
@@ -154,6 +163,88 @@ pub fn insert_or_update_server(conn: &Connection, srv: &DbServerRecord) -> Resul
             srv.created_at,
         ],
     ).map_err(|e| format!("SQLite Insert Error: {}", e))?;
+
+    // If an account_ain was provided, associate this server with the account
+    if let Some(ain) = account_ain {
+        let is_owner = if srv.owner_ain.as_deref() == Some(ain) { 1 } else { 0 };
+        conn.execute(
+            "INSERT INTO account_servers (account_ain, server_id, joined_at, is_owner)
+             VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(account_ain, server_id) DO NOTHING;",
+            params![ain, srv.id, srv.created_at, is_owner],
+        ).map_err(|e| format!("SQLite Account-Server Insert Error: {}", e))?;
+    }
+
+    Ok(())
+}
+
+pub fn fetch_servers_for_account(conn: &Connection, account_ain: &str) -> Result<Vec<DbServerRecord>, String> {
+    // 1. Check if account_servers is completely empty across the DB (legacy migration)
+    let total_account_servers: i64 = conn
+        .query_row("SELECT COUNT(*) FROM account_servers", [], |row| row.get(0))
+        .unwrap_or(0);
+
+    if total_account_servers == 0 {
+        // Migrate all existing unlinked servers to this first querying account
+        let _ = conn.execute(
+            "INSERT OR IGNORE INTO account_servers (account_ain, server_id, joined_at, is_owner)
+             SELECT ?1, id, created_at, 1 FROM servers",
+            params![account_ain],
+        );
+    }
+
+    let mut stmt = conn
+        .prepare(
+            "SELECT s.id, s.name, s.icon_letter, s.icon, s.description, s.encrypted, s.owner_ain, s.manifest_url, s.git_repo_json, s.categories_json, s.created_at
+             FROM servers s
+             INNER JOIN account_servers a ON s.id = a.server_id
+             WHERE a.account_ain = ?1
+             ORDER BY a.rowid ASC",
+        )
+        .map_err(|e| format!("SQLite Query Error: {}", e))?;
+
+    let rows = stmt
+        .query_map(params![account_ain], |row| {
+            let enc_int: i32 = row.get(5)?;
+            Ok(DbServerRecord {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                icon_letter: row.get(2)?,
+                icon: row.get(3)?,
+                description: row.get(4)?,
+                encrypted: enc_int == 1,
+                owner_ain: row.get(6)?,
+                manifest_url: row.get(7)?,
+                git_repo_json: row.get(8)?,
+                categories_json: row.get(9)?,
+                created_at: row.get(10)?,
+            })
+        })
+        .map_err(|e| format!("SQLite Map Error: {}", e))?;
+
+    let mut result = Vec::new();
+    for r in rows {
+        if let Ok(srv) = r {
+            result.push(srv);
+        }
+    }
+    Ok(result)
+}
+
+pub fn remove_server_for_account(conn: &Connection, server_id: &str, account_ain: &str) -> Result<(), String> {
+    conn.execute(
+        "DELETE FROM account_servers WHERE server_id = ?1 AND account_ain = ?2",
+        params![server_id, account_ain],
+    ).map_err(|e| format!("SQLite Delete Error: {}", e))?;
+
+    let remaining: i64 = conn
+        .query_row("SELECT COUNT(*) FROM account_servers WHERE server_id = ?1", params![server_id], |row| row.get(0))
+        .unwrap_or(0);
+
+    if remaining == 0 {
+        let _ = conn.execute("DELETE FROM servers WHERE id = ?1", params![server_id]);
+    }
+
     Ok(())
 }
 
@@ -191,6 +282,7 @@ pub fn fetch_all_servers(conn: &Connection) -> Result<Vec<DbServerRecord>, Strin
 }
 
 pub fn remove_server(conn: &Connection, server_id: &str) -> Result<(), String> {
+    conn.execute("DELETE FROM account_servers WHERE server_id = ?1", params![server_id]).ok();
     conn.execute("DELETE FROM servers WHERE id = ?1", params![server_id])
         .map_err(|e| format!("SQLite Delete Error: {}", e))?;
     Ok(())
@@ -475,10 +567,14 @@ mod tests {
             created_at: "2026-10-01Z".to_string(),
         };
 
-        insert_or_update_server(&conn, &srv).expect("Insert server must succeed");
+        insert_or_update_server(&conn, &srv, Some("ZENO-1111-2222-3333")).expect("Insert server must succeed");
         let servers = fetch_all_servers(&conn).expect("Fetch servers must succeed");
         assert_eq!(servers.len(), 1);
         assert_eq!(servers[0].name, "Zeno Core Alpha");
+
+        let account_servers = fetch_servers_for_account(&conn, "ZENO-1111-2222-3333").expect("Fetch account servers must succeed");
+        assert_eq!(account_servers.len(), 1);
+        assert_eq!(account_servers[0].id, "srv-alpha");
 
         let msg = DbMessageRecord {
             id: None,
@@ -499,4 +595,57 @@ mod tests {
         assert_eq!(fetched_msgs.len(), 1);
         assert_eq!(fetched_msgs[0].text, "Hello Zeno Decentralized Mesh!");
     }
+
+    #[test]
+    fn test_multi_account_server_isolation() {
+        let conn = setup_test_db();
+
+        let srv_main = DbServerRecord {
+            id: "srv-main-corp".to_string(),
+            name: "Main Account Corp".to_string(),
+            icon_letter: "M".to_string(),
+            icon: None,
+            description: None,
+            encrypted: true,
+            owner_ain: Some("AIN-MAIN-111".to_string()),
+            manifest_url: None,
+            git_repo_json: None,
+            categories_json: "[]".to_string(),
+            created_at: "2026-10-01Z".to_string(),
+        };
+
+        let srv_alt = DbServerRecord {
+            id: "srv-alt-anon".to_string(),
+            name: "Alt Account Stealth".to_string(),
+            icon_letter: "A".to_string(),
+            icon: None,
+            description: None,
+            encrypted: true,
+            owner_ain: Some("AIN-ALT-222".to_string()),
+            manifest_url: None,
+            git_repo_json: None,
+            categories_json: "[]".to_string(),
+            created_at: "2026-10-01Z".to_string(),
+        };
+
+        // Main account creates / joins Main Corp
+        insert_or_update_server(&conn, &srv_main, Some("AIN-MAIN-111")).expect("Main insert ok");
+        // Alt account creates / joins Alt Stealth
+        insert_or_update_server(&conn, &srv_alt, Some("AIN-ALT-222")).expect("Alt insert ok");
+
+        // Verify isolation
+        let main_servers = fetch_servers_for_account(&conn, "AIN-MAIN-111").expect("Fetch main ok");
+        assert_eq!(main_servers.len(), 1);
+        assert_eq!(main_servers[0].id, "srv-main-corp");
+
+        let alt_servers = fetch_servers_for_account(&conn, "AIN-ALT-222").expect("Fetch alt ok");
+        assert_eq!(alt_servers.len(), 1);
+        assert_eq!(alt_servers[0].id, "srv-alt-anon");
+
+        // Alt account should NOT see Main Corp
+        assert!(alt_servers.iter().all(|s| s.id != "srv-main-corp"));
+        // Main account should NOT see Alt Stealth
+        assert!(main_servers.iter().all(|s| s.id != "srv-alt-anon"));
+    }
 }
+

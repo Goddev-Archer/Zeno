@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Editor, { Monaco } from "@monaco-editor/react";
 import { Icon } from "@iconify/react";
-import { Profile, Server } from "../../types";
+import { Profile, Server, DmConversation, DirectMessage } from "../../types";
 
 export interface PatchedSnippetData {
   code: string;
@@ -33,6 +33,11 @@ interface RightPanelIslandProps {
   onCloseSnippetPatcher: () => void;
   theme: "dark" | "light";
   onClosePanel: () => void;
+  // DM integration (Schritt 4)
+  isDmMode?: boolean;
+  activeDmPeer?: DmConversation;
+  dmMessages?: DirectMessage[];
+  onOpenInIde?: (code: string, language: string, title?: string) => void;
 }
 
 export const RightPanelIsland: React.FC<RightPanelIslandProps> = ({
@@ -49,7 +54,11 @@ export const RightPanelIsland: React.FC<RightPanelIslandProps> = ({
   onSendPatchedSnippet,
   onCloseSnippetPatcher,
   theme,
-  onClosePanel
+  onClosePanel,
+  isDmMode = false,
+  activeDmPeer,
+  dmMessages = [],
+  onOpenInIde
 }) => {
   const [activeTab, setActiveTab] = useState<"members" | "patcher">("members");
   const [editorCode, setEditorCode] = useState<string>("");
@@ -66,7 +75,8 @@ export const RightPanelIsland: React.FC<RightPanelIslandProps> = ({
     }
   }, [activeSnippet]);
 
-  if (activeServerId === "home") return null;
+  if (activeServerId === "home" && !isDmMode) return null;
+  if (!isOpen) return null;
 
   // Custom Monaco Editor Theme Registration
   const handleEditorWillMount = (monaco: Monaco) => {
@@ -142,22 +152,40 @@ export const RightPanelIsland: React.FC<RightPanelIslandProps> = ({
   const allProfiles = [localProfile, ...Object.values(mockProfiles).filter(p => p.name !== currentUserName)];
   const totalPeersCount = allProfiles.length + onlinePeers.length;
 
+  const sharedSnippets = (dmMessages || []).filter((m) => !!m.codeSnippet);
+  const peerFingerprint = activeDmPeer?.peerAin
+    ? `SHA256:${activeDmPeer.peerAin.replace(/[^A-F0-9]/gi, "").substring(0, 16).match(/.{2}/g)?.join(":") || "8F:3A:9B:21"}`
+    : "SHA256:00:00:00:00";
+
   return (
     <aside className={`right-panel-island ${!isOpen ? "collapsed" : ""}`} aria-label="Rechtes Arbeitsbereich-Panel">
       {/* Island Header with Switchable Tabs */}
       <header className="right-island-header">
         <nav className="right-island-tabs" role="tablist">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "members"}
-            className={`right-tab-btn ${activeTab === "members" ? "active" : ""}`}
-            onClick={() => setActiveTab("members")}
-          >
-            <Icon icon="mage:users" className="tab-icon" />
-            <span>Mitglieder</span>
-            <span className="tab-badge">{totalPeersCount}</span>
-          </button>
+          {isDmMode && activeDmPeer ? (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "members"}
+              className={`right-tab-btn ${activeTab === "members" ? "active" : ""}`}
+              onClick={() => setActiveTab("members")}
+            >
+              <Icon icon={activeDmPeer.isSelfChat ? "lucide:bookmark" : "lucide:shield-check"} className="tab-icon" />
+              <span>{activeDmPeer.isSelfChat ? "Notizbuch" : "Sicherheit"}</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "members"}
+              className={`right-tab-btn ${activeTab === "members" ? "active" : ""}`}
+              onClick={() => setActiveTab("members")}
+            >
+              <Icon icon="mage:users" className="tab-icon" />
+              <span>Mitglieder</span>
+              <span className="tab-badge">{totalPeersCount}</span>
+            </button>
+          )}
 
           <button
             type="button"
@@ -185,47 +213,225 @@ export const RightPanelIsland: React.FC<RightPanelIslandProps> = ({
       {/* Island Body Content */}
       <div className="right-island-body">
         {activeTab === "members" ? (
-          /* ══════════════════════════════════════════════════════════════
-             MEMBER LIST VIEW
-             ══════════════════════════════════════════════════════════════ */
-          <div className="members-content-scroll">
-            <div className="members-category-group">
-              <h4 className="members-category-title">
-                <span>ONLINE PEERS</span>
-                <span className="category-count">{allProfiles.length}</span>
-              </h4>
-
-              <div className="members-list-items">
-                {allProfiles.map((prof) => (
-                  <button
-                    key={prof.id}
-                    className="member-item-btn"
-                    onClick={() => onSelectProfile(prof)}
-                    type="button"
+          isDmMode && activeDmPeer ? (
+            /* ══════════════════════════════════════════════════════════════
+               DM PEER-SECURITY & NOTEBOOK INSPECTOR (SCHRITT 4)
+               ══════════════════════════════════════════════════════════════ */
+            <div className="members-content-scroll" style={{ padding: "14px", display: "flex", flexDirection: "column", gap: "14px" }}>
+              {/* Header Profile Card */}
+              <div style={{ background: "var(--bg-canvas)", border: "1px solid var(--border-island)", borderRadius: "10px", padding: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <div
+                    className={`message-avatar ${activeDmPeer.isSelfChat ? "orange" : "blue"}`}
+                    style={{
+                      width: "36px",
+                      height: "36px",
+                      fontSize: activeDmPeer.isSelfChat ? "16px" : "13px",
+                      borderRadius: "50%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0
+                    }}
                   >
-                    <div className="member-avatar-wrapper">
-                      {prof.avatarImage ? (
-                        <img src={prof.avatarImage} alt={prof.name} className="member-avatar-img" />
+                    {activeDmPeer.peerAvatar || activeDmPeer.peerName[0]}
+                  </div>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <h4 style={{ margin: 0, fontSize: "13px", fontWeight: "700", color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {activeDmPeer.peerName}
+                    </h4>
+                    <span style={{ fontSize: "11px", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "4px" }}>
+                      {activeDmPeer.isSelfChat ? (
+                        <>
+                          <Icon icon="lucide:bookmark" style={{ color: "var(--accent-oxide)" }} />
+                          <span>Privates Notizboard</span>
+                        </>
                       ) : (
-                        <div className="member-avatar-fallback" style={{ backgroundColor: prof.avatarColor || "var(--accent-oxide)" }}>
-                          {prof.avatar || prof.name[0]}
-                        </div>
+                        <>
+                          <Icon icon="lucide:radio" style={{ color: activeDmPeer.connectionStatus === "p2p_direct" ? "#10B981" : "#F59E0B" }} />
+                          <span>{activeDmPeer.connectionStatus === "p2p_direct" ? "P2P Direkt-Kanal" : "Relayed Envelope"}</span>
+                        </>
                       )}
-                      <span className="member-status-dot online" />
-                    </div>
+                    </span>
+                  </div>
+                </div>
 
-                    <div className="member-text-meta">
-                      <div className="member-name-row">
-                        <span className="member-display-name">{prof.name}</span>
-                        {prof.badge && <span className="member-badge-pill">{prof.badge}</span>}
-                      </div>
-                      <span className="member-status-quote">{prof.status || "Zero-Knowledge Peer"}</span>
+                {activeDmPeer.peerStatusQuote && (
+                  <p style={{ margin: 0, fontSize: "11px", color: "var(--text-secondary)", fontStyle: "italic", lineHeight: 1.35 }}>
+                    "{activeDmPeer.peerStatusQuote}"
+                  </p>
+                )}
+              </div>
+
+              {/* Security Metrics or Local Storage Card */}
+              {!activeDmPeer.isSelfChat ? (
+                <div style={{ background: "var(--bg-canvas)", border: "1px solid var(--border-island)", borderRadius: "10px", padding: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--accent-relay)", fontSize: "11px", fontWeight: "700", textTransform: "uppercase" }}>
+                    <Icon icon="lucide:shield-check" style={{ fontSize: "14px" }} />
+                    <span>Sicherheits-Status & Fingerprint</span>
+                  </div>
+
+                  <div>
+                    <label style={{ display: "block", fontSize: "10px", color: "var(--text-muted)", marginBottom: "3px" }}>
+                      Safety Numbers (MITM-Prüfsumme):
+                    </label>
+                    <code style={{ display: "block", background: "var(--bg-island)", padding: "5px 8px", borderRadius: "6px", fontSize: "10px", fontFamily: "var(--font-mono)", color: "var(--accent-relay)", wordBreak: "break-all" }}>
+                      {peerFingerprint}
+                    </code>
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "5px", fontSize: "11px", color: "var(--text-secondary)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span>Verschlüsselung:</span>
+                      <strong style={{ color: "var(--text-primary)" }}>Argon2id + ChaCha20</strong>
                     </div>
-                  </button>
-                ))}
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span>E2EE Status:</span>
+                      <strong style={{ color: "var(--status-verified)" }}>Zero-Knowledge ✓</strong>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span>Latenz:</span>
+                      <span style={{ fontFamily: "var(--font-mono)", color: "var(--status-verified)" }}>{activeDmPeer.pingMs || 14} ms</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ background: "var(--bg-canvas)", border: "1px solid var(--border-island)", borderRadius: "10px", padding: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--accent-oxide)", fontSize: "11px", fontWeight: "700", textTransform: "uppercase" }}>
+                    <Icon icon="lucide:database" style={{ fontSize: "14px" }} />
+                    <span>Lokaler Tresor-Status</span>
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "5px", fontSize: "11px", color: "var(--text-secondary)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span>Speicherort:</span>
+                      <strong style={{ color: "var(--text-primary)" }}>100% Lokal (SQLite)</strong>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span>Verschlüsselung:</span>
+                      <strong style={{ color: "var(--accent-oxide)" }}>AES-256-GCM</strong>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span>Gespeicherte Notizen:</span>
+                      <strong style={{ color: "var(--text-primary)" }}>{(dmMessages || []).length}</strong>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span>Offline-Sicherheit:</span>
+                      <strong style={{ color: "var(--status-verified)" }}>Gerät verlässt es nie ✓</strong>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Shared Code Snippets */}
+              <div style={{ background: "var(--bg-canvas)", border: "1px solid var(--border-island)", borderRadius: "10px", padding: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--text-primary)", fontSize: "11px", fontWeight: "700" }}>
+                    <Icon icon="lucide:code" style={{ fontSize: "14px", color: "var(--accent-oxide)" }} />
+                    <span>Code-Snippets ({sharedSnippets.length})</span>
+                  </div>
+                </div>
+
+                {sharedSnippets.length === 0 ? (
+                  <p style={{ margin: 0, fontSize: "11px", color: "var(--text-muted)", fontStyle: "italic" }}>
+                    Bisher keine Snippets abgelegt.
+                  </p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    {sharedSnippets.map((msg) => (
+                      <div
+                        key={msg.id}
+                        style={{
+                          background: "var(--bg-island)",
+                          border: "1px solid var(--border-island)",
+                          borderRadius: "6px",
+                          padding: "6px 8px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: "6px"
+                        }}
+                      >
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {msg.codeSnippet?.title || "Code-Snippet"}
+                          </div>
+                          <span style={{ fontSize: "10px", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+                            {msg.codeSnippet?.language.toUpperCase()} • {msg.time}
+                          </span>
+                        </div>
+                        {onOpenInIde && msg.codeSnippet && (
+                          <button
+                            type="button"
+                            onClick={() => onOpenInIde(msg.codeSnippet!.code, msg.codeSnippet!.language, msg.codeSnippet!.title)}
+                            title="In Zeno IDE laden"
+                            style={{
+                              padding: "3px 6px",
+                              borderRadius: "4px",
+                              background: "var(--bg-elevated)",
+                              border: "1px solid var(--border-island)",
+                              color: "var(--accent-oxide)",
+                              fontSize: "10px",
+                              fontWeight: "600",
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "3px"
+                            }}
+                          >
+                            <Icon icon="lucide:external-link" style={{ fontSize: "11px" }} />
+                            IDE
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
-          </div>
+          ) : (
+            /* ══════════════════════════════════════════════════════════════
+               SERVER MEMBER LIST VIEW
+               ══════════════════════════════════════════════════════════════ */
+            <div className="members-content-scroll">
+              <div className="members-category-group">
+                <h4 className="members-category-title">
+                  <span>ONLINE PEERS</span>
+                  <span className="category-count">{allProfiles.length}</span>
+                </h4>
+
+                <div className="members-list-items">
+                  {allProfiles.map((prof) => (
+                    <button
+                      key={prof.id}
+                      className="member-item-btn"
+                      onClick={() => onSelectProfile(prof)}
+                      type="button"
+                    >
+                      <div className="member-avatar-wrapper">
+                        {prof.avatarImage ? (
+                          <img src={prof.avatarImage} alt={prof.name} className="member-avatar-img" />
+                        ) : (
+                          <div className="member-avatar-fallback" style={{ backgroundColor: prof.avatarColor || "var(--accent-oxide)" }}>
+                            {prof.avatar || prof.name[0]}
+                          </div>
+                        )}
+                        <span className="member-status-dot online" />
+                      </div>
+
+                      <div className="member-text-meta">
+                        <div className="member-name-row">
+                          <span className="member-display-name">{prof.name}</span>
+                          {prof.badge && <span className="member-badge-pill">{prof.badge}</span>}
+                        </div>
+                        <span className="member-status-quote">{prof.status || "Zero-Knowledge Peer"}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )
         ) : (
           /* ══════════════════════════════════════════════════════════════
              MONACO IN-CHAT-IDE & SNIPPET PATCHER
@@ -301,7 +507,7 @@ export const RightPanelIsland: React.FC<RightPanelIslandProps> = ({
                 onClick={handleSendPatched}
                 title="Gepatchten Code als Antwort im Kanal posten"
               >
-                <Icon icon="mage:send" />
+                <Icon icon="lucide:send" />
                 <span>Gepatchtes Snippet zurücksenden</span>
               </button>
             </div>

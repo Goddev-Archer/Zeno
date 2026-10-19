@@ -3,14 +3,92 @@ import { Icon } from "@iconify/react";
 import { ZenoLogo } from "./ZenoLogo";
 import "./App.css";
 
+interface ReleaseInfo {
+  tagName: string;
+  downloadUrl: string;
+  assetName: string;
+  assetSize: string;
+  isDynamic: boolean;
+}
+
+const DEFAULT_RELEASE: ReleaseInfo = {
+  tagName: "v0.2.1-alpha",
+  downloadUrl: "https://github.com/Goddev-Archer/Zeno/releases/download/v0.2.1-alpha/zeno-v0.2.1-alpha-windows-x64-portable.zip",
+  assetName: "zeno-v0.2.1-alpha-windows-x64-portable.zip",
+  assetSize: "ca. 68 MB",
+  isDynamic: false,
+};
+
 export const App: React.FC = () => {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [activeMockServer, setActiveMockServer] = useState<string>("zeno");
   const [mockPatched, setMockPatched] = useState<boolean>(false);
+  const [release, setRelease] = useState<ReleaseInfo>(DEFAULT_RELEASE);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
+
+  // Dynamically resolve the latest Alpha Release from GitHub
+  useEffect(() => {
+    let isMounted = true;
+    const fetchLatestAlpha = async () => {
+      try {
+        const res = await fetch("https://api.github.com/repos/Goddev-Archer/Zeno/releases", {
+          headers: { Accept: "application/vnd.github.v3+json" }
+        });
+        if (!res.ok) return;
+
+        const releases = await res.json();
+        if (!Array.isArray(releases) || releases.length === 0) return;
+
+        // Pick latest non-draft release (pre-releases / alphas are explicitly included)
+        const latest = releases.find((r: any) => !r.draft) || releases[0];
+        if (!latest) return;
+
+        const tag = latest.tag_name || "v0.2.1-alpha";
+        let downloadUrl = `https://github.com/Goddev-Archer/Zeno/releases/download/${tag}/zeno-${tag}-windows-x64-portable.zip`;
+        let assetName = `zeno-${tag}-windows-x64-portable.zip`;
+        let assetSize = "ca. 68 MB";
+
+        if (Array.isArray(latest.assets) && latest.assets.length > 0) {
+          // Prefer Windows portable .zip asset
+          const zipAsset = latest.assets.find((a: any) =>
+            typeof a.name === "string" && a.name.endsWith(".zip") && (a.name.toLowerCase().includes("windows") || a.name.toLowerCase().includes("win"))
+          ) || latest.assets.find((a: any) =>
+            typeof a.name === "string" && a.name.endsWith(".zip")
+          ) || latest.assets.find((a: any) =>
+            typeof a.name === "string" && a.name.endsWith(".exe")
+          ) || latest.assets[0];
+
+          if (zipAsset) {
+            downloadUrl = zipAsset.browser_download_url;
+            assetName = zipAsset.name;
+            if (zipAsset.size) {
+              assetSize = `${(zipAsset.size / (1024 * 1024)).toFixed(1)} MB`;
+            }
+          }
+        }
+
+        if (isMounted) {
+          setRelease({
+            tagName: tag,
+            downloadUrl,
+            assetName,
+            assetSize,
+            isDynamic: true,
+          });
+        }
+      } catch {
+        // Fallback silently to DEFAULT_RELEASE
+      }
+    };
+
+    fetchLatestAlpha();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const toggleTheme = () => {
     setTheme((prev) => (prev === "dark" ? "light" : "dark"));
@@ -68,7 +146,7 @@ export const App: React.FC = () => {
         <div className="hero-pill-badge">
           <span className="pulse-dot" />
           <span>Zero-Knowledge & Decentralized Developer Workspace</span>
-          <span className="text-oxide">v0.1.0-alpha</span>
+          <span className="text-oxide">{release.tagName}</span>
         </div>
 
         <h1 className="hero-title">
@@ -82,9 +160,13 @@ export const App: React.FC = () => {
         </p>
 
         <div className="hero-cta-group">
-          <a href="#downloads" className="btn-primary-download">
+          <a
+            href={release.downloadUrl}
+            className="btn-primary-download"
+            title={`Zeno ${release.tagName} direkt herunterladen (${release.assetName})`}
+          >
             <Icon icon="mage:download" style={{ fontSize: "18px" }} />
-            <span>Zeno Alpha herunterladen</span>
+            <span>Zeno {release.tagName} herunterladen (.zip)</span>
           </a>
 
           <a
@@ -362,7 +444,7 @@ export const App: React.FC = () => {
           <div>
             <p className="section-tag">Offizieller Release</p>
             <h2 style={{ fontSize: "32px", fontWeight: 800, marginBottom: "14px" }}>
-              Zeno v0.1.0-alpha herunterladen
+              Zeno {release.tagName} herunterladen
             </h2>
             <p style={{ color: "var(--text-secondary)", marginBottom: "24px", fontSize: "15px" }}>
               Voll funktionsfähiger, autarker Standalone-Build. Keine Node.js- oder Rust-Installation 
@@ -371,13 +453,12 @@ export const App: React.FC = () => {
 
             <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginBottom: "20px" }}>
               <a 
-                href="https://github.com/Goddev-Archer/Zeno/releases"
-                target="_blank" 
-                rel="noopener noreferrer"
+                href={release.downloadUrl}
                 className="btn-primary-download"
+                title={`Direktdownload: ${release.assetName}`}
               >
                 <Icon icon="mdi:microsoft-windows" style={{ fontSize: "18px" }} />
-                <span>Windows x64 (.zip / .exe)</span>
+                <span>Windows x64 (.zip Portable) • {release.assetSize}</span>
               </a>
 
               <a 
@@ -391,9 +472,20 @@ export const App: React.FC = () => {
               </a>
             </div>
 
-            <p style={{ fontSize: "12px", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
-              Offiziell kryptografisch signiert mit GPG Key ID: <strong>A3ACEB626EBFB7EC</strong>
-            </p>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", fontSize: "12px", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+              <span>Datei: <code>{release.assetName}</code></span>
+              <span>•</span>
+              <span>Signiert mit GPG Key ID: <strong>A3ACEB626EBFB7EC</strong></span>
+              {release.isDynamic && (
+                <>
+                  <span>•</span>
+                  <span style={{ color: "#10B981", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                    <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#10B981" }} />
+                    Auto-Sync aktiv
+                  </span>
+                </>
+              )}
+            </div>
           </div>
 
           {/* Terminal GPG Verification Mock */}
@@ -407,7 +499,7 @@ export const App: React.FC = () => {
             <p style={{ color: "var(--accent-oxide)" }}>$ gpg --import zeno-release-public-key.asc</p>
             <br />
             <p style={{ color: "var(--text-muted)" }}># 2. Echtheit der Release-Binary prüfen</p>
-            <p style={{ color: "var(--accent-oxide)" }}>$ gpg --verify zeno.exe.asc zeno.exe</p>
+            <p style={{ color: "var(--accent-oxide)" }}>$ gpg --verify {release.assetName}.asc {release.assetName}</p>
             <p style={{ color: "var(--status-verified)", marginTop: "4px" }}>
               gpg: Good signature from "Goddev Archer (Zeno Release Signing Key)" [ultimate]
             </p>
@@ -431,8 +523,33 @@ export const App: React.FC = () => {
             100% Free &amp; Open Source • Zero Telemetry Guarantee • Released under MIT / GPLv3
           </p>
 
-          <div style={{ display: "flex", gap: "16px" }}>
-            <a href="https://github.com/Goddev-Archer/Zeno" target="_blank" rel="noopener noreferrer" style={{ color: "var(--text-secondary)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "20px", flexWrap: "wrap" }}>
+            <a
+              href="mailto:goddevarcher@outlook.com"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                color: "var(--text-secondary)",
+                textDecoration: "none",
+                fontSize: "13px",
+                fontFamily: "var(--font-mono)",
+                transition: "color 0.15s ease",
+              }}
+              className="footer-email-link"
+              title="Entwickler- & Security-Kontakt per E-Mail"
+            >
+              <Icon icon="mdi:email-outline" style={{ fontSize: "16px" }} />
+              <span>goddevarcher@outlook.com</span>
+            </a>
+
+            <a
+              href="https://github.com/Goddev-Archer/Zeno"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: "var(--text-secondary)", display: "flex", alignItems: "center", transition: "color 0.15s ease" }}
+              title="GitHub Repository"
+            >
               <Icon icon="mdi:github" style={{ fontSize: "20px" }} />
             </a>
           </div>

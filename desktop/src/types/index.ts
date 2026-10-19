@@ -313,3 +313,41 @@ export interface SystemCompilersStatus {
   goVersion?: string;
 }
 
+// --- DIRECT MESSAGES (PEER-TO-PEER & BYOS) ---
+
+export type DmDeliveryRoute = "p2p_direct" | "relay_envelope" | "byos_drop" | "local_cache";
+export type DmMessageStatus = "queued" | "sending" | "delivered" | "read";
+export type DmPeerConnectionStatus = "p2p_direct" | "relay" | "offline";
+
+export interface DirectMessage {
+  id: string;
+  senderAin: string;
+  recipientAin: string;
+  content: string;
+  time: string;
+  timestamp: number;
+  status: DmMessageStatus;
+  deliveryRoute: DmDeliveryRoute;
+  codeSnippet?: {
+    language: string;
+    code: string;
+    title?: string;
+  };
+  attachment?: MessageAttachment;
+}
+
+export interface DmConversation {
+  peerAin: string;
+  peerName: string;
+  peerAvatar?: string;
+  peerStatusQuote?: string;
+  connectionStatus: DmPeerConnectionStatus;
+  pingMs?: number;
+  unreadCount: number;
+  lastMessage?: DirectMessage;
+  isPopout?: boolean;
+  isSelfChat?: boolean;
+  selfChatTopic?: string;
+}
+
+

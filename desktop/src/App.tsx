@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Icon } from "@iconify/react";
 import { loader } from "@monaco-editor/react";
 import * as monaco from "monaco-editor";
+import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
 
 // --- TYPES & UTILS ---
@@ -19,10 +20,13 @@ import {
   LiveGitStatus,
   LiveGitCommit,
   UserIdentity,
-  IdeWorkspaceGitStatus
+  IdeWorkspaceGitStatus,
+  DmConversation,
+  DirectMessage
 } from "./types";
 import {
-  getActiveIdentityFromDb
+  getActiveIdentityFromDb,
+  isTauriEnvironment
 } from "./services/cryptoService";
 import { executeZeroKnowledgeAuth, syncEncryptedVaultToServer } from "./services/backendService";
 import { commitAndPushServerManifest, commitAndPushServerReadme, readServerReadme } from "./services/gitServerSyncService";
@@ -69,15 +73,21 @@ import {
   initialMessages,
   mockProfiles,
   HUB_RUNTIMES_CATALOG,
-  INITIAL_WIDGETS
+  INITIAL_WIDGETS,
+  initialDmConversations,
+  initialDmMessages,
+  DEFAULT_SELF_CHAT_AIN,
+  MAX_SELF_CHATS
 } from "./data/mockData";
 
 // --- COMPONENTS ---
 import { ZenoErrorBoundary } from "./components/common/ErrorBoundary";
+import { CustomTitlebar } from "./components/common/CustomTitlebar";
 import { ServerSidebar } from "./components/sidebar/ServerSidebar";
 import { ChannelSidebar } from "./components/sidebar/ChannelSidebar";
 import { RightPanelIsland, PatchedSnippetData } from "./components/sidebar/RightPanelIsland";
 import { ChatArea } from "./components/chat/ChatArea";
+import { DmChatArea } from "./components/chat/DmChatArea";
 import { Dashboard } from "./components/dashboard/Dashboard";
 import { WasmHub } from "./components/wasm/WasmHub";
 import { ZenoIde } from "./components/ide/ZenoIde";
@@ -88,6 +98,7 @@ import { PluginsSettingsTab } from "./components/settings/PluginsSettingsTab";
 // --- MODALS ---
 import { SovereignAccountModal } from "./components/modals/SovereignAccountModal";
 import { CreateJoinServerModal } from "./components/modals/CreateJoinServerModal";
+import { CreateDmModal } from "./components/modals/CreateDmModal";
 import { ProfileCardModal } from "./components/modals/ProfileCardModal";
 import { SettingsModal } from "./components/modals/SettingsModal";
 import { CodeEditorModal } from "./components/modals/CodeEditorModal";
@@ -207,30 +218,215 @@ const lightPresets = [
 ];
 
 function ZenoMainApp() {
-  const [servers, setServers] = useState<Server[]>(() => {
-    const saved = localStorage.getItem("zeno_custom_servers");
-    if (saved) {
+  // Check URL query parameters for Popout mode (e.g. ?popout=dm&peerAin=...)
+  const urlParams = new URLSearchParams(window.location.search);
+  const isPopoutMode = urlParams.get("popout") === "dm";
+  const popoutPeerAin = urlParams.get("peerAin");
+  const popoutPeerName = urlParams.get("peerName");
+
+  const [servers, setServers] = useState<Server[]>(initialServers);
+  const [activeServerId, setActiveServerId] = useState<string>("home");
+  const [homeTab, setHomeTab] = useState<"dashboard" | "wasm_hub" | "ide" | "plugins" | "wiki" | "dm">("dashboard");
+  const [dmConversations, setDmConversations] = useState<DmConversation[]>(initialDmConversations);
+  const [activeDmPeerAin, setActiveDmPeerAin] = useState<string | null>(popoutPeerAin || DEFAULT_SELF_CHAT_AIN);
+  const [isCreateDmModalOpen, setIsCreateDmModalOpen] = useState<boolean>(false);
+  const [dmMessages, setDmMessages] = useState<Record<string, DirectMessage[]>>(() => {
+    if (popoutPeerAin) {
       try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+        const saved = localStorage.getItem(`zeno_dm_history_${popoutPeerAin}`);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          return {
+            ...initialDmMessages,
+            [popoutPeerAin]: parsed
+          };
         }
-      } catch (e) {
-        console.error("Failed to parse saved servers", e);
-      }
+      } catch (_) {}
     }
-    return initialServers;
+    return initialDmMessages;
   });
 
+  // Cross-Window DM Synchronization (BroadcastChannel)
   useEffect(() => {
+    let bc: BroadcastChannel | null = null;
     try {
-      localStorage.setItem("zeno_custom_servers", JSON.stringify(servers));
+      bc = new BroadcastChannel("zeno_dm_sync_channel");
+      bc.onmessage = (e: MessageEvent) => {
+        const data = e.data;
+        if (data && data.type === "dm_message" && data.peerAin && data.msg) {
+          setDmMessages((prev) => {
+            const list = prev[data.peerAin] || [];
+            if (list.some((m) => m.id === data.msg.id)) return prev;
+            const updated = [...list, data.msg];
+            try {
+              localStorage.setItem(`zeno_dm_history_${data.peerAin}`, JSON.stringify(updated));
+            } catch (_) {}
+            return {
+              ...prev,
+              [data.peerAin]: updated
+            };
+          });
+          setDmConversations((prev) =>
+            prev.map((dm) =>
+              dm.peerAin === data.peerAin ? { ...dm, lastMessage: data.msg } : dm
+            )
+          );
+        }
+      };
     } catch (e) {
-      console.error("Failed to save servers to localStorage", e);
+      console.warn("BroadcastChannel error:", e);
     }
-  }, [servers]);
-  const [activeServerId, setActiveServerId] = useState<string>("home");
-  const [homeTab, setHomeTab] = useState<"dashboard" | "wasm_hub" | "ide" | "plugins" | "wiki">("dashboard");
+    return () => {
+      if (bc) {
+        bc.close();
+      }
+    };
+  }, []);
+
+  const handleSelectDm = (peerAin: string) => {
+    setActiveDmPeerAin(peerAin);
+    setHomeTab("dm");
+    setActiveServerId("home");
+    setDmConversations((prev) =>
+      prev.map((dm) => (dm.peerAin === peerAin ? { ...dm, unreadCount: 0 } : dm))
+    );
+  };
+
+  const handleStartNewDm = () => {
+    setIsCreateDmModalOpen(true);
+  };
+
+  const handleCreatePeerDm = (peerAin: string, nickname: string) => {
+    const existing = dmConversations.find((d) => d.peerAin === peerAin);
+    if (existing) {
+      handleSelectDm(peerAin);
+      showToast(`P2P-Chat mit ${existing.peerName} geöffnet! 💬`);
+      return;
+    }
+
+    const newDm: DmConversation = {
+      peerAin: peerAin,
+      peerName: nickname || `Peer ${peerAin.slice(-4)}`,
+      peerStatusQuote: "Neuer P2P-Kontakt",
+      connectionStatus: "p2p_direct",
+      pingMs: 18,
+      unreadCount: 0
+    };
+
+    setDmConversations((prev) => [newDm, ...prev]);
+    setActiveDmPeerAin(peerAin);
+    setHomeTab("dm");
+    setActiveServerId("home");
+    showToast(`Neuer P2P-Chat mit ${newDm.peerName} gestartet! 💬`);
+  };
+
+  const handleCreateSelfChat = (title: string, avatarEmoji?: string) => {
+    const currentSelfChats = dmConversations.filter((d) => d.isSelfChat);
+    if (currentSelfChats.length >= MAX_SELF_CHATS) {
+      showToast(`Maximal ${MAX_SELF_CHATS} Selbstchats / Notizboards erlaubt! ⚠️`);
+      return;
+    }
+
+    const uniqueAin = `ZENO-SELF-${Date.now().toString(36).toUpperCase()}`;
+    const newSelfChat: DmConversation = {
+      peerAin: uniqueAin,
+      peerName: title,
+      peerAvatar: avatarEmoji || "📝",
+      peerStatusQuote: "Lokales Notizboard & Vault",
+      connectionStatus: "p2p_direct",
+      isSelfChat: true,
+      selfChatTopic: title,
+      unreadCount: 0
+    };
+
+    setDmConversations((prev) => [newSelfChat, ...prev]);
+    setActiveDmPeerAin(uniqueAin);
+    setHomeTab("dm");
+    setActiveServerId("home");
+    showToast(`Neues Notizboard „${title}“ angelegt! 📝`);
+  };
+
+  const handleSendDmMessage = (
+    content: string,
+    codeSnippet?: { language: string; code: string; title?: string }
+  ) => {
+    const targetAin = isPopoutMode ? (popoutPeerAin || activeDmPeerAin) : activeDmPeerAin;
+    if (!targetAin) return;
+
+    const isSelf = dmConversations.find((d) => d.peerAin === targetAin)?.isSelfChat;
+
+    const newMsg: DirectMessage = {
+      id: `dm-msg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      senderAin: userIdentity?.ain || "self",
+      recipientAin: targetAin,
+      content,
+      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      timestamp: Date.now(),
+      status: "delivered",
+      deliveryRoute: isSelf ? "local_cache" : "p2p_direct",
+      codeSnippet
+    };
+
+    setDmMessages((prev) => {
+      const updated = [...(prev[targetAin] || []), newMsg];
+      try {
+        localStorage.setItem(`zeno_dm_history_${targetAin}`, JSON.stringify(updated));
+      } catch (_) {}
+      return {
+        ...prev,
+        [targetAin]: updated
+      };
+    });
+
+    setDmConversations((prev) =>
+      prev.map((dm) =>
+        dm.peerAin === targetAin
+          ? { ...dm, lastMessage: newMsg }
+          : dm
+      )
+    );
+
+    // Cross-window broadcast
+    try {
+      const bc = new BroadcastChannel("zeno_dm_sync_channel");
+      bc.postMessage({ type: "dm_message", peerAin: targetAin, msg: newMsg });
+      bc.close();
+    } catch (_) {}
+  };
+
+  const handleDetachDmPopout = async () => {
+    if (!activeDmPeerAin) return;
+    const peer = dmConversations.find((d) => d.peerAin === activeDmPeerAin);
+    const peerName = peer?.peerName || "Direct Contact";
+
+    // Persist current history before launching popout
+    try {
+      localStorage.setItem(`zeno_dm_history_${activeDmPeerAin}`, JSON.stringify(dmMessages[activeDmPeerAin] || []));
+    } catch (_) {}
+
+    if (isTauriEnvironment()) {
+      try {
+        await invoke("window_open_dm_popout", {
+          peerAin: activeDmPeerAin,
+          peerName
+        });
+        showToast(`Popout für @${peerName} geöffnet! ↗️`);
+      } catch (err: any) {
+        console.error("Popout error:", err);
+        showToast(`Popout-Fehler: ${err?.message || err}`);
+      }
+    } else {
+      // Browser multi-window fallback
+      const encAin = encodeURIComponent(activeDmPeerAin);
+      const encName = encodeURIComponent(peerName);
+      window.open(
+        `/?popout=dm&peerAin=${encAin}&peerName=${encName}`,
+        `dm_popout_${activeDmPeerAin}`,
+        "width=520,height=720,menubar=no,toolbar=no,location=no,status=no,resizable=yes"
+      );
+      showToast(`Popout-Fenster für @${peerName} geöffnet! ↗️`);
+    }
+  };
   const [activeServer, setActiveServer] = useState<Server>(initialServers[0]);
   const [activeChannel, setActiveChannel] = useState<Channel>(initialServers[0].categories[0].channels[0]);
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
@@ -346,6 +542,16 @@ function ZenoMainApp() {
   const [isSovereignModalOpen, setIsSovereignModalOpen] = useState<boolean>(false);
   const [sovereignModalTab, setSovereignModalTab] = useState<"create" | "restore" | "manage">("create");
 
+  // Account-scoped custom servers persistence
+  useEffect(() => {
+    if (!userIdentity?.ain) return;
+    try {
+      localStorage.setItem(`zeno_custom_servers_${userIdentity.ain}`, JSON.stringify(servers));
+    } catch (e) {
+      console.error("Failed to save servers to localStorage", e);
+    }
+  }, [servers, userIdentity?.ain]);
+
   // Server Rules Verification & Acknowledgment State
   const [rulesAcceptedServers, setRulesAcceptedServers] = useState<Record<string, boolean>>(() => {
     try {
@@ -382,8 +588,53 @@ function ZenoMainApp() {
     showToast("📜 Regelwerk verifiziert & bestätigt! Voller Server-Zugriff freigeschaltet.");
   };
 
+  const loadServersForAccount = async (ain: string) => {
+    try {
+      // 1. Try loading from native SQLite for this specific account
+      const dbServers = await loadServersFromDb(ain);
+      if (dbServers && dbServers.length > 0) {
+        setServers(dbServers);
+        setActiveServer(dbServers[0]);
+        if (dbServers[0].categories?.[0]?.channels?.[0]) {
+          setActiveChannel(dbServers[0].categories[0].channels[0]);
+        }
+        return;
+      }
+
+      // 2. Try loading from scoped localStorage
+      const saved = localStorage.getItem(`zeno_custom_servers_${ain}`);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setServers(parsed);
+            setActiveServer(parsed[0]);
+            if (parsed[0].categories?.[0]?.channels?.[0]) {
+              setActiveChannel(parsed[0].categories[0].channels[0]);
+            }
+            return;
+          }
+        } catch (e) {
+          console.error("Failed to parse saved servers for account", e);
+        }
+      }
+
+      // 3. Fallback: Clean default workspace for newly created/switched account
+      setServers(initialServers);
+      setActiveServer(initialServers[0]);
+      if (initialServers[0].categories?.[0]?.channels?.[0]) {
+        setActiveChannel(initialServers[0].categories[0].channels[0]);
+      }
+      for (const s of initialServers) {
+        await saveServerToDb(s, ain);
+      }
+    } catch (err) {
+      console.error("[Zeno] Error loading servers for account", err);
+    }
+  };
+
   useEffect(() => {
-    getActiveIdentityFromDb().then((activeIdn) => {
+    getActiveIdentityFromDb().then(async (activeIdn) => {
       if (activeIdn) {
         const idn: UserIdentity = {
           ain: activeIdn.ain,
@@ -397,6 +648,9 @@ function ZenoMainApp() {
         if (activeIdn.username) {
           setUserName(activeIdn.username);
         }
+        // Load servers scoped strictly to this active identity
+        await loadServersForAccount(activeIdn.ain);
+
         // If the active identity does NOT have a 12-word seed phrase (legacy mock key), launch the Sovereign Onboarding Wizard!
         if (!activeIdn.mnemonic) {
           setSovereignModalTab("create");
@@ -426,12 +680,17 @@ function ZenoMainApp() {
     } catch (e) {}
   }, []);
 
-  const handleIdentityChanged = (newIdentity: UserIdentity, newUsername: string) => {
+  const handleIdentityChanged = async (newIdentity: UserIdentity, newUsername: string) => {
     setUserIdentity(newIdentity);
     relayClient.setCurrentIdentity(newIdentity);
     if (newUsername) {
       setUserName(newUsername);
     }
+    // Isolate servers per account: load this account's instances!
+    await loadServersForAccount(newIdentity.ain);
+    // Clear chat message cache to prevent leaking conversation views between accounts
+    setChatMessages({});
+    setActiveServerId("home");
   };
 
   useEffect(() => {
@@ -588,21 +847,6 @@ function ZenoMainApp() {
 
   // --- RUST BACKEND CORE: DATABASE & VOICE/NETWORK EVENT SUBSCRIPTIONS ---
   useEffect(() => {
-    // 1. Load servers from Rust SQLite DB if available
-    loadServersFromDb().then((dbServers) => {
-      if (dbServers && dbServers.length > 0) {
-        setServers(dbServers);
-        setActiveServer((prev) => {
-          const exists = dbServers.some((s) => s.id === prev.id);
-          return exists ? prev : dbServers[0];
-        });
-        setActiveChannel((prevCh) => {
-          const currentSrv = dbServers[0];
-          const hasCh = currentSrv.categories?.some((c) => c.channels.some((ch) => ch.id === prevCh.id));
-          return hasCh ? prevCh : (currentSrv.categories?.[0]?.channels?.[0] || prevCh);
-        });
-      }
-    });
 
     // 2. Subscribe to Voice State changes from Rust
     const unlistenVoicePromise = subscribeToVoiceState((status) => {
@@ -881,12 +1125,16 @@ function ZenoMainApp() {
   const [isCreateJoinServerModalOpen, setIsCreateJoinServerModalOpen] = useState<boolean>(false);
 
   const handleServerCreated = (newServer: Server) => {
-    setServers((prev: Server[]) => [...prev, newServer]);
-    saveServerToDb(newServer);
-    setActiveServerId(newServer.id);
-    setActiveServer(newServer);
-    if (newServer.categories && newServer.categories[0] && newServer.categories[0].channels[0]) {
-      setActiveChannel(newServer.categories[0].channels[0]);
+    const srvWithOwner: Server = {
+      ...newServer,
+      ownerAin: userIdentity?.ain || newServer.ownerAin
+    };
+    setServers((prev: Server[]) => [...prev, srvWithOwner]);
+    saveServerToDb(srvWithOwner, userIdentity?.ain);
+    setActiveServerId(srvWithOwner.id);
+    setActiveServer(srvWithOwner);
+    if (srvWithOwner.categories && srvWithOwner.categories[0] && srvWithOwner.categories[0].channels[0]) {
+      setActiveChannel(srvWithOwner.categories[0].channels[0]);
     }
   };
 
@@ -921,7 +1169,7 @@ function ZenoMainApp() {
       };
     }
     setServers((prev: Server[]) => [...prev, joinedServer]);
-    saveServerToDb(joinedServer);
+    saveServerToDb(joinedServer, userIdentity?.ain);
     setActiveServerId(joinedServer.id);
     setActiveServer(joinedServer);
     if (joinedServer.categories && joinedServer.categories[0] && joinedServer.categories[0].channels[0]) {
@@ -954,7 +1202,7 @@ function ZenoMainApp() {
 
     setActiveServer(updatedServer);
     setServers((prev: Server[]) => prev.map((s) => (s.id === updatedServer.id ? updatedServer : s)));
-    await saveServerToDb(updatedServer);
+    await saveServerToDb(updatedServer, userIdentity?.ain);
 
     if (autoCommitGit) {
       showToast(`Kanal #${newChannel.name} erstellt. Sichere in Git... 🌿`);
@@ -1000,7 +1248,7 @@ function ZenoMainApp() {
       }
     }
 
-    await saveServerToDb(updatedServer);
+    await saveServerToDb(updatedServer, userIdentity?.ain);
     showToast(`Kanal #${deletedChannelName || channelId} gelöscht.`);
 
     if (activeServer.gitRepo) {
@@ -1041,7 +1289,7 @@ function ZenoMainApp() {
 
     setActiveServer(updatedServer);
     setServers((prev: Server[]) => prev.map((s) => (s.id === updatedServer.id ? updatedServer : s)));
-    await saveServerToDb(updatedServer);
+    await saveServerToDb(updatedServer, userIdentity?.ain);
     showToast(`Kategorie "${cleanName}" mit #allgemein erstellt! 📁`);
 
     if (activeServer.gitRepo) {
@@ -2221,16 +2469,113 @@ function ZenoMainApp() {
     }
   };
 
+  const getTitlebarTitle = () => {
+    if (activeServerId === "home") {
+      if (homeTab === "dm" && activeDmPeerAin) {
+        const peer = dmConversations.find((d) => d.peerAin === activeDmPeerAin);
+        return peer ? `@${peer.peerName}` : "Direct Messages";
+      }
+      if (homeTab === "ide") {
+        const folderName = ideWorkspacePath ? ideWorkspacePath.split(/[/\\]/).filter(Boolean).pop() : "Workspace";
+        return `Zeno IDE — ${folderName}`;
+      }
+      if (homeTab === "wiki") return "Knowledge Hub";
+      if (homeTab === "wasm_hub") return "Wasm Hub";
+      if (homeTab === "plugins") return "Plugin Store & Extensions";
+      return "Dashboard";
+    }
+    return `${activeServer?.name || "Server"}  #${activeChannel?.name || "general"}`;
+  };
+
+  const getTitlebarSubtitle = () => {
+    if (activeServerId === "home") {
+      if (homeTab === "dm") return "Direct Messages";
+      if (homeTab === "ide") return "Development";
+      if (homeTab === "wiki") return "Documentation";
+      if (homeTab === "wasm_hub") return "Runtimes";
+      if (homeTab === "plugins") return "Plugins";
+      return "Zeno Home";
+    }
+    return activeServer?.name || "Server";
+  };
+
+  if (isPopoutMode) {
+    const activePopoutPeer: DmConversation = dmConversations.find(
+      (d) => d.peerAin === popoutPeerAin
+    ) || {
+      peerAin: popoutPeerAin || "p2p_direct",
+      peerName: popoutPeerName || "Direct Contact",
+      peerStatusQuote: "Serverloser Ende-zu-Ende verschlüsselter Direktkanal",
+      peerAvatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${popoutPeerAin || "zeno"}`,
+      connectionStatus: "p2p_direct",
+      pingMs: 12,
+      unreadCount: 0
+    };
+
+    return (
+      <div
+        className={`zeno-popout-layout ${theme === "light" ? "light light-mode theme-light" : "dark"} ${glassmorphism ? "glassmorphism" : ""}`}
+        style={{
+          "--canvas-bg": canvasColor,
+          "--glow-color": glowColor
+        } as React.CSSProperties}
+      >
+        <CustomTitlebar
+          title={`@${activePopoutPeer.peerName}`}
+          subtitle="Direct Message"
+          isPopout={true}
+          theme={theme}
+          onToggleTheme={handleThemeToggle}
+        />
+
+        <div className="zeno-popout-content">
+          <DmChatArea
+            activePeer={activePopoutPeer}
+            messages={dmMessages[activePopoutPeer.peerAin] || []}
+            currentUserName={userName}
+            currentUserAin={userIdentity?.ain}
+            onSendMessage={handleSendDmMessage}
+            onOpenInIde={(code) => {
+              showToast("Code-Snippet in Zwischenablage kopiert! 📋");
+              navigator.clipboard?.writeText(code);
+            }}
+            openInPrivacyBrowser={openInPrivacyBrowser}
+            showToast={showToast}
+          />
+        </div>
+
+        {/* TOAST NOTIFICATION CONTAINER */}
+        <div className="toast-container">
+          {toasts.map((toast) => (
+            <div key={toast.id} className="toast">
+              {toast.message}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   const activeIdeFile = ideFiles.find((f) => f.path === ideActiveFilePath);
 
   return (
     <div
-      className={`app-layout ${isSidebarCollapsed ? "sidebar-collapsed" : ""} ${activeServerId === "home" && homeTab === "ide" ? "in-ide" : ""} ${activeServerId === "home" ? `is-home home-tab-${homeTab}` : "is-server chat-active"} ${isMembersOpen && activeServerId !== "home" ? "members-open" : "members-closed"} ${theme === "light" ? "light light-mode theme-light" : "dark"} ${glassmorphism ? "glassmorphism" : ""}`}
+      className={`zeno-app-wrapper ${theme === "light" ? "light light-mode theme-light" : "dark"} ${glassmorphism ? "glassmorphism" : ""}`}
       style={{
         "--canvas-bg": canvasColor,
         "--glow-color": glowColor
       } as React.CSSProperties}
     >
+      <CustomTitlebar
+        title={getTitlebarTitle()}
+        subtitle={getTitlebarSubtitle()}
+        theme={theme}
+        onToggleTheme={handleThemeToggle}
+      />
+
+      <div
+        className={`app-layout ${isSidebarCollapsed ? "sidebar-collapsed" : ""} ${activeServerId === "home" && homeTab === "ide" ? "in-ide" : ""} ${activeServerId === "home" ? `is-home home-tab-${homeTab}` : "is-server chat-active"} ${isMembersOpen && (activeServerId !== "home" || homeTab === "dm") ? "members-open" : "members-closed"}`}
+      >
       {/* 1. SERVER SIDEBAR */}
       <ServerSidebar
         servers={servers}
@@ -2290,6 +2635,10 @@ function ZenoMainApp() {
           setIsSettingsOpen(true);
         }}
         onToggleSidebar={toggleSidebar}
+        dmConversations={dmConversations}
+        activeDmPeerAin={activeDmPeerAin}
+        onSelectDm={handleSelectDm}
+        onStartNewDm={handleStartNewDm}
       />
 
       {/* Floating Restore Button if Sidebar is Collapsed on Dashboard */}
@@ -2390,6 +2739,26 @@ function ZenoMainApp() {
             setEditorOutput={setEditorOutput}
             setIsEditorOpen={setIsEditorOpen}
             handleInstallRuntime={handleInstallRuntime}
+            showToast={showToast}
+          />
+        ) : homeTab === "dm" && activeDmPeerAin && dmConversations.find((d) => d.peerAin === activeDmPeerAin) ? (
+          <DmChatArea
+            activePeer={dmConversations.find((d) => d.peerAin === activeDmPeerAin)!}
+            messages={dmMessages[activeDmPeerAin] || []}
+            currentUserName={userName}
+            currentUserAin={userIdentity?.ain}
+            onSendMessage={handleSendDmMessage}
+            onDetachPopout={handleDetachDmPopout}
+            onOpenInIde={(code, language, title) => {
+              setEditorCode(code);
+              setEditorLanguage(language);
+              setEditorFilename(title || `snippet.${language}`);
+              setHomeTab("ide");
+              showToast("Snippet in die Zeno IDE geladen! 🛠️");
+            }}
+            onToggleRightPanel={() => setIsMembersOpen((prev) => !prev)}
+            isRightPanelOpen={isMembersOpen}
+            openInPrivacyBrowser={openInPrivacyBrowser}
             showToast={showToast}
           />
         ) : (
@@ -2505,6 +2874,20 @@ function ZenoMainApp() {
         onCloseSnippetPatcher={() => setActivePatchedSnippet(null)}
         theme={theme}
         onClosePanel={() => setIsMembersOpen(false)}
+        isDmMode={activeServerId === "home" && homeTab === "dm"}
+        activeDmPeer={
+          activeServerId === "home" && homeTab === "dm" && activeDmPeerAin
+            ? dmConversations.find((d) => d.peerAin === activeDmPeerAin)
+            : undefined
+        }
+        dmMessages={activeDmPeerAin ? dmMessages[activeDmPeerAin] || [] : []}
+        onOpenInIde={(code, language, title) => {
+          setEditorCode(code);
+          setEditorLanguage(language);
+          setEditorFilename(title || `snippet.${language}`);
+          setHomeTab("ide");
+          showToast("Snippet in die Zeno IDE geladen! 🛠️");
+        }}
       />
 
       {/* 5. MODALS & DIALOGS */}
@@ -2668,6 +3051,15 @@ function ZenoMainApp() {
         userAin={userIdentity?.ain}
       />
 
+      <CreateDmModal
+        isOpen={isCreateDmModalOpen}
+        onClose={() => setIsCreateDmModalOpen(false)}
+        existingDms={dmConversations}
+        onCreatePeerDm={handleCreatePeerDm}
+        onCreateSelfChat={handleCreateSelfChat}
+        showToast={showToast}
+      />
+
       <InstanceBrowserModal
         isOpen={isInstanceBrowserOpen}
         onClose={() => setIsInstanceBrowserOpen(false)}
@@ -2731,6 +3123,7 @@ function ZenoMainApp() {
             {toast.message}
           </div>
         ))}
+      </div>
       </div>
     </div>
   );

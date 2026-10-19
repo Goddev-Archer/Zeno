@@ -1,4 +1,4 @@
-import { Server, Message, Profile, IdeFile, HubRuntimeItem, WidgetConfig } from "../types";
+import { Server, Message, Profile, IdeFile, HubRuntimeItem, WidgetConfig, DmConversation, DirectMessage } from "../types";
 
 /**
  * Standard-Workspace, der als Fallback dient, falls die lokale SQLite-Datenbank noch keine Server enthält.
@@ -31,6 +31,64 @@ export const defaultServers: Server[] = [
 ];
 
 export const initialServers: Server[] = defaultServers;
+
+/**
+ * P2P Direct-Message & Selbstchat (Notizboard) Konfiguration
+ * Keine Fake-Accounts mehr. Standardmäßig startet der Nutzer mit seinem
+ * privaten "Notizen an mich selbst"-Notizboard.
+ */
+export const DEFAULT_SELF_CHAT_AIN = "ZENO-SELF-NOTE-MAIN";
+export const MAX_SELF_CHATS = 5;
+
+export const initialDmConversations: DmConversation[] = [
+  {
+    peerAin: DEFAULT_SELF_CHAT_AIN,
+    peerName: "Notizen an mich selbst",
+    peerAvatar: "📝",
+    peerStatusQuote: "Privates Ende-zu-Ende verschlüsseltes Notizboard (Nur auf diesem Gerät)",
+    connectionStatus: "p2p_direct",
+    isSelfChat: true,
+    selfChatTopic: "Allgemein",
+    pingMs: 0,
+    unreadCount: 0,
+    lastMessage: {
+      id: "self-note-welcome",
+      senderAin: "self",
+      recipientAin: "self",
+      content: "Willkommen in deinem persönlichen Zeno-Notizboard! 📝\n\nHier kannst du Gedanken festhalten, To-Dos notieren, Code-Snippets zwischenspeichern und Links ablegen. Alles wird lokal auf deinem Rechner sicher gespeichert.",
+      time: "09:00",
+      timestamp: Date.now() - 3600000,
+      status: "delivered",
+      deliveryRoute: "p2p_direct",
+      codeSnippet: {
+        language: "markdown",
+        title: "quick_ideas.md",
+        code: "- [x] P2P-Verschlüsselung aktivieren\n- [ ] Multi-Monitor Popout testen\n- [ ] Eigene Notizen organisieren"
+      }
+    }
+  }
+];
+
+export const initialDmMessages: Record<string, DirectMessage[]> = {
+  [DEFAULT_SELF_CHAT_AIN]: [
+    {
+      id: "self-note-welcome",
+      senderAin: "self",
+      recipientAin: "self",
+      content: "Willkommen in deinem persönlichen Zeno-Notizboard! 📝\n\nHier kannst du Gedanken festhalten, To-Dos notieren, Code-Snippets zwischenspeichern und Links ablegen. Alles wird lokal auf deinem Rechner sicher gespeichert.",
+      time: "09:00",
+      timestamp: Date.now() - 3600000,
+      status: "delivered",
+      deliveryRoute: "p2p_direct",
+      codeSnippet: {
+        language: "markdown",
+        title: "quick_ideas.md",
+        code: "- [x] P2P-Verschlüsselung aktivieren\n- [ ] Multi-Monitor Popout testen\n- [ ] Eigene Notizen organisieren"
+      }
+    }
+  ]
+};
+
 
 /**
  * Keine Fake-Chat-Nachrichten mehr. Kanäle starten sauber leer

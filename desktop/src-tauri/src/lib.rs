@@ -1352,21 +1352,29 @@ fn db_delete_identity(state: tauri::State<db::DbState>, ain: String) -> Result<(
     db::remove_identity(&conn, &ain)
 }
 #[tauri::command]
-fn db_save_server(state: tauri::State<db::DbState>, server: db::DbServerRecord) -> Result<(), String> {
+fn db_save_server(state: tauri::State<db::DbState>, server: db::DbServerRecord, account_ain: Option<String>) -> Result<(), String> {
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
-    db::insert_or_update_server(&conn, &server)
+    db::insert_or_update_server(&conn, &server, account_ain.as_deref())
 }
 
 #[tauri::command]
-fn db_get_servers(state: tauri::State<db::DbState>) -> Result<Vec<db::DbServerRecord>, String> {
+fn db_get_servers(state: tauri::State<db::DbState>, account_ain: Option<String>) -> Result<Vec<db::DbServerRecord>, String> {
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
-    db::fetch_all_servers(&conn)
+    if let Some(ain) = account_ain {
+        db::fetch_servers_for_account(&conn, &ain)
+    } else {
+        db::fetch_all_servers(&conn)
+    }
 }
 
 #[tauri::command]
-fn db_delete_server(state: tauri::State<db::DbState>, server_id: String) -> Result<(), String> {
+fn db_delete_server(state: tauri::State<db::DbState>, server_id: String, account_ain: Option<String>) -> Result<(), String> {
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
-    db::remove_server(&conn, &server_id)
+    if let Some(ain) = account_ain {
+        db::remove_server_for_account(&conn, &server_id, &ain)
+    } else {
+        db::remove_server(&conn, &server_id)
+    }
 }
 
 #[tauri::command]
@@ -1553,11 +1561,81 @@ fn plugin_delete_installed(app: tauri::AppHandle, plugin_id: String) -> Result<(
     Ok(())
 }
 
+#[tauri::command]
+fn window_minimize(window: tauri::Window) -> Result<(), String> {
+    window.minimize().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn window_is_maximized(window: tauri::Window) -> Result<bool, String> {
+    window.is_maximized().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn window_toggle_maximize(window: tauri::Window) -> Result<bool, String> {
+    if window.is_maximized().map_err(|e| e.to_string())? {
+        window.unmaximize().map_err(|e| e.to_string())?;
+        Ok(false)
+    } else {
+        window.maximize().map_err(|e| e.to_string())?;
+        Ok(true)
+    }
+}
+
+#[tauri::command]
+fn window_close(window: tauri::Window) -> Result<(), String> {
+    window.close().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn window_open_dm_popout(app: tauri::AppHandle, peer_ain: String, peer_name: String) -> Result<(), String> {
+    let safe_label = format!("dm_popout_{}", peer_ain.chars().filter(|c| c.is_alphanumeric() || *c == '_').collect::<String>());
+    
+    if let Some(existing_window) = app.get_webview_window(&safe_label) {
+        let _ = existing_window.show();
+        let _ = existing_window.set_focus();
+        return Ok(());
+    }
+
+    let enc_ain: String = url::form_urlencoded::byte_serialize(peer_ain.trim().as_bytes()).collect();
+    let enc_name: String = url::form_urlencoded::byte_serialize(peer_name.trim().as_bytes()).collect();
+
+    let webview_url = if let Some(main_win) = app.get_webview_window("main") {
+        if let Ok(mut u) = main_win.url() {
+            u.set_query(Some(&format!("popout=dm&peerAin={}&peerName={}", enc_ain, enc_name)));
+            tauri::WebviewUrl::External(u)
+        } else {
+            tauri::WebviewUrl::App(format!("index.html?popout=dm&peerAin={}&peerName={}", enc_ain, enc_name).into())
+        }
+    } else {
+        tauri::WebviewUrl::App(format!("index.html?popout=dm&peerAin={}&peerName={}", enc_ain, enc_name).into())
+    };
+
+    let builder = tauri::WebviewWindowBuilder::new(
+        &app,
+        &safe_label,
+        webview_url,
+    )
+    .title(format!("Zeno — @{}", peer_name))
+    .inner_size(520.0, 720.0)
+    .min_inner_size(380.0, 480.0)
+    .decorations(false)
+    .resizable(true);
+
+    builder.build().map_err(|e| format!("Fehler beim Erstellen des Popout-Fensters: {}", e))?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
+            window_minimize,
+            window_is_maximized,
+            window_toggle_maximize,
+            window_close,
+            window_open_dm_popout,
             greet,
             get_git_status,
             get_git_log,

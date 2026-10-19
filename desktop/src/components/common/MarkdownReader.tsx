@@ -182,7 +182,7 @@ export const MarkdownReader: React.FC<MarkdownReaderProps> = ({
                 }}
                 title="In Monaco-Editor bearbeiten"
               >
-                <Icon icon="mage:code" /> Im Editor öffnen
+                <Icon icon="lucide:code" /> Im Editor öffnen
               </button>
             )}
             {showCopyAll && (

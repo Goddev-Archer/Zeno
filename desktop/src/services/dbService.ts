@@ -32,9 +32,9 @@ export interface DbMessageRecord {
 }
 
 /**
- * Saves or updates a Server in the native Rust SQLite database
+ * Saves or updates a Server in the native Rust SQLite database, scoped to an account
  */
-export async function saveServerToDb(server: Server): Promise<void> {
+export async function saveServerToDb(server: Server, accountAin?: string): Promise<void> {
   if (!isTauriEnvironment()) return;
 
   try {
@@ -45,28 +45,28 @@ export async function saveServerToDb(server: Server): Promise<void> {
       icon: server.icon,
       description: server.description,
       encrypted: server.encrypted ?? true,
-      ownerAin: server.ownerAin,
+      ownerAin: server.ownerAin || accountAin,
       manifestUrl: server.manifestUrl,
       gitRepoJson: server.gitRepo ? JSON.stringify(server.gitRepo) : undefined,
       categoriesJson: JSON.stringify(server.categories || []),
       createdAt: new Date().toISOString()
     };
 
-    await invoke("db_save_server", { server: record });
-    console.log(`[Zeno SQLite] Server "${server.name}" in nativer DB gespeichert.`);
+    await invoke("db_save_server", { server: record, accountAin: accountAin || server.ownerAin });
+    console.log(`[Zeno SQLite] Server "${server.name}" für Account "${accountAin || server.ownerAin || 'global'}" in nativer DB gespeichert.`);
   } catch (e) {
     console.error("[Zeno SQLite] Fehler beim Speichern des Servers:", e);
   }
 }
 
 /**
- * Loads all Servers from the native Rust SQLite database
+ * Loads Servers for an account from the native Rust SQLite database
  */
-export async function loadServersFromDb(): Promise<Server[] | null> {
+export async function loadServersFromDb(accountAin?: string): Promise<Server[] | null> {
   if (!isTauriEnvironment()) return null;
 
   try {
-    const records = await invoke<DbServerRecord[]>("db_get_servers");
+    const records = await invoke<DbServerRecord[]>("db_get_servers", { accountAin });
     if (!records || records.length === 0) return null;
 
     return records.map((r) => ({
@@ -89,13 +89,13 @@ export async function loadServersFromDb(): Promise<Server[] | null> {
 }
 
 /**
- * Deletes a Server from the native Rust SQLite database
+ * Deletes a Server from the native Rust SQLite database for an account
  */
-export async function deleteServerFromDb(serverId: string): Promise<void> {
+export async function deleteServerFromDb(serverId: string, accountAin?: string): Promise<void> {
   if (!isTauriEnvironment()) return;
 
   try {
-    await invoke("db_delete_server", { serverId });
+    await invoke("db_delete_server", { serverId, accountAin });
     console.log(`[Zeno SQLite] Server "${serverId}" aus nativer DB gelöscht.`);
   } catch (e) {
     console.error("[Zeno SQLite] Fehler beim Löschen des Servers:", e);
