@@ -218,11 +218,12 @@ const lightPresets = [
 ];
 
 function ZenoMainApp() {
-  // Check URL query parameters for Popout mode (e.g. ?popout=dm&peerAin=...)
+  // Check window.__ZENO_POPOUT_CONFIG__ (injected via Tauri initialization_script) or URL query parameters
   const urlParams = new URLSearchParams(window.location.search);
-  const isPopoutMode = urlParams.get("popout") === "dm";
-  const popoutPeerAin = urlParams.get("peerAin");
-  const popoutPeerName = urlParams.get("peerName");
+  const popoutConfig = typeof window !== "undefined" ? (window as any).__ZENO_POPOUT_CONFIG__ : null;
+  const isPopoutMode = Boolean(popoutConfig) || urlParams.get("popout") === "dm";
+  const popoutPeerAin = popoutConfig?.peerAin || urlParams.get("peerAin");
+  const popoutPeerName = popoutConfig?.peerName || urlParams.get("peerName");
 
   const [servers, setServers] = useState<Server[]>(initialServers);
   const [activeServerId, setActiveServerId] = useState<string>("home");
@@ -2506,7 +2507,7 @@ function ZenoMainApp() {
       peerAin: popoutPeerAin || "p2p_direct",
       peerName: popoutPeerName || "Direct Contact",
       peerStatusQuote: "Serverloser Ende-zu-Ende verschlüsselter Direktkanal",
-      peerAvatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${popoutPeerAin || "zeno"}`,
+      peerAvatar: popoutPeerName ? popoutPeerName[0].toUpperCase() : "👤",
       connectionStatus: "p2p_direct",
       pingMs: 12,
       unreadCount: 0

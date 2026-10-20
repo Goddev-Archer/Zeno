@@ -1584,7 +1584,9 @@ fn window_toggle_maximize(window: tauri::Window) -> Result<bool, String> {
 
 #[tauri::command]
 fn window_close(window: tauri::Window) -> Result<(), String> {
-    window.close().map_err(|e| e.to_string())
+    let _ = window.destroy();
+    let _ = window.close();
+    Ok(())
 }
 
 #[tauri::command]
@@ -1597,25 +1599,24 @@ fn window_open_dm_popout(app: tauri::AppHandle, peer_ain: String, peer_name: Str
         return Ok(());
     }
 
-    let enc_ain: String = url::form_urlencoded::byte_serialize(peer_ain.trim().as_bytes()).collect();
-    let enc_name: String = url::form_urlencoded::byte_serialize(peer_name.trim().as_bytes()).collect();
-
-    let webview_url = if let Some(main_win) = app.get_webview_window("main") {
-        if let Ok(mut u) = main_win.url() {
-            u.set_query(Some(&format!("popout=dm&peerAin={}&peerName={}", enc_ain, enc_name)));
-            tauri::WebviewUrl::External(u)
-        } else {
-            tauri::WebviewUrl::App(format!("index.html?popout=dm&peerAin={}&peerName={}", enc_ain, enc_name).into())
-        }
-    } else {
-        tauri::WebviewUrl::App(format!("index.html?popout=dm&peerAin={}&peerName={}", enc_ain, enc_name).into())
-    };
+    let init_script = format!(
+        r#"
+        window.__ZENO_POPOUT_CONFIG__ = {{
+            mode: "dm",
+            peerAin: {},
+            peerName: {}
+        }};
+        "#,
+        serde_json::to_string(&peer_ain).unwrap_or_else(|_| "\"\"".to_string()),
+        serde_json::to_string(&peer_name).unwrap_or_else(|_| "\"\"".to_string())
+    );
 
     let builder = tauri::WebviewWindowBuilder::new(
         &app,
         &safe_label,
-        webview_url,
+        tauri::WebviewUrl::App("index.html".into()),
     )
+    .initialization_script(&init_script)
     .title(format!("Zeno — @{}", peer_name))
     .inner_size(520.0, 720.0)
     .min_inner_size(380.0, 480.0)

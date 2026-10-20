@@ -10,6 +10,13 @@
 
   <body>
     <div id="root"></div>
+    <script>
+      window.addEventListener("keydown", function(e) {
+        if (e.key === "Escape" && (window.location.search.includes("popout") || window.__ZENO_POPOUT_CONFIG__)) {
+          window.close();
+        }
+      });
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

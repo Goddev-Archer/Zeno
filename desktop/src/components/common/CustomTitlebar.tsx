@@ -45,6 +45,24 @@ export const CustomTitlebar: React.FC<CustomTitlebarProps> = ({
     }
   }, [isTauri]);
 
+  useEffect(() => {
+    if (isPopout) {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === "Escape") {
+          if (isTauri) {
+            getCurrentWindow().close().catch(() => {
+              invoke("window_close").catch(() => window.close());
+            });
+          } else {
+            window.close();
+          }
+        }
+      };
+      window.addEventListener("keydown", handleKeyDown);
+      return () => window.removeEventListener("keydown", handleKeyDown);
+    }
+  }, [isPopout, isTauri]);
+
   const handleMinimize = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isTauri) {
@@ -83,16 +101,24 @@ export const CustomTitlebar: React.FC<CustomTitlebarProps> = ({
     if (isTauri) {
       try {
         await getCurrentWindow().close();
-      } catch {
-        try {
-          await invoke("window_close");
-        } catch {
-          window.close();
-        }
+        return;
+      } catch (err) {
+        console.warn("getCurrentWindow().close() error:", err);
       }
-    } else {
-      window.close();
+      try {
+        await getCurrentWindow().destroy();
+        return;
+      } catch (err) {
+        console.warn("getCurrentWindow().destroy() error:", err);
+      }
+      try {
+        await invoke("window_close");
+        return;
+      } catch (err) {
+        console.warn("invoke('window_close') error:", err);
+      }
     }
+    window.close();
   };
 
   return (
