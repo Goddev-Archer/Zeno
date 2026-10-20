@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Icon } from "@iconify/react";
 import {
   WidgetConfig,
@@ -89,6 +89,38 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onJoinVoice
 }) => {
   const [copiedAin, setCopiedAin] = useState<boolean>(false);
+  const dashboardScrollRef = useRef<HTMLDivElement>(null);
+  const [hasOverflowBelow, setHasOverflowBelow] = useState<boolean>(false);
+
+  const checkOverflow = useCallback(() => {
+    const el = dashboardScrollRef.current;
+    if (!el) return;
+    const isOverflowing = el.scrollHeight - el.scrollTop - el.clientHeight > 18;
+    setHasOverflowBelow(isOverflowing);
+  }, []);
+
+  useEffect(() => {
+    checkOverflow();
+    const el = dashboardScrollRef.current;
+    if (!el) return;
+
+    const observer = new ResizeObserver(() => checkOverflow());
+    observer.observe(el);
+    window.addEventListener("resize", checkOverflow);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", checkOverflow);
+    };
+  }, [checkOverflow]);
+
+  const handleScroll = () => {
+    checkOverflow();
+  };
+
+  const handleScrollDownHint = () => {
+    dashboardScrollRef.current?.scrollBy({ top: 220, behavior: "smooth" });
+  };
 
   const displayAin = userIdentity?.ain || "ZENO-D432-EAA1-8B01";
   const displayFingerprint = userIdentity?.fingerprint || "0x9F82A4C1B920";
@@ -140,21 +172,24 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
   };
 
   return (
-    <div
-      className="zeno-dashboard"
-      style={{
-        padding: "16px 20px",
-        overflowY: "auto",
-        display: "flex",
-        flexDirection: "column",
-        gap: "14px",
-        height: "100%",
-        maxHeight: "100%",
-        boxSizing: "border-box",
-        backgroundColor: "transparent",
-        color: "var(--text-primary)"
-      }}
-    >
+    <div className="zeno-dashboard-wrapper" style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
+      <div
+        ref={dashboardScrollRef}
+        onScroll={handleScroll}
+        className="zeno-dashboard"
+        style={{
+          padding: "16px 20px 56px 20px",
+          overflowY: "auto",
+          display: "flex",
+          flexDirection: "column",
+          gap: "14px",
+          height: "100%",
+          maxHeight: "100%",
+          boxSizing: "border-box",
+          backgroundColor: "transparent",
+          color: "var(--text-primary)"
+        }}
+      >
       {/* 1. FLOATING HERO & IDENTITY STATUS ISLAND */}
       <section
         style={{
@@ -625,6 +660,19 @@ Passwörter. Deine kryptografischen Schlüssel gehören allein dir.
 
         </div>
 
+      </div>
+      </div>
+
+      {/* Dynamic bottom blur & fade overlay when content is cut off below */}
+      <div
+        className={`zeno-dashboard-cut-blur ${hasOverflowBelow ? "visible" : ""}`}
+        onClick={handleScrollDownHint}
+        title="Nach unten scrollen, um weitere Widgets zu sehen"
+      >
+        <div className="zeno-dashboard-cut-blur-pill">
+          <Icon icon="mage:chevron-down" style={{ fontSize: "14px" }} />
+          <span>Weitere Widgets anzeigen</span>
+        </div>
       </div>
     </div>
   );
