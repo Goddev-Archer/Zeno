@@ -1212,34 +1212,28 @@ body.light-mode .titlebar-btn:hover {
    ============================================================ */
 .chat-area {
   grid-column: 3;
+  position: relative;
+  z-index: 5; /* Sit in front of right-panel-island so it slides out from behind */
   background-color: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-island);
   border-left: none; /* Seamless dock against channel-sidebar right border */
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
-  border-top-right-radius: var(--radius-lg);
-  border-bottom-right-radius: var(--radius-lg);
+  border-top-right-radius: var(--island-radius, 12px) !important;
+  border-bottom-right-radius: var(--island-radius, 12px) !important;
+  border-right: 1px solid var(--border-island) !important;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transition: background-color var(--transition-normal), backdrop-filter var(--transition-normal);
-  transition: border-radius 0.25s ease, border-left 0.25s ease, border-right 0.25s ease, background-color var(--transition-normal), backdrop-filter var(--transition-normal);
-}
-
-/* When members sidebar is open, dock right side flush to members sidebar */
-.app-layout.members-open .chat-area,
-.app-layout:has(.members-sidebar:not(.collapsed)) .chat-area {
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-  border-right: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
+  transition: border-radius 0.25s ease, border-left 0.25s ease, background-color var(--transition-normal), backdrop-filter var(--transition-normal);
 }
 
 /* When channel sidebar is collapsed, restore left border and rounded corners */
 .app-layout.sidebar-collapsed .chat-area {
-  border-left: 1px solid var(--border-color);
-  border-top-left-radius: var(--radius-lg);
-  border-bottom-left-radius: var(--radius-lg);
+  border-left: 1px solid var(--border-island);
+  border-top-left-radius: var(--island-radius, 12px);
+  border-bottom-left-radius: var(--island-radius, 12px);
 }
 
 .glass-effect .chat-area {
@@ -5540,41 +5534,62 @@ body.light-mode .git-owner-bar,
 
 /* ── Right Panel Island (Monaco In-Chat-IDE & Member Island) ── */
 .right-panel-island {
-  width: 320px;
+  grid-column: 4;
+  width: 280px;
   height: 100%;
   background-color: var(--bg-island);
   border: 1px solid var(--border-island);
-  border-radius: var(--island-radius);
+  border-radius: var(--island-radius, 12px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.28);
-  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1),
-              opacity 0.25s ease,
-              margin 0.3s cubic-bezier(0.16, 1, 0.3, 1),
-              border-color 0.2s ease;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.32);
   flex-shrink: 0;
+  margin-left: 8px; /* Island Gap between Chat-Fenster and Mitgliederleiste */
+  position: relative;
+  z-index: 1; /* Layered behind .chat-area (z-index: 5) */
+  transform: translateX(0);
+  opacity: 1;
+  pointer-events: auto;
+  transition: 
+    width 0.34s cubic-bezier(0.16, 1, 0.3, 1),
+    margin-left 0.34s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.36s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.26s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.3s ease,
+    border-color 0.2s ease;
+  will-change: width, transform, opacity, margin-left;
 }
 
 .right-panel-island.collapsed {
   width: 0 !important;
   min-width: 0 !important;
-  opacity: 0 !important;
-  margin-left: -8px !important;
+  max-width: 0 !important;
+  margin-left: 0 !important;
   padding: 0 !important;
-  border: none !important;
-  pointer-events: none;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
+  opacity: 0 !important;
+  transform: translateX(-80px) scale(0.96) !important; /* Slide behind the chat window */
+  pointer-events: none !important;
+  overflow: hidden !important;
 }
 
-@keyframes rightIslandSlideIn {
-  from {
-    opacity: 0;
-    transform: translateX(18px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+/* Prevent inner content from squishing during width transition */
+.right-panel-island .right-island-header,
+.right-panel-island .right-island-body {
+  width: 280px;
+  min-width: 280px;
+  box-sizing: border-box;
+}
+
+/* Light mode overrides for right-panel-island */
+.light-mode .right-panel-island,
+[data-theme="light"] .right-panel-island,
+body.light-mode .right-panel-island {
+  background-color: var(--bg-island);
+  border-color: var(--border-island);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 
 .right-island-header {

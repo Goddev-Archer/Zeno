@@ -76,7 +76,6 @@ export const RightPanelIsland: React.FC<RightPanelIslandProps> = ({
   }, [activeSnippet]);
 
   if (activeServerId === "home" && !isDmMode) return null;
-  if (!isOpen) return null;
 
   // Custom Monaco Editor Theme Registration
   const handleEditorWillMount = (monaco: Monaco) => {
