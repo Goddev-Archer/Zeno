@@ -1365,13 +1365,101 @@ body.light-mode .titlebar-btn:hover {
 
 .message {
   display: flex;
-  padding: 8px 16px;
+  padding: 8px 16px 2px 16px;
   gap: 12px;
   transition: background-color var(--transition-fast);
 }
 
 .message:hover {
   background-color: rgba(255, 255, 255, 0.015);
+}
+
+body.light-mode .message:hover,
+[data-theme="light"] .message:hover {
+  background-color: rgba(0, 0, 0, 0.025);
+}
+
+/* ── Discord-Style Message Grouping (Consecutive Messages within 2 Min) ── */
+.message.message-compact {
+  padding-top: 1px;
+  padding-bottom: 2px;
+  min-height: 22px;
+}
+
+.message.message-compact:hover {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+body.light-mode .message.message-compact:hover,
+[data-theme="light"] .message.message-compact:hover {
+  background-color: rgba(0, 0, 0, 0.025);
+}
+
+.message-compact-gutter {
+  width: 36px;
+  min-width: 36px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  user-select: none;
+  padding-right: 2px;
+}
+
+.message-compact-timestamp {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.message.message-compact:hover .message-compact-timestamp {
+  opacity: 0.75;
+}
+
+.message-compact-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.message-compact-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.message-compact-status {
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.message.message-compact:hover .message-compact-status {
+  opacity: 1;
+}
+
+.message-compact-status.is-pending {
+  opacity: 1 !important;
+}
+
+.message-compact-delete {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  margin-top: 2px;
+}
+
+.message.message-compact:hover .message-compact-delete {
+  opacity: 1;
 }
 
 .message-avatar {

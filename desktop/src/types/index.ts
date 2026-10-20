@@ -122,6 +122,7 @@ export interface Message {
   author: string;
   text: string;
   time: string;
+  timestamp?: number;
   color: string;
   code?: string;
   attachment?: MessageAttachment;

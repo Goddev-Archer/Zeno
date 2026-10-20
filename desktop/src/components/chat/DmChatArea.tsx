@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Icon } from "@iconify/react";
 import { DirectMessage, DmConversation } from "../../types";
 import { GfmChatRenderer } from "./GfmChatRenderer";
+import { shouldGroupDmMessages } from "../../utils/chatUtils";
 
 interface DmChatAreaProps {
   activePeer: DmConversation;
@@ -449,6 +450,100 @@ export const DmChatArea: React.FC<DmChatAreaProps> = ({
               ? (currentUserName ? currentUserName[0].toUpperCase() : "C")
               : (activePeer.peerAvatar || activePeer.peerName[0]?.toUpperCase() || "P");
             const avatarColor = isMe ? "purple" : "blue";
+
+            const prevMsg = i > 0 ? messages[i - 1] : null;
+            const isGrouped = shouldGroupDmMessages(prevMsg, msg, currentUserAin, 2);
+
+            if (isGrouped) {
+              const isPending = msg.status === "queued" || msg.status === "sending";
+              return (
+                <article
+                  key={msg.id || i}
+                  className="message message-compact message-animate"
+                  style={{ "--idx": Math.min(i, 6) } as React.CSSProperties}
+                >
+                  <div className="message-compact-gutter">
+                    <time className="message-compact-timestamp" title={msg.time}>
+                      {msg.time}
+                    </time>
+                  </div>
+
+                  <div className="message-body message-compact-body">
+                    <div className="message-compact-row">
+                      <div className="message-content" style={{ flex: 1, minWidth: 0 }}>
+                        <GfmChatRenderer
+                          text={msg.content}
+                          onOpenPrivacyBrowser={openInPrivacyBrowser || ((url) => window.open(url, "_blank"))}
+                          showToast={showToast}
+                        />
+
+                        {/* Embedded Code Snippet */}
+                        {msg.codeSnippet && (
+                          <div className="code-block-wrapper" style={{ marginTop: "8px" }}>
+                            <header className="code-block-header">
+                              <span className="code-block-language">
+                                {msg.codeSnippet.title || msg.codeSnippet.language}
+                              </span>
+                              <div className="code-block-actions" style={{ display: "flex", gap: "6px" }}>
+                                {onOpenInIde && (
+                                  <button
+                                    type="button"
+                                    className="code-action-btn"
+                                    onClick={() => onOpenInIde(msg.codeSnippet!.code, msg.codeSnippet!.language, msg.codeSnippet!.title)}
+                                    title="In der Zeno IDE öffnen"
+                                    style={{ display: "inline-flex", alignItems: "center", gap: "3px" }}
+                                  >
+                                    <Icon icon="lucide:code" />
+                                    <span>In IDE</span>
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  className="code-action-btn"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(msg.codeSnippet!.code);
+                                    showToast("Code in Zwischenablage kopiert! 📋");
+                                  }}
+                                  title="Code kopieren"
+                                  style={{ display: "inline-flex", alignItems: "center", gap: "3px" }}
+                                >
+                                  <Icon icon="mage:copy" />
+                                  <span>Kopieren</span>
+                                </button>
+                              </div>
+                            </header>
+                            <pre className="code-block">
+                              <code className={`language-${msg.codeSnippet.language}`}>{msg.codeSnippet.code}</code>
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className={`message-compact-status ${isPending ? "is-pending" : ""}`}>
+                        {isMe ? (
+                          getStatusBadge(msg)
+                        ) : (
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "3px",
+                              fontSize: "10px",
+                              color: "var(--text-muted)",
+                              fontFamily: "var(--font-mono)"
+                            }}
+                            title="E2EE verschlüsselt empfangen"
+                          >
+                            <Icon icon="mage:lock" style={{ fontSize: "11px", color: "var(--accent-oxide)" }} />
+                            <span>E2EE</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              );
+            }
 
             return (
               <article

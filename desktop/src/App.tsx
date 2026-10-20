@@ -1613,6 +1613,7 @@ function ZenoMainApp() {
       author: userName || "CipherNaut",
       text: messageText,
       time,
+      timestamp: Date.now(),
       color: "purple",
       attachment: pendingAttachment || undefined,
       isBoxed,

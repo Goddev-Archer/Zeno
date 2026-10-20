@@ -3,6 +3,7 @@ import { Icon } from "@iconify/react";
 import { Server, Channel, Message, Profile, MessageAttachment } from "../../types";
 import { cleanUrl } from "../../utils/urlCleaner";
 import { GfmChatRenderer } from "./GfmChatRenderer";
+import { shouldGroupChannelMessages } from "../../utils/chatUtils";
 
 interface ChatAreaProps {
   activeServer: Server;
@@ -159,214 +160,259 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           <span className="date-separator-text">— Heute —</span>
         </div>
 
-        {(chatMessages[activeChannel?.id || "allgemein"] || []).map((msg, i) => {
-          if (!msg.text?.trim() && !msg.code && !msg.attachment) {
-            return null;
-          }
-          const urlMatch = msg.text ? msg.text.match(/(https?:\/\/[^\s]+)/) : null;
-          const foundUrl = urlMatch ? urlMatch[0] : null;
-          const urlDetails = foundUrl ? cleanUrl(foundUrl) : null;
-          const canDelete = isServerOwner || msg.author === (currentUserName || "CipherNaut");
-          const authorProfile: Profile = mockProfiles[msg.author] || {
-            id: `peer-${msg.author}`,
-            name: msg.author,
-            avatar: (msg.author || "P")[0].toUpperCase(),
-            avatarColor: msg.color || "purple",
-            role: "Teilnehmer",
-            roleColor: "blue",
-            status: '"Souveräner Peer online"',
-            fingerprint: "ZENO-SOVEREIGN"
-          };
+        {(() => {
+          const rawMsgs = chatMessages[activeChannel?.id || "allgemein"] || [];
+          const validMsgs = rawMsgs.filter((msg) => !!msg.text?.trim() || !!msg.code || !!msg.attachment);
 
-          return (
-            <article 
-              key={msg.id || i} 
-              className="message message-animate"
-              style={{ "--idx": Math.min(i, 6) } as React.CSSProperties}
-            >
-              <div 
-                className={`message-avatar ${msg.color}`}
-                onClick={() => setSelectedUserProfile(authorProfile)}
-                style={{ cursor: "pointer" }}
-                title={`Profil von ${msg.author} anzeigen`}
-              >
-                {msg.author[0]}
-              </div>
-              <div className="message-body">
-                <header className="message-header" style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span className={`message-author ${msg.color}`} onClick={() => setSelectedUserProfile(authorProfile)} style={{ cursor: "pointer" }}>
-                      {msg.author}
-                    </span>
-                    {authorProfile.role === "Bot" && <span className="badge bot-badge">BOT</span>}
-                    <time className="message-timestamp">{msg.time}</time>
+          return validMsgs.map((msg, i) => {
+            const prevMsg = i > 0 ? validMsgs[i - 1] : null;
+            const isGrouped = shouldGroupChannelMessages(prevMsg, msg, 2);
+            const urlMatch = msg.text ? msg.text.match(/(https?:\/\/[^\s]+)/) : null;
+            const foundUrl = urlMatch ? urlMatch[0] : null;
+            const urlDetails = foundUrl ? cleanUrl(foundUrl) : null;
+            const canDelete = isServerOwner || msg.author === (currentUserName || "CipherNaut");
+            const authorProfile: Profile = mockProfiles[msg.author] || {
+              id: `peer-${msg.author}`,
+              name: msg.author,
+              avatar: (msg.author || "P")[0].toUpperCase(),
+              avatarColor: msg.color || "purple",
+              role: "Teilnehmer",
+              roleColor: "blue",
+              status: '"Souveräner Peer online"',
+              fingerprint: "ZENO-SOVEREIGN"
+            };
+
+            const renderMessageContent = () => (
+              <div className="message-content">
+                <GfmChatRenderer
+                  text={msg.text}
+                  isBoxed={msg.isBoxed || isRulesChannel}
+                  author={msg.author}
+                  time={msg.time}
+                  onOpenPrivacyBrowser={openInPrivacyBrowser}
+                  showToast={showToast}
+                  onPatchSnippet={(code, lang, fname) => {
+                    if (onPatchSnippet) {
+                      onPatchSnippet(code, lang, fname, msg.id, msg.author);
+                    }
+                  }}
+                  onDelete={canDelete ? () => {
+                    if (window.confirm("Möchtest du diesen Eintrag wirklich löschen?")) {
+                      onDeleteMessage && onDeleteMessage(activeChannel?.id || "allgemein", msg.id, msg.text);
+                    }
+                  } : undefined}
+                />
+
+                {/* Privacy Preserving Link Preview Card */}
+                {foundUrl && urlDetails && (
+                  <div className="privacy-link-card">
+                    <div className="privacy-link-card-header">
+                      <span className="privacy-link-card-title">
+                        <Icon icon="mage:shield-check" style={{ color: "#59A869", fontSize: "16px" }} />
+                        Privacy Link Preview
+                      </span>
+                      <span className="badge" style={{ backgroundColor: "rgba(89, 168, 105, 0.15)", color: "#59A869", border: "1px solid rgba(89, 168, 105, 0.3)", fontSize: "9px", padding: "2px 6px" }}>
+                        🛡️ System-Browser (IP-Schutz)
+                      </span>
+                    </div>
+                    <div className="privacy-link-card-url">
+                      {urlDetails.cleanedUrl}
+                    </div>
+                    {urlDetails.strippedParams.length > 0 && (
+                      <div style={{ fontSize: "10px", color: "#FFC66D", display: "flex", alignItems: "center", gap: "4px" }}>
+                        <Icon icon="mage:information-circle" />
+                        {urlDetails.strippedParams.length} Tracking-Parameter automatisch entfernt ({urlDetails.strippedParams.join(", ")})
+                      </div>
+                    )}
+                    <div className="privacy-link-card-actions">
+                      <button 
+                        className="settings-btn primary" 
+                        onClick={() => openInPrivacyBrowser(foundUrl)} 
+                        style={{ fontSize: "11px", padding: "4px 10px", display: "flex", alignItems: "center", gap: "4px" }}
+                      >
+                        <Icon icon="lucide:globe" /> Im Browser öffnen
+                      </button>
+                      <button 
+                        className="settings-btn" 
+                        onClick={() => { navigator.clipboard.writeText(urlDetails.cleanedUrl); showToast("Saubere URL kopiert!"); }} 
+                        style={{ fontSize: "11px", padding: "4px 10px", display: "flex", alignItems: "center", gap: "4px" }}
+                      >
+                        <Icon icon="mage:copy" /> Saubere URL kopieren
+                      </button>
+                    </div>
                   </div>
-                  {canDelete && (
-                    <button
-                      type="button"
-                      className="message-delete-action-btn"
-                      onClick={() => {
-                        if (window.confirm("Möchtest du diese Nachricht wirklich löschen?")) {
-                          onDeleteMessage && onDeleteMessage(activeChannel?.id || "allgemein", msg.id, msg.text);
-                        }
-                      }}
-                      title="Nachricht löschen"
-                    >
-                      <Icon icon="mage:trash" />
-                    </button>
-                  )}
-                </header>
-                <div className="message-content">
-                  <GfmChatRenderer
-                    text={msg.text}
-                    isBoxed={msg.isBoxed || isRulesChannel}
-                    author={msg.author}
-                    time={msg.time}
-                    onOpenPrivacyBrowser={openInPrivacyBrowser}
-                    showToast={showToast}
-                    onPatchSnippet={(code, lang, fname) => {
-                      if (onPatchSnippet) {
-                        onPatchSnippet(code, lang, fname, msg.id, msg.author);
-                      }
-                    }}
-                    onDelete={canDelete ? () => {
-                      if (window.confirm("Möchtest du diesen Eintrag wirklich löschen?")) {
-                        onDeleteMessage && onDeleteMessage(activeChannel?.id || "allgemein", msg.id, msg.text);
-                      }
-                    } : undefined}
-                  />
-
-                  {/* Privacy Preserving Link Preview Card */}
-                  {foundUrl && urlDetails && (
-                    <div className="privacy-link-card">
-                      <div className="privacy-link-card-header">
-                        <span className="privacy-link-card-title">
-                          <Icon icon="mage:shield-check" style={{ color: "#59A869", fontSize: "16px" }} />
-                          Privacy Link Preview
-                        </span>
-                        <span className="badge" style={{ backgroundColor: "rgba(89, 168, 105, 0.15)", color: "#59A869", border: "1px solid rgba(89, 168, 105, 0.3)", fontSize: "9px", padding: "2px 6px" }}>
-                          🛡️ System-Browser (IP-Schutz)
-                        </span>
-                      </div>
-                      <div className="privacy-link-card-url">
-                        {urlDetails.cleanedUrl}
-                      </div>
-                      {urlDetails.strippedParams.length > 0 && (
-                        <div style={{ fontSize: "10px", color: "#FFC66D", display: "flex", alignItems: "center", gap: "4px" }}>
-                          <Icon icon="mage:information-circle" />
-                          {urlDetails.strippedParams.length} Tracking-Parameter automatisch entfernt ({urlDetails.strippedParams.join(", ")})
-                        </div>
-                      )}
-                      <div className="privacy-link-card-actions">
+                )}
+                
+                {/* Embedded Code Block (Only shown if text does not already contain a fenced markdown code block) */}
+                {msg.code && !msg.text?.includes("```") && (
+                  <div className="code-block-wrapper" data-language="rust">
+                    <header className="code-block-header">
+                      <span className="code-block-language">Rust</span>
+                      <div className="code-block-actions" style={{ display: "flex", gap: "6px" }}>
                         <button 
-                          className="settings-btn primary" 
-                          onClick={() => openInPrivacyBrowser(foundUrl)} 
-                          style={{ fontSize: "11px", padding: "4px 10px", display: "flex", alignItems: "center", gap: "4px" }}
+                          className="code-action-btn btn-patch-snippet"
+                          style={{ 
+                            display: "inline-flex", 
+                            alignItems: "center", 
+                            gap: "4px", 
+                            backgroundColor: "var(--accent-oxide)", 
+                            color: "#FFFFFF",
+                            border: "none",
+                            padding: "3px 8px",
+                            borderRadius: "6px",
+                            fontSize: "11px",
+                            fontWeight: 600
+                          }}
+                          onClick={() => {
+                            if (onPatchSnippet) {
+                              onPatchSnippet(msg.code || "", detectLanguage(msg.code || ""), "snippet.rs", msg.id, msg.author);
+                            } else {
+                              setEditorCode(msg.code || "");
+                              setEditorFilename("snippet.rs");
+                              setEditorLanguage(detectLanguage(msg.code || ""));
+                              setEditorWorkflowStep("editor");
+                              setIsEditorOpen(true);
+                            }
+                          }}
+                          title="Code im In-Chat Monaco Editor patchen"
                         >
-                          <Icon icon="lucide:globe" /> Im Browser öffnen
+                          <Icon icon="lucide:code" style={{ fontSize: "13px" }} />
+                          <span>Im In-Chat-Editor patchen</span>
                         </button>
+
                         <button 
-                          className="settings-btn" 
-                          onClick={() => { navigator.clipboard.writeText(urlDetails.cleanedUrl); showToast("Saubere URL kopiert!"); }} 
-                          style={{ fontSize: "11px", padding: "4px 10px", display: "flex", alignItems: "center", gap: "4px" }}
+                          className="code-action-btn btn-open-editor" 
+                          onClick={() => { setEditorCode(msg.code || ""); setEditorFilename("snippet.rs"); setEditorLanguage(detectLanguage(msg.code || "")); setEditorWorkflowStep("editor"); setIsEditorOpen(true); }}
+                          title="Im Vollbild-Editor öffnen"
                         >
-                          <Icon icon="mage:copy" /> Saubere URL kopieren
+                          IDE
                         </button>
                       </div>
-                    </div>
-                  )}
-                  
-                  {/* Embedded Code Block (Only shown if text does not already contain a fenced markdown code block) */}
-                  {msg.code && !msg.text?.includes("```") && (
-                    <div className="code-block-wrapper" data-language="rust">
-                      <header className="code-block-header">
-                        <span className="code-block-language">Rust</span>
-                        <div className="code-block-actions" style={{ display: "flex", gap: "6px" }}>
-                          <button 
-                            className="code-action-btn btn-patch-snippet"
-                            style={{ 
-                              display: "inline-flex", 
-                              alignItems: "center", 
-                              gap: "4px", 
-                              backgroundColor: "var(--accent-oxide)", 
-                              color: "#FFFFFF",
-                              border: "none",
-                              padding: "3px 8px",
-                              borderRadius: "6px",
-                              fontSize: "11px",
-                              fontWeight: 600
-                            }}
-                            onClick={() => {
-                              if (onPatchSnippet) {
-                                onPatchSnippet(msg.code || "", detectLanguage(msg.code || ""), "snippet.rs", msg.id, msg.author);
-                              } else {
-                                setEditorCode(msg.code || "");
-                                setEditorFilename("snippet.rs");
-                                setEditorLanguage(detectLanguage(msg.code || ""));
-                                setEditorWorkflowStep("editor");
-                                setIsEditorOpen(true);
-                              }
-                            }}
-                            title="Code im In-Chat Monaco Editor patchen"
-                          >
-                            <Icon icon="lucide:code" style={{ fontSize: "13px" }} />
-                            <span>Im In-Chat-Editor patchen</span>
-                          </button>
+                    </header>
+                    <pre className="code-block">
+                      <code className="language-rust">{msg.code}</code>
+                    </pre>
+                  </div>
+                )}
 
-                          <button 
-                            className="code-action-btn btn-open-editor" 
-                            onClick={() => { setEditorCode(msg.code || ""); setEditorFilename("snippet.rs"); setEditorLanguage(detectLanguage(msg.code || "")); setEditorWorkflowStep("editor"); setIsEditorOpen(true); }}
-                            title="Im Vollbild-Editor öffnen"
-                          >
-                            IDE
-                          </button>
+                {/* Message Attachment Rendering */}
+                {msg.attachment && (
+                  <div className="message-attachment-card">
+                    {msg.attachment.dataUrl ? (
+                      <div className="message-attachment-image-wrapper">
+                        <img src={msg.attachment.dataUrl} alt={msg.attachment.name} className="message-attachment-image" />
+                      </div>
+                    ) : (
+                      <div className="message-attachment-file-info">
+                        <Icon icon="mage:file-records" className="attachment-file-icon" />
+                        <div className="attachment-text-details">
+                          <span className="attachment-filename">{msg.attachment.name}</span>
+                          <span className="attachment-filesize">{msg.attachment.size}</span>
                         </div>
-                      </header>
-                      <pre className="code-block">
-                        <code className="language-rust">{msg.code}</code>
-                      </pre>
-                    </div>
-                  )}
-
-                  {/* Message Attachment Rendering */}
-                  {msg.attachment && (
-                    <div className="message-attachment-card">
-                      {msg.attachment.dataUrl ? (
-                        <div className="message-attachment-image-wrapper">
-                          <img src={msg.attachment.dataUrl} alt={msg.attachment.name} className="message-attachment-image" />
-                        </div>
-                      ) : (
-                        <div className="message-attachment-file-info">
-                          <Icon icon="mage:file-records" className="attachment-file-icon" />
-                          <div className="attachment-text-details">
-                            <span className="attachment-filename">{msg.attachment.name}</span>
-                            <span className="attachment-filesize">{msg.attachment.size}</span>
-                          </div>
-                          <button 
-                            className="attachment-download-btn" 
-                            onClick={() => {
-                              const blob = new Blob(["Simulierter Dateiinhalt"], { type: msg.attachment?.type || "text/plain" });
-                              const url = URL.createObjectURL(blob);
-                              const link = document.createElement("a");
-                              link.href = url;
-                              link.download = msg.attachment?.name || "file";
-                              link.click();
-                              URL.revokeObjectURL(url);
-                              showToast(`Download von "${msg.attachment?.name}" gestartet`);
-                            }}
-                            title="Herunterladen"
-                          >
-                            <Icon icon="mage:download" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                        <button 
+                          className="attachment-download-btn" 
+                          onClick={() => {
+                            const blob = new Blob(["Simulierter Dateiinhalt"], { type: msg.attachment?.type || "text/plain" });
+                            const url = URL.createObjectURL(blob);
+                            const link = document.createElement("a");
+                            link.href = url;
+                            link.download = msg.attachment?.name || "file";
+                            link.click();
+                            URL.revokeObjectURL(url);
+                            showToast(`Download von "${msg.attachment?.name}" gestartet`);
+                          }}
+                          title="Herunterladen"
+                        >
+                          <Icon icon="mage:download" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            </article>
-          );
-        })}
+            );
+
+            if (isGrouped) {
+              return (
+                <article 
+                  key={msg.id || i} 
+                  className="message message-compact message-animate"
+                  style={{ "--idx": Math.min(i, 6) } as React.CSSProperties}
+                >
+                  <div className="message-compact-gutter">
+                    <time className="message-compact-timestamp" title={msg.time}>
+                      {msg.time}
+                    </time>
+                  </div>
+                  <div className="message-body message-compact-body">
+                    <div className="message-compact-row">
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        {renderMessageContent()}
+                      </div>
+                      {canDelete && (
+                        <button
+                          type="button"
+                          className="message-delete-action-btn message-compact-delete"
+                          onClick={() => {
+                            if (window.confirm("Möchtest du diese Nachricht wirklich löschen?")) {
+                              onDeleteMessage && onDeleteMessage(activeChannel?.id || "allgemein", msg.id, msg.text);
+                            }
+                          }}
+                          title="Nachricht löschen"
+                        >
+                          <Icon icon="mage:trash" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              );
+            }
+
+            return (
+              <article 
+                key={msg.id || i} 
+                className="message message-animate"
+                style={{ "--idx": Math.min(i, 6) } as React.CSSProperties}
+              >
+                <div 
+                  className={`message-avatar ${msg.color}`}
+                  onClick={() => setSelectedUserProfile(authorProfile)}
+                  style={{ cursor: "pointer" }}
+                  title={`Profil von ${msg.author} anzeigen`}
+                >
+                  {msg.author[0]}
+                </div>
+                <div className="message-body">
+                  <header className="message-header" style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span className={`message-author ${msg.color}`} onClick={() => setSelectedUserProfile(authorProfile)} style={{ cursor: "pointer" }}>
+                        {msg.author}
+                      </span>
+                      {authorProfile.role === "Bot" && <span className="badge bot-badge">BOT</span>}
+                      <time className="message-timestamp">{msg.time}</time>
+                    </div>
+                    {canDelete && (
+                      <button
+                        type="button"
+                        className="message-delete-action-btn"
+                        onClick={() => {
+                          if (window.confirm("Möchtest du diese Nachricht wirklich löschen?")) {
+                            onDeleteMessage && onDeleteMessage(activeChannel?.id || "allgemein", msg.id, msg.text);
+                          }
+                        }}
+                        title="Nachricht löschen"
+                      >
+                        <Icon icon="mage:trash" />
+                      </button>
+                    )}
+                  </header>
+                  {renderMessageContent()}
+                </div>
+              </article>
+            );
+          });
+        })()}
 
         {/* Sovereign Rules Verification & Unlock Banner */}
         {isRulesChannel && (
