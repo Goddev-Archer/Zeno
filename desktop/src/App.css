@@ -4580,12 +4580,12 @@ body.light-mode .layout-banner_overlay .profile-card-body {
 .zeno-markdown-body h1,
 .zeno-markdown-body h2 {
   padding-bottom: 0.35em;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: 1px solid var(--border-island);
   margin-top: 24px;
   margin-bottom: 16px;
   font-weight: 700;
   line-height: 1.25;
-  color: #FFFFFF;
+  color: var(--text-primary);
 }
 
 .zeno-markdown-body h1 {
@@ -4603,7 +4603,7 @@ body.light-mode .layout-banner_overlay .profile-card-body {
   margin-top: 22px;
   margin-bottom: 12px;
   font-weight: 600;
-  color: #FFFFFF;
+  color: var(--text-primary);
 }
 
 .zeno-markdown-body h4 {
@@ -4611,7 +4611,7 @@ body.light-mode .layout-banner_overlay .profile-card-body {
   margin-top: 18px;
   margin-bottom: 8px;
   font-weight: 600;
-  color: var(--text-primary, #DFE1E5);
+  color: var(--text-primary);
 }
 
 .zeno-markdown-body h5,
@@ -4620,7 +4620,7 @@ body.light-mode .layout-banner_overlay .profile-card-body {
   margin-top: 14px;
   margin-bottom: 6px;
   font-weight: 600;
-  color: var(--text-secondary, #A8AAAD);
+  color: var(--text-secondary);
 }
 
 /* Paragraphs & Text */
@@ -4628,16 +4628,17 @@ body.light-mode .layout-banner_overlay .profile-card-body {
   margin-top: 0;
   margin-bottom: 16px;
   line-height: 1.68;
+  color: var(--text-primary);
 }
 
 .zeno-markdown-body strong {
   font-weight: 700;
-  color: #FFFFFF;
+  color: var(--text-primary);
 }
 
 .zeno-markdown-body em {
   font-style: italic;
-  color: #CBD5E1;
+  color: var(--text-secondary);
 }
 
 .zeno-markdown-body del {
@@ -4650,7 +4651,7 @@ body.light-mode .layout-banner_overlay .profile-card-body {
   height: 1px;
   padding: 0;
   margin: 24px 0;
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: var(--border-island);
   border: 0;
 }
 
@@ -4983,6 +4984,61 @@ body.light-mode .code-block-header {
   margin-top: 0;
   margin-bottom: 8px;
   line-height: 1.55;
+  color: var(--text-primary);
+}
+
+.chat-markdown h1,
+.chat-markdown h2,
+.chat-markdown h3,
+.chat-markdown h4,
+.chat-markdown h5,
+.chat-markdown h6 {
+  color: var(--text-primary);
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: 14px;
+  margin-bottom: 8px;
+}
+
+.chat-markdown h1 {
+  font-size: 1.6em;
+  border-bottom: 1px solid var(--border-island);
+  padding-bottom: 4px;
+}
+
+.chat-markdown h2 {
+  font-size: 1.35em;
+  border-bottom: 1px solid var(--border-island);
+  padding-bottom: 4px;
+}
+
+.chat-markdown h3 {
+  font-size: 1.18em;
+}
+
+.chat-markdown h4 {
+  font-size: 1.05em;
+}
+
+.chat-markdown h5,
+.chat-markdown h6 {
+  font-size: 0.95em;
+  color: var(--text-secondary);
+}
+
+.chat-markdown strong {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.chat-markdown em {
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+.chat-markdown del {
+  text-decoration: line-through;
+  opacity: 0.65;
 }
 
 .chat-markdown a {
@@ -5004,21 +5060,22 @@ body.light-mode .code-block-header {
 
 .chat-markdown li {
   margin-bottom: 4px;
+  color: var(--text-primary);
 }
 
 .chat-markdown blockquote {
   margin: 8px 0;
   padding: 6px 14px;
-  border-left: 3px solid rgba(255, 255, 255, 0.25);
-  background: rgba(255, 255, 255, 0.03);
+  border-left: 3px solid var(--accent-color, #38BDF8);
+  background: rgba(56, 189, 248, 0.05);
   border-radius: 0 4px 4px 0;
-  color: var(--text-secondary, #A0A5AD);
+  color: var(--text-secondary);
 }
 
 .chat-markdown hr {
   margin: 14px 0;
   border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid var(--border-island);
 }
 
 /* Boxed Message Card Container (/boxed) */
@@ -5136,10 +5193,97 @@ body.light-mode .boxed-copy-btn:hover,
   color: #000000;
 }
 
+/* ── Light Mode Markdown Headings & Text Formatting ── */
+.light-mode .zeno-markdown-body h1,
+.light-mode .zeno-markdown-body h2,
+.light-mode .zeno-markdown-body h3,
+.light-mode .zeno-markdown-body h4,
+.light-mode .zeno-markdown-body h5,
+.light-mode .zeno-markdown-body h6,
+.light-mode .chat-markdown h1,
+.light-mode .chat-markdown h2,
+.light-mode .chat-markdown h3,
+.light-mode .chat-markdown h4,
+.light-mode .chat-markdown h5,
+.light-mode .chat-markdown h6,
+[data-theme="light"] .zeno-markdown-body h1,
+[data-theme="light"] .zeno-markdown-body h2,
+[data-theme="light"] .zeno-markdown-body h3,
+[data-theme="light"] .zeno-markdown-body h4,
+[data-theme="light"] .zeno-markdown-body h5,
+[data-theme="light"] .zeno-markdown-body h6,
+[data-theme="light"] .chat-markdown h1,
+[data-theme="light"] .chat-markdown h2,
+[data-theme="light"] .chat-markdown h3,
+[data-theme="light"] .chat-markdown h4,
+[data-theme="light"] .chat-markdown h5,
+[data-theme="light"] .chat-markdown h6,
+body.light-mode .zeno-markdown-body h1,
+body.light-mode .zeno-markdown-body h2,
+body.light-mode .zeno-markdown-body h3,
+body.light-mode .zeno-markdown-body h4,
+body.light-mode .zeno-markdown-body h5,
+body.light-mode .zeno-markdown-body h6,
+body.light-mode .chat-markdown h1,
+body.light-mode .chat-markdown h2,
+body.light-mode .chat-markdown h3,
+body.light-mode .chat-markdown h4,
+body.light-mode .chat-markdown h5,
+body.light-mode .chat-markdown h6 {
+  color: #18181B !important;
+  border-bottom-color: #D4CDBC !important;
+}
+
+.light-mode .zeno-markdown-body strong,
+.light-mode .chat-markdown strong,
+[data-theme="light"] .zeno-markdown-body strong,
+[data-theme="light"] .chat-markdown strong,
+body.light-mode .zeno-markdown-body strong,
+body.light-mode .chat-markdown strong {
+  color: #18181B !important;
+  font-weight: 700 !important;
+}
+
+.light-mode .zeno-markdown-body em,
+.light-mode .chat-markdown em,
+[data-theme="light"] .zeno-markdown-body em,
+[data-theme="light"] .chat-markdown em,
+body.light-mode .zeno-markdown-body em,
+body.light-mode .chat-markdown em {
+  color: #52525B !important;
+}
+
+.light-mode .zeno-markdown-body p,
+.light-mode .chat-markdown p,
+.light-mode .zeno-markdown-body li,
+.light-mode .chat-markdown li,
+[data-theme="light"] .zeno-markdown-body p,
+[data-theme="light"] .chat-markdown p,
+[data-theme="light"] .zeno-markdown-body li,
+[data-theme="light"] .chat-markdown li,
+body.light-mode .zeno-markdown-body p,
+body.light-mode .chat-markdown p,
+body.light-mode .zeno-markdown-body li,
+body.light-mode .chat-markdown li {
+  color: #18181B !important;
+}
+
+.light-mode .zeno-markdown-body hr,
+.light-mode .chat-markdown hr,
+[data-theme="light"] .zeno-markdown-body hr,
+[data-theme="light"] .chat-markdown hr,
+body.light-mode .zeno-markdown-body hr,
+body.light-mode .chat-markdown hr {
+  background-color: #D4CDBC !important;
+  border-top-color: #D4CDBC !important;
+}
+
+.light-mode .zeno-markdown-body pre,
+[data-theme="light"] .zeno-markdown-body pre,
 body.light-mode .zeno-markdown-body pre,
 .app-layout.light-mode .zeno-markdown-body pre {
-  background-color: #F6F8FA;
-  border: 1px solid #D0D7DE;
+  background-color: #ECE6DA !important;
+  border: 1px solid #D4CDBC !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
