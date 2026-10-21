@@ -1335,12 +1335,18 @@ body.light-mode .titlebar-btn:hover {
   flex-direction: column;
 }
 
+.messages-container > * {
+  flex-shrink: 0;
+  min-height: fit-content;
+}
+
 .date-separator {
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 12px 16px;
   position: relative;
+  flex-shrink: 0;
 }
 
 .date-separator::before {
@@ -1368,6 +1374,11 @@ body.light-mode .titlebar-btn:hover {
   padding: 8px 16px 2px 16px;
   gap: 12px;
   transition: background-color var(--transition-fast);
+  flex-shrink: 0;
+  min-height: fit-content;
+  width: 100%;
+  box-sizing: border-box;
+  position: relative;
 }
 
 .message:hover {
@@ -1381,9 +1392,14 @@ body.light-mode .message:hover,
 
 /* ── Discord-Style Message Grouping (Consecutive Messages within 2 Min) ── */
 .message.message-compact {
-  padding-top: 1px;
+  padding-top: 2px;
   padding-bottom: 2px;
   min-height: 22px;
+  height: auto;
+  flex-shrink: 0;
+  width: 100%;
+  box-sizing: border-box;
+  position: relative;
 }
 
 .message.message-compact:hover {
@@ -1425,6 +1441,7 @@ body.light-mode .message.message-compact:hover,
   flex-direction: column;
   min-width: 0;
   flex: 1;
+  width: 100%;
 }
 
 .message-compact-row {
@@ -1433,6 +1450,7 @@ body.light-mode .message.message-compact:hover,
   justify-content: space-between;
   gap: 8px;
   min-width: 0;
+  width: 100%;
 }
 
 .message-compact-status {
@@ -1485,6 +1503,7 @@ body.light-mode .message.message-compact:hover,
   flex-direction: column;
   min-width: 0;
   flex: 1;
+  width: 100%;
 }
 
 .message-header {
@@ -1492,6 +1511,7 @@ body.light-mode .message.message-compact:hover,
   align-items: baseline;
   gap: 8px;
   margin-bottom: 3px;
+  flex-shrink: 0;
 }
 
 .message-author {
@@ -1516,16 +1536,26 @@ body.light-mode .message.message-compact:hover,
   line-height: 1.5;
   color: var(--text-primary);
   user-select: text;
+  width: 100%;
+  min-width: 0;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 /* Code block wrapper (IDE-like) */
 .code-block-wrapper {
   margin-top: 8px;
+  margin-bottom: 12px;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   background-color: var(--bg-tertiary);
   overflow: hidden;
-  max-width: 680px;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  display: block;
+  clear: both;
+  position: relative;
 }
 
 .code-block-header {
@@ -4927,13 +4957,19 @@ body.light-mode .layout-banner_overlay .profile-card-body {
 /* Code Block Wrapper with Header & Copy Button */
 .code-block-wrapper {
   margin-top: 6px;
-  margin-bottom: 18px;
+  margin-bottom: 12px;
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background-color: #0D1117;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
   transition: background-color 0.2s ease, border-color 0.2s ease;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  display: block;
+  clear: both;
+  position: relative;
 }
 
 .code-block-header {
@@ -4977,12 +5013,17 @@ body.light-mode .layout-banner_overlay .profile-card-body {
   color: #FFFFFF;
 }
 
-.code-block-wrapper pre {
+.code-block-wrapper pre,
+.light-mode .code-block-wrapper pre,
+[data-theme="light"] .code-block-wrapper pre,
+body.light-mode .code-block-wrapper pre {
   margin: 0 !important;
   border: none !important;
   border-radius: 0 !important;
   box-shadow: none !important;
   background-color: transparent !important;
+  padding: 12px 14px !important;
+  overflow-x: auto;
 }
 
 .code-block-wrapper pre code {

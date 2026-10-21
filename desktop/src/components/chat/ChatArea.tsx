@@ -337,7 +337,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 <article 
                   key={msg.id || i} 
                   className="message message-compact message-animate"
-                  style={{ "--idx": Math.min(i, 6) } as React.CSSProperties}
+                  style={{ "--idx": Math.min(i, 6), flexShrink: 0 } as React.CSSProperties}
                 >
                   <div className="message-compact-gutter">
                     <time className="message-compact-timestamp" title={msg.time}>
@@ -346,7 +346,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   </div>
                   <div className="message-body message-compact-body">
                     <div className="message-compact-row">
-                      <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ flex: 1, minWidth: 0, width: "100%" }}>
                         {renderMessageContent()}
                       </div>
                       {canDelete && (
@@ -373,7 +373,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               <article 
                 key={msg.id || i} 
                 className="message message-animate"
-                style={{ "--idx": Math.min(i, 6) } as React.CSSProperties}
+                style={{ "--idx": Math.min(i, 6), flexShrink: 0 } as React.CSSProperties}
               >
                 <div 
                   className={`message-avatar ${msg.color}`}
