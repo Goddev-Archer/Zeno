@@ -1,0 +1,27 @@
+<svg viewBox="0 0 100 100" width="100" height="100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="zenoZGrad" x1="28%" y1="28%" x2="72%" y2="72%">
+      <stop offset="0%" stop-color="#F97316" />
+      <stop offset="50%" stop-color="#F4F4F6" />
+      <stop offset="100%" stop-color="#38BDF8" />
+    </linearGradient>
+  </defs>
+
+  <!-- Squircle Base Frame -->
+  <rect x="4" y="4" width="92" height="92" rx="22" ry="22" fill="#121217" stroke="#262633" stroke-width="2.5"/>
+
+  <!-- Left Code Bracket: < -->
+  <path d="M 37 33 L 24 42 L 37 51" stroke="#F97316" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Right Code Bracket: > -->
+  <path d="M 63 49 L 76 58 L 63 67" stroke="#38BDF8" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Geometric 'Z' Main Track -->
+  <path d="M 32 28 L 68 28 L 32 72 L 68 72" stroke="url(#zenoZGrad)" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- 3 Connected P2P Nodes -->
+  <circle cx="32" cy="28" r="4.2" fill="#F97316" />
+  <circle cx="50" cy="50" r="4.8" fill="#38BDF8" />
+  <circle cx="50" cy="50" r="2.2" fill="#08080B" />
+  <circle cx="68" cy="72" r="4.2" fill="#38BDF8" />
+</svg>
