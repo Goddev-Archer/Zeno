@@ -27,8 +27,11 @@
   --glow-relay: rgba(56, 189, 248, 0.15);
   --hero-mesh: radial-gradient(circle at 50% 20%, rgba(249, 115, 22, 0.14) 0%, rgba(56, 189, 248, 0.08) 35%, transparent 70%);
 
-  --font-ui:   'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --font-ui:      'Noto Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-content: 'Noto Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-header:  'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono:    'JetBrains Mono', monospace;
 }
 
 [data-theme="light"] {
@@ -74,6 +77,25 @@ body {
   line-height: 1.6;
   overflow-x: hidden;
   transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* ── Typography Roles (Noto Sans Content vs Brand/Header/Footer/Eyecatcher) ── */
+header,
+footer,
+.site-header,
+.site-footer,
+.zeno-logo-container,
+.nav-link,
+.btn,
+.hero-badge,
+.bento-tag,
+.pill-badge,
+.eyecatcher,
+.hero-title,
+.section-title,
+.cta-title,
+h1, h2, h3, h4 {
+  font-family: var(--font-header);
 }
 
 /* ── Typography & Links ── */

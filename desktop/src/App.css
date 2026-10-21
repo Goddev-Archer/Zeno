@@ -4,7 +4,7 @@
    ============================================================ */
 
 /* ── Google Fonts ──────────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap');
 
 /* ── Design Tokens: Dual-Theme (Carbon & Oxide & Warm Parchment) ── */
 :root,
@@ -47,9 +47,12 @@ body.dark-mode {
   --accent-warning: var(--status-warning);
   --accent-danger:  var(--status-danger);
 
-  /* Typography */
-  --font-ui:   'Inter', 'Segoe UI', -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  /* Typography: Noto Sans for universal internationalized content, Inter/JetBrains for branding */
+  --font-ui:      'Noto Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-content: 'Noto Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-header:  'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono:    'JetBrains Mono', monospace;
 
   /* Floating Island System */
   --island-gap:    8px;
@@ -99,6 +102,57 @@ body {
   line-height: 1.4;
   overflow: hidden;
   user-select: none;
+}
+
+/* ── Typography Roles (Noto Sans Content vs. Brand/Header/Footer/Eyecatcher) ── */
+.zeno-custom-titlebar,
+.chat-header,
+.chat-header-channel,
+.chat-header-title,
+.island-header,
+.island-title,
+.modal-header,
+.dialog-header,
+.settings-header,
+.sidebar-header,
+.category-header,
+.section-header,
+.workspace-header,
+.panel-header,
+h1, h2, h3 {
+  font-family: var(--font-header);
+}
+
+.zeno-status-bar,
+.app-footer,
+.status-strip,
+.chat-input-footer {
+  font-family: var(--font-header);
+}
+
+.zeno-logo-container,
+.titlebar-app-name,
+.brand-title,
+.logo-text,
+.zeno-wordmark {
+  font-family: var(--font-header);
+}
+
+.badge,
+.bot-badge,
+.supporter-badge,
+.server-protocol-badge,
+.profile-badge,
+.role-badge,
+.unread-badge,
+.count-badge,
+.notification-badge,
+.status-pill,
+.chip,
+.tag,
+.eyecatcher,
+.hero-badge {
+  font-family: var(--font-display);
 }
 
 button, input, textarea {
@@ -3207,7 +3261,7 @@ body.light-mode .layout-banner_overlay .profile-card-body {
   border-left: 3px solid var(--accent-color, #3574F0);
   border-radius: 4px;
   padding: 10px 16px;
-  font-family: 'Inter', 'Segoe UI', sans-serif;
+  font-family: var(--font-content);
   font-size: 13px;
   line-height: 1.4;
   max-width: 360px;
@@ -4687,7 +4741,7 @@ body.light-mode .layout-banner_overlay .profile-card-body {
    ============================================================ */
 
 .zeno-markdown-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+  font-family: var(--font-content);
   font-size: 14px;
   line-height: 1.68;
   word-wrap: break-word;
