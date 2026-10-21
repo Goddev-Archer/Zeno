@@ -520,7 +520,15 @@ export const App: React.FC = () => {
           </div>
 
           <p className="footer-copy">
-            100% Free &amp; Open Source • Zero Telemetry Guarantee • Released under MIT / GPLv3
+            100% Free &amp; Open Source • Zero Telemetry Guarantee • Released under{" "}
+            <a
+              href="https://github.com/Goddev-Archer/Zeno/blob/main/LICENSE"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="footer-license-link"
+            >
+              Apache License 2.0
+            </a>
           </p>
 
           <div style={{ display: "flex", alignItems: "center", gap: "20px", flexWrap: "wrap" }}>

@@ -748,6 +748,18 @@ button {
   color: var(--text-muted);
 }
 
+.footer-license-link {
+  color: var(--accent-relay);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.15s ease, text-decoration 0.15s ease;
+}
+
+.footer-license-link:hover {
+  color: var(--accent-oxide);
+  text-decoration: underline;
+}
+
 .footer-email-link:hover {
   color: var(--accent-oxide) !important;
 }
